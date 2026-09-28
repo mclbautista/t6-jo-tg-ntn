@@ -1,0 +1,18 @@
+# Non-secret configuration. Copy to config.yaml and fill in the real values.
+# Secrets (Telegram bot token, Notion integration token) go in .env, never here.
+
+# --- Telegram scope filter (build-time values, supplied by the owner) ---
+intake_chat_id: -1000000000000      # the intake supergroup's chat id
+intake_topic_id: 0                  # the intake forum topic's message_thread_id
+captured_reaction: "✅"             # emoji picked from the real group's reactions
+
+# --- Polling ---
+poll_timeout: 50                    # Telegram long-poll timeout (seconds, max 50)
+poll_interval: 1.0                  # pause between poll+drain cycles (seconds)
+
+# --- Notion ---
+job_orders_data_source_id: "3d8fb4d5-9e59-8073-a0d0-000b77632947"
+notion_version: "2026-03-11"        # pinned API version (do not change casually)
+
+# --- Ledger ---
+ledger_path: "./data/ledger.db"

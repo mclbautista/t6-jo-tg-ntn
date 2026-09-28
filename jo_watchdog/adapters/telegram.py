@@ -1,0 +1,54 @@
+"""aiogram-based Telegram adapter: a typed client, not an offset-owning dispatcher.
+
+This module imports aiogram only here — the worker never sees it. The adapter
+controls the polling offset explicitly (the worker asks the ledger for
+``next_offset`` and this adapter passes it straight to ``get_updates``), so no
+dispatcher advances the offset behind our back.
+"""
+
+from __future__ import annotations
+
+from jo_watchdog.adapters.protocols import IncomingUpdate
+
+
+class AiogramTelegramClient:
+    """Wraps an aiogram ``Bot`` as a plain long-polling client."""
+
+    def __init__(self, bot):
+        # ``bot`` is an aiogram.Bot; kept untyped here so importing this module
+        # does not force aiogram on callers that only build the pure core.
+        self._bot = bot
+
+    async def get_updates(self, offset: int, timeout: int) -> list[IncomingUpdate]:
+        updates = await self._bot.get_updates(
+            offset=offset,
+            timeout=timeout,
+            allowed_updates=["message"],
+        )
+        result: list[IncomingUpdate] = []
+        for update in updates:
+            message = update.message
+            if message is None:
+                continue
+            result.append(
+                IncomingUpdate(
+                    update_id=update.update_id,
+                    chat_id=message.chat.id,
+                    message_id=message.message_id,
+                    message_thread_id=getattr(message, "message_thread_id", None),
+                    text=message.text or message.caption or "",
+                    raw=update.model_dump(mode="json"),
+                )
+            )
+        return result
+
+    async def set_reaction(self, chat_id: int, message_id: int, emoji: str) -> None:
+        # ReactionTypeEmoji is imported lazily to keep aiogram out of the hot path
+        # for fake-adapter tests.
+        from aiogram.types import ReactionTypeEmoji
+
+        await self._bot.set_message_reaction(
+            chat_id=chat_id,
+            message_id=message_id,
+            reaction=[ReactionTypeEmoji(emoji=emoji)],
+        )
