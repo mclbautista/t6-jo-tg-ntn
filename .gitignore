@@ -11,3 +11,4 @@ config.yaml
 *.db-shm
 .pytest_cache/
 .ruff_cache/
+.worktrees/
