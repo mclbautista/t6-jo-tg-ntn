@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 
 from jo_watchdog.ledger.db import Ledger
+from jo_watchdog.ledger.migrations import MIGRATION_1
 from jo_watchdog.ledger.states import State
 
 
@@ -57,6 +58,43 @@ class SchemaTests(unittest.TestCase):
             self.ledger._conn.execute(
                 "INSERT INTO offsets (id, last_committed_offset) VALUES (2, 5)"
             )
+
+    def test_v1_database_migrates_and_backfills_mask_metadata(self):
+        self.ledger.close()
+        legacy_path = Path(self.tmp.name) / "legacy.db"
+        connection = sqlite3.connect(legacy_path)
+        for statement in MIGRATION_1:
+            connection.execute(statement)
+        connection.execute("INSERT INTO schema_version VALUES (1, 't')")
+        connection.execute(
+            "INSERT INTO messages (chat_id, message_id, telegram_key, update_id, raw_source,"
+            " text, first_line, state, plan_json, created_at, updated_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                -100,
+                1,
+                "-100:1",
+                1,
+                '{"text":"PW: legacy-secret"}',
+                "PW: legacy-secret",
+                "PW: legacy-secret",
+                "planned",
+                '{"name":"PW: legacy-secret","telegram_key":"-100:1",'
+                '"body_blocks":["PW: legacy-secret"]}',
+                "t",
+                "t",
+            ),
+        )
+        connection.commit()
+        connection.close()
+
+        self.ledger = Ledger(legacy_path)
+        message = self.ledger.get_message("-100:1")
+        assert message is not None
+        self.assertEqual(message["masked_count"], 1)
+        self.assertEqual(message["masker_version"], "1.0.0")
+        self.assertNotIn("legacy-secret", message["masked_text"])
+        self.assertNotIn("legacy-secret", message["plan_json"])
 
 
 class AcceptMessageTests(unittest.TestCase):

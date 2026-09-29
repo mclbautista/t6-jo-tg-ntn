@@ -54,5 +54,11 @@ MIGRATION_1 = [
     """,
 ]
 
-# Append MIGRATION_2 here for ticket #3 (adds `extracted` state + DeepSeek columns).
-MIGRATIONS: list[list[str]] = [MIGRATION_1]
+MIGRATION_2 = [
+    "ALTER TABLE messages ADD COLUMN masked_text TEXT",
+    "ALTER TABLE messages ADD COLUMN masker_version TEXT",
+    "ALTER TABLE messages ADD COLUMN masked_count INTEGER",
+]
+
+# Ticket #3 can append MIGRATION_3 (adds `extracted` state + DeepSeek columns).
+MIGRATIONS: list[list[str]] = [MIGRATION_1, MIGRATION_2]

@@ -9,16 +9,18 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import logging
 import sys
+from pathlib import Path
 
 from jo_watchdog.app.config import load_config, notion_token, telegram_token
+from jo_watchdog.app.logging_config import configure_logging
 from jo_watchdog.app.worker import Worker
 from jo_watchdog.ledger.db import Ledger
 
 
 async def run(config_path: str) -> None:
     config = load_config(config_path)
+    configure_logging(log_path=Path(config.ledger_path).with_name("jo-watchdog.jsonl"))
     ledger = Ledger(config.ledger_path)
 
     from aiogram import Bot
@@ -31,7 +33,6 @@ async def run(config_path: str) -> None:
     notion = NotionAdapter(notion_token())
 
     worker = Worker(ledger=ledger, telegram=telegram, notion=notion, config=config)
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
     try:
         await worker.run()

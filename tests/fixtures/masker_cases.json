@@ -1,0 +1,38 @@
+{
+  "source": {
+    "issue": "https://github.com/mclbautista/t6-jo-tg-ntn/issues/19",
+    "design": "/Users/cyrilbautista/Projects/t6-jo-tg-ntn/map/tickets/secrets-in-raw-text.md",
+    "corpus": "/Users/cyrilbautista/Projects/t6-jo-tg-ntn/map/tickets/sample-corpus-redacted.md"
+  },
+  "replacement": "[password withheld – see Telegram message]",
+  "positive": [
+    ["pw: secret", "pw: [password withheld – see Telegram message]", 1],
+    ["PW: secret", "PW: [password withheld – see Telegram message]", 1],
+    ["Pass=secret", "Pass=[password withheld – see Telegram message]", 1],
+    ["PASSWORD: secret", "PASSWORD: [password withheld – see Telegram message]", 1],
+    ["passcode= 1234", "passcode= [password withheld – see Telegram message]", 1],
+    ["PIN: 1234", "PIN: [password withheld – see Telegram message]", 1],
+    ["PW:\n\nsecret", "PW:\n\n[password withheld – see Telegram message]", 1]
+  ],
+  "negative": [
+    "dl with pw",
+    "DL w pw, 14 days expiry",
+    "With password",
+    "nondl with pw",
+    "downloadable with pw",
+    "DL w pw",
+    "DL w/ pw",
+    "non dl w pw",
+    "downloadable w password",
+    "Link Settings: DL with password",
+    "Link Settings: Expiry 30 days, with password",
+    "https://example.com/?password=secret",
+    "https://example.com/?foo=1&pass=x",
+    "https://example.com/pw=secret",
+    "https://www.dropbox.com/s/abc?dl=0&rlkey=xyz",
+    "https://files.example.test/download?token=abc&pin=1234",
+    "pw : secret",
+    "password = secret",
+    "enter the passcode"
+  ]
+}

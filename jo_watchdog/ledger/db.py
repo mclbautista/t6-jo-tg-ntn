@@ -15,11 +15,14 @@ It runs in WAL mode and is a plain, inspectable SQLite file.
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import time
 from contextlib import contextmanager
 from pathlib import Path
 
+from jo_watchdog.core.masker import outbound_text
+from jo_watchdog.core.plan import build_plan
 from jo_watchdog.ledger.migrations import MIGRATIONS
 from jo_watchdog.ledger.states import State, can_transition
 
@@ -36,14 +39,29 @@ class Ledger:
     """A single connection to the ledger database."""
 
     def __init__(self, path: str | Path, *, apply_migrations: bool = True):
-        self._path = str(path)
-        self._conn = sqlite3.connect(self._path, isolation_level=None)
+        db_path = Path(path)
+        db_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        db_path.parent.chmod(0o700)
+        self._path = str(db_path)
+        previous_umask = os.umask(0o077)
+        try:
+            self._conn = sqlite3.connect(self._path, isolation_level=None)
+        finally:
+            os.umask(previous_umask)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         if apply_migrations:
             self._migrate()
+            self._backfill_mask_metadata()
+        self._protect_files()
+
+    def _protect_files(self) -> None:
+        """Keep the database and SQLite companion files readable by the owner only."""
+        for path in (Path(self._path), Path(f"{self._path}-wal"), Path(f"{self._path}-shm")):
+            if path.exists():
+                path.chmod(0o600)
 
     # -- schema ------------------------------------------------------------
 
@@ -68,6 +86,34 @@ class Ledger:
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
         ).fetchone()
         return row is not None
+
+    def _backfill_mask_metadata(self) -> None:
+        """Make pre-v1 rows reproducible and remove raw text from stored plans."""
+        rows = self._conn.execute(
+            "SELECT id, telegram_key, text, plan_json FROM messages"
+            " WHERE masked_text IS NULL OR masker_version IS NULL OR masked_count IS NULL"
+        ).fetchall()
+        if not rows:
+            return
+        with self._transaction():
+            for row in rows:
+                masked = outbound_text(row["text"])
+                plan_json = row["plan_json"]
+                if plan_json is not None:
+                    old_plan = json.loads(plan_json)
+                    plan = build_plan(old_plan["name"], row["telegram_key"], row["text"])
+                    plan_json = plan.model_dump_json()
+                self._conn.execute(
+                    "UPDATE messages SET masked_text = ?, masker_version = ?,"
+                    " masked_count = ?, plan_json = ? WHERE id = ?",
+                    (
+                        masked.text,
+                        masked.masker_version,
+                        masked.withheld_count,
+                        plan_json,
+                        row["id"],
+                    ),
+                )
 
     @contextmanager
     def _transaction(self):
@@ -141,16 +187,32 @@ class Ledger:
         """
         key = telegram_key(chat_id, message_id)
         now = _now()
+        masked = outbound_text(text)
         with self._transaction():
             self._conn.execute(
                 "INSERT INTO messages"
                 " (chat_id, message_id, telegram_key, update_id, raw_source, text,"
-                "  first_line, state, created_at, updated_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (chat_id, message_id, key, update_id, raw_source, text, first_line,
-                 State.RECEIVED.value, now, now),
+                "  first_line, masked_text, masker_version, masked_count, state,"
+                "  created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    chat_id,
+                    message_id,
+                    key,
+                    update_id,
+                    raw_source,
+                    text,
+                    first_line,
+                    masked.text,
+                    masked.masker_version,
+                    masked.withheld_count,
+                    State.RECEIVED.value,
+                    now,
+                    now,
+                ),
             )
             self._advance_offset(update_id)
+        self._protect_files()
         return key
 
     def has_message(self, key: str) -> bool:
@@ -180,14 +242,16 @@ class Ledger:
         first_line: str,
     ) -> None:
         """Record out-of-scope traffic and advance the offset past it."""
+        safe_first_line = outbound_text(first_line).text
         with self._transaction():
             self._conn.execute(
                 "INSERT INTO ignore_log"
                 " (chat_id, message_id, update_id, reason, first_line, created_at)"
                 " VALUES (?, ?, ?, ?, ?, ?)",
-                (chat_id, message_id, update_id, reason, first_line, _now()),
+                (chat_id, message_id, update_id, reason, safe_first_line, _now()),
             )
             self._advance_offset(update_id)
+        self._protect_files()
 
     # -- state machine -----------------------------------------------------
 
@@ -209,7 +273,7 @@ class Ledger:
     def store_plan(self, key: str, plan: dict) -> None:
         self._conn.execute(
             "UPDATE messages SET plan_json = ?, updated_at = ? WHERE telegram_key = ?",
-            (json.dumps(plan), _now(), key),
+            (json.dumps(plan, ensure_ascii=False), _now(), key),
         )
 
     def mark_writing(self, key: str) -> bool:

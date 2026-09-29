@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from jo_watchdog.core.masker import outbound_text
+
 # Notion text items cap at 2000 characters (write-path research, §2).
 BLOCK_LIMIT = 2000
 
@@ -66,9 +68,11 @@ def first_line_of(text: str) -> str:
 
 
 def build_plan(name: str, telegram_key: str, raw_text: str) -> Plan:
-    """Build the minimal plan from a name, a Telegram key, and raw source text."""
+    """Build a plan after source-derived text crosses the outbound boundary."""
+    safe_name = outbound_text(name).text
+    safe_source = outbound_text(raw_text).text
     return Plan(
-        name=name,
+        name=safe_name,
         telegram_key=telegram_key,
-        body_blocks=split_blocks(raw_text),
+        body_blocks=split_blocks(safe_source),
     )

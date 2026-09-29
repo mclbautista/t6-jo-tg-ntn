@@ -46,15 +46,19 @@ class BuildPlanTests(unittest.TestCase):
 
 
 class MaskerSeamTests(unittest.TestCase):
-    def test_masker_is_identity_in_v0(self):
-        # Ticket #2 replaces this with the deterministic credential masker.
-        # Until then the seam must be a lossless identity so raw text is preserved.
-        self.assertEqual(mask_text("pw: secret"), "pw: secret")
+    def test_masker_redacts_credentials_at_the_existing_seam(self):
+        self.assertEqual(
+            mask_text("pw: secret"),
+            "pw: [password withheld – see Telegram message]",
+        )
 
     def test_masker_is_applied_to_blocks(self):
         from jo_watchdog.core.masker import mask_blocks
 
-        self.assertEqual(mask_blocks(["a", "b"]), ["a", "b"])
+        self.assertEqual(
+            mask_blocks(["pw: secret", "dl with pw"]),
+            ["pw: [password withheld – see Telegram message]", "dl with pw"],
+        )
 
 
 if __name__ == "__main__":
