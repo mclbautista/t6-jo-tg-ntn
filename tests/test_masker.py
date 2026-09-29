@@ -106,6 +106,31 @@ class RequiredNotToMaskTests(unittest.TestCase):
         expected = f"https://example.com/?password=secret PW: {WITHHELD}"
         self.assertEqual(mask_result(source), (expected, 1))
 
+    def test_inline_value_masks_around_preserved_url(self):
+        cases = [
+            (
+                "PW: https://files.example/download secret-after-url",
+                f"PW: https://files.example/download {WITHHELD}",
+                1,
+            ),
+            (
+                "PW: secret-before-url https://files.example/download trailing-secret",
+                f"PW: {WITHHELD} https://files.example/download ",
+                1,
+            ),
+            (
+                "PW: first https://files.example/one trailing pass: "
+                "https://files.example/two second",
+                f"PW: {WITHHELD} https://files.example/one  pass: "
+                f"https://files.example/two {WITHHELD}",
+                2,
+            ),
+        ]
+        for source, expected, count in cases:
+            with self.subTest(source=source):
+                self.assertEqual(mask_result(source), (expected, count))
+                self.assertEqual(mask_result(expected), (expected, 0))
+
 
 class DeterminismAndMetadataTests(unittest.TestCase):
     def test_reapplying_masker_is_idempotent_and_adds_no_count(self):

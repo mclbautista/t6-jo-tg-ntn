@@ -18,86 +18,23 @@ _ASSIGNMENT = re.compile(r"\b(password|passcode|pass|pin|pw)[:=]", re.IGNORECASE
 _URL_TOKEN = re.compile(r"(?:https?|ftp)://\S*|www\.\S*", re.IGNORECASE)
 
 
-def _maskable_spans(line: str) -> list[tuple[int, int]]:
-    """Return spans outside URL tokens, which must remain byte-for-byte intact."""
-    spans: list[tuple[int, int]] = []
-    cursor = 0
-    for match in _URL_TOKEN.finditer(line):
-        if match.start() > cursor:
-            spans.append((cursor, match.start()))
-        cursor = match.end()
-    if cursor < len(line):
-        spans.append((cursor, len(line)))
-    return spans
-
-
-def _mask_segment(segment: str) -> tuple[str, int]:
-    """Mask every supported assignment in a URL-free segment."""
-    matches = list(_ASSIGNMENT.finditer(segment))
-    if not matches:
-        return segment, 0
-
-    parts: list[str] = []
-    withheld_count = 0
-    cursor = 0
-    for position, match in enumerate(matches):
-        parts.append(segment[cursor : match.end()])
-        next_start = matches[position + 1].start() if position + 1 < len(matches) else len(segment)
-        value = segment[match.end() : next_start]
-        stripped = value.strip()
-        if stripped and stripped != WITHHELD:
-            leading = len(value) - len(value.lstrip())
-            trailing = len(value.rstrip())
-            parts.append(value[:leading] + WITHHELD + value[trailing:])
-            withheld_count += 1
-        else:
-            parts.append(value)
-        cursor = next_start
-    parts.append(segment[cursor:])
-    return "".join(parts), withheld_count
-
-
-def _line_result(line: str) -> tuple[str, int, bool]:
-    """Return masked line, count, and whether its last assignment is dangling."""
-    url_spans = [(match.start(), match.end()) for match in _URL_TOKEN.finditer(line)]
-    assignments = [
-        match
-        for match in _ASSIGNMENT.finditer(line)
-        if not any(start <= match.start() < end for start, end in url_spans)
-    ]
-    if not assignments:
-        return line, 0, False
-
-    parts: list[str] = []
-    withheld_count = 0
-    cursor = 0
-    for start, end in _maskable_spans(line):
-        parts.append(line[cursor:start])
-        masked, count = _mask_segment(line[start:end])
-        parts.append(masked)
-        withheld_count += count
-        cursor = end
-    parts.append(line[cursor:])
-    dangling = not line[assignments[-1].end() :].strip()
-    return "".join(parts), withheld_count, dangling
-
-
-def _mask_next_line_value(line: str) -> tuple[str, int]:
-    """Mask a dangling assignment's value without altering URL tokens."""
-    url_matches = list(_URL_TOKEN.finditer(line))
+def _mask_value(value: str) -> tuple[str, int]:
+    """Mask a value's non-URL text while preserving every URL token."""
+    url_matches = list(_URL_TOKEN.finditer(value))
     if not url_matches:
-        value = line.lstrip(" \t")
-        if value == WITHHELD:
-            return line, 0
-        indentation = line[: len(line) - len(value)]
-        return indentation + WITHHELD, 1
+        stripped = value.strip()
+        if not stripped or stripped == WITHHELD:
+            return value, 0
+        leading = len(value) - len(value.lstrip())
+        trailing = len(value.rstrip())
+        return value[:leading] + WITHHELD + value[trailing:], 1
 
     parts: list[str] = []
     cursor = 0
     placeholder_added = False
     newly_withheld = False
     for match in url_matches:
-        segment = line[cursor : match.start()]
+        segment = value[cursor : match.start()]
         if segment.strip() == WITHHELD and not placeholder_added:
             parts.append(segment)
             placeholder_added = True
@@ -116,7 +53,7 @@ def _mask_next_line_value(line: str) -> tuple[str, int]:
         parts.append(match.group())
         cursor = match.end()
 
-    segment = line[cursor:]
+    segment = value[cursor:]
     if segment.strip() == WITHHELD and not placeholder_added:
         parts.append(segment)
         placeholder_added = True
@@ -124,7 +61,6 @@ def _mask_next_line_value(line: str) -> tuple[str, int]:
         leading = len(segment) - len(segment.lstrip())
         trailing = len(segment.rstrip())
         parts.append(segment[:leading] + WITHHELD + segment[trailing:])
-        placeholder_added = True
         newly_withheld = True
     elif segment.strip():
         leading = len(segment) - len(segment.lstrip())
@@ -133,6 +69,38 @@ def _mask_next_line_value(line: str) -> tuple[str, int]:
     else:
         parts.append(segment)
     return "".join(parts), int(newly_withheld)
+
+
+def _line_result(line: str) -> tuple[str, int, bool]:
+    """Return masked line, count, and whether its last assignment is dangling."""
+    url_spans = [(match.start(), match.end()) for match in _URL_TOKEN.finditer(line)]
+    assignments = [
+        match
+        for match in _ASSIGNMENT.finditer(line)
+        if not any(start <= match.start() < end for start, end in url_spans)
+    ]
+    if not assignments:
+        return line, 0, False
+
+    parts = [line[: assignments[0].start()]]
+    withheld_count = 0
+    for position, match in enumerate(assignments):
+        value_end = (
+            assignments[position + 1].start()
+            if position + 1 < len(assignments)
+            else len(line)
+        )
+        parts.append(line[match.start() : match.end()])
+        masked_value, count = _mask_value(line[match.end() : value_end])
+        parts.append(masked_value)
+        withheld_count += count
+    dangling = not line[assignments[-1].end() :].strip()
+    return "".join(parts), withheld_count, dangling
+
+
+def _mask_next_line_value(line: str) -> tuple[str, int]:
+    """Mask a dangling assignment's value without altering URL tokens."""
+    return _mask_value(line)
 
 
 class MaskedText(NamedTuple):
