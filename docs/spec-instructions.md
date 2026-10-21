@@ -12,12 +12,36 @@ Design sources are in `map/` (the same documents are mirrored as closed GitHub i
 
 1. `map/technical-design-and-architecture.md` — the current truth. Closes the design.
 2. `map/amendment-log.md` — lists every older statement the design ticket supersedes. Read it before you read any older ticket, and keep it open while you do.
-3. PRD issue #28 and build issues #20–#27 — the requirement-level restatement, written after the design closed. Where #28 settles something more precisely than the design tickets, it wins (it already settles several items in section 4).
+3. PRD issue #28 and build issues #20–#27 — the requirement-level restatement, written after the design closed. Where #28 is more specific than the design tickets, it wins (it already settles several items in section 4). Where #28 and the design directly contradict each other, do not pick one: record both in Appendix C. No direct contradiction was found when these instructions were written.
 4. Merged code and `docs/ledger-schema.md` — authoritative for what already exists.
 5. `map/map.md` — destination, standing principles, verified facts about the live Notion schemas, decisions summary, out-of-scope list.
 6. `map/build-tickets.md` — the build order (tracer bullets). Carry it into the spec unchanged in substance.
 7. The topic tickets in `map/tickets/`, which are history where amended and still authoritative for detail that was never amended:
    `telegram-bot-api-capabilities.md`, `notion-write-path.md` + `notion-write-path-findings.md`, `job-order-field-mapping.md`, `sample-corpus-redacted.md`, `reliability-and-operations.md`, `resolve-people-and-projects.md`, `deadline-phrases.md`, `forwarded-job-orders.md`, `reposts-duplicates-idempotency.md`, `classifier-and-extractor-design.md`, `verification-and-ops-reporting.md`, `ops-topic-mockups.md`, `secrets-in-raw-text.md`, `deliverable-matching.md`.
+
+### How `SPEC.md` relates to PRD #28
+
+#28 is the behavior contract: 118 numbered user stories (US-1 … US-118), 16 numbered Implementation Decisions (ID-1 … ID-16), Testing Decisions and an Out of Scope list. Each build issue #20–#27 carries its own acceptance criteria. `SPEC.md` must not restate #28 in different words, and must not change any acceptance criterion in the build issues. It adds the layer #28 deliberately leaves at sentence level:
+
+| #28 section | What #28 already says | What `SPEC.md` must add |
+|---|---|---|
+| ID-2 Runtime | one process, pure core, SQLite holds ledger/caches/traces/outbox | module boundaries, `core` CLI JSON contracts, every ledger table and column (R1) |
+| ID-3 Telegram | admin of intake group, own the offset, filter, edits, reaction | `allowed_updates`, fields read per update, link formats, deadman mechanics, reaction lookup call (R11) |
+| ID-4 DeepSeek | one call, three verdicts, failure = retry | Pydantic schema field by field, prompt structure and tag, few-shot/eval split (R15) |
+| ID-5 Masker | labels, span, placeholder | regex spec, test case table |
+| ID-6 Field mapping | rule per property in one sentence | per-property table with corpus examples, header pattern table, Name format (R6), Notes layout (R4), body block layout |
+| ID-7 Resolution | match chain, thresholds | cache snapshot format, normalization functions, ambiguity rules as code-level steps |
+| ID-8 Deadlines | phrase families | full corpus deadline table, date+shift (R2), unlisted phrases and year inference (R3) |
+| ID-9 Jev | Choice per candidate, thresholds, shadow mode | adapter interface and wire format (R8), stored trace fields |
+| ID-10 Verification/ops | nine checks, tagging, one report per capture | exact trigger conditions (R9, R10), verbatim templates incl. the combined report (R5) |
+| ID-11 State machine | states, reconciliation, read-back | transition table, columns touched per transition, field-by-field read-back comparison rules |
+| ID-12 Retries/heartbeat | schedule, deadman, heartbeat lines | attempt accounting per stage (R12), heartbeat SQL and verbatim template |
+| ID-13 Notion | adapter, limits, smoke concerns | endpoint list, error-code table, splitting algorithm |
+| ID-14 Config/logging | which settings exist | full config schema with types, defaults, validation; env var names (R16); log line schema |
+| ID-15 Deployment | image, mounts, dry-run | Dockerfile/Compose requirements, HEALTHCHECK definition, setup runbook |
+| Testing Decisions | four seams and their assertions | fixture layout, which corpus messages are golden/few-shot/eval, recorded-fixture inventory |
+
+Every requirement in `SPEC.md` cites the US and ID numbers it implements, e.g. `(US-48–52, ID-8)`, so a reviewer can check coverage both ways.
 
 Known superseded statements you must **not** carry forward (full list in the amendment log): Jev-vs-Laya bake-off; Laya at all; pinned model versions; the generative name-echo Deliverable matcher with a `reason` sentence; the 30-JO labeled eval as the matcher's launch gate; the day(7pm)/night(5am) shift model; "no assignee resolves → Deadline blank" for shift phrases; Deliverable "blank in v1"; a staged dry-run go-live; "Laya/Jev" as the classify/extract provider.
 
@@ -42,7 +66,7 @@ Each section lists what it must contain and where to find it. Every bullet is a 
 ### 3.1 Purpose and scope
 - Destination paragraph and the Job Order → Deliverable → Project Health rationale (`map/map.md` Destination).
 - In scope for v1: text messages and forwards from one intake topic; one-way capture; status always `Needs Intake Review`.
-- Out of scope, verbatim from `map.md` "Out of scope" (write-back, applying edits/deletes, photos/files without caption, multi-message JOs, replies to posters, fixing old UTC rows, unlabeled credentials, model pinning, staged dry-run, external uptime check).
+- Out of scope: copy #28's "Out of Scope" list verbatim. It is a superset of `map/map.md`'s list; it adds, among others, no automatic merging or splitting, no creating Deliverables, no backfilling relations, Coordinator never following the poster, no other process writing watchdog rows, and the list of events that get no per-message alert.
 - Volume assumption: ~10–12 JOs/day; cost and latency are not constraints.
 
 ### 3.2 Glossary and principles
@@ -63,7 +87,7 @@ Each section lists what it must contain and where to find it. Every bullet is a 
 - Fields read from each update: text or caption, sender, date, `message_thread_id`, `forward_origin` (all four types and their fields, from `telegram-bot-api-capabilities.md` §3), entities for @mentions with user ids.
 - 429 `retry_after` handling.
 - Deadman: heartbeat stamp every poll cycle; stale > 10 minutes → exit non-zero.
-- Reaction: one fixed "captured" emoji, set only after a confirmed write, never swapped or removed to signal a problem; inline retry once or twice (seconds), then count the failure for the heartbeat.
+- Reaction: one fixed "captured" emoji, set only after a confirmed write **and read-back** (ID-3), never swapped or removed to signal a problem; inline retry once or twice (seconds), then count the failure for the heartbeat.
 - Message link formats for the intake message and for channel-origin originals (`t.me/c/<id>/<msg_id>` private, `t.me/<username>/<id>` public).
 
 ### 3.5 Ledger (SQLite) — the published contract
@@ -71,8 +95,8 @@ Start from `docs/ledger-schema.md` and `jo_watchdog/ledger/migrations.py`, which
 - File location (`./data` bind mount, dir 0700, db file 0600), WAL mode.
 - Every table with every column, type, nullability, key and index: at least `schema_version`, `messages`, `stage_results`, `offsets`, `outbox`, `ignore_log`, `cache_snapshot`, plus whatever stores LLM call traces (model id requested and returned, prompt-version tag, masker version, token counts in/out, candidate snapshot for the matcher) and heartbeat/deadman state.
 - Pipeline states and allowed transitions: `received` → `extracted` → `planned` → `writing` → `written` → `done` (design §7), plus terminal/side states for `ignored` (`not_jo`, `no_text`, out-of-scope), `failed` after 5 attempts, and "held at `extracted`" for an empty cache.
-- Claim semantics (`BEGIN IMMEDIATE`), attempt counter, `next_attempt_at`, retry schedule 30s → 2m → 5m → 10m → 15m, 5 attempts.
-- What is stored at `planned`: the exact Notion payload (every property, resolved page ids, deadline datetime, matcher outcome, body blocks), so a retry replays the stored result instead of recomputing.
+- Claim semantics (`BEGIN IMMEDIATE`), attempt counter, `next_attempt_at`, retry schedule 30s → 2m → 5m → 10m → 15m, 5 attempts, honoring a provider's own retry timing (`Retry-After`, Telegram `retry_after`) when it is longer (ID-12). How a human triggers a manual retry of an exhausted message (CLI command or SQL update) — #28 requires "manual retry eligibility" but nothing says how.
+- What is stored at `planned`: the exact Notion payload (every property, resolved page ids, deadline datetime, matcher outcome, body blocks) **and the pending ops reports** (ID-11), so a retry replays the stored result instead of recomputing.
 - Raw text stored unmasked only here; everything leaving the ledger goes through the masker.
 - Migration rules: numbered, forward-only, backward-compatible for one release.
 - A statement that this schema is a versioned read-only contract for other tools (OCP).
@@ -110,7 +134,7 @@ Merge `deadline-phrases.md` with design §9 and amendment 6. Write one if-then r
 From design §6 and amendments 2–3 only (the original matcher ticket is superseded where they differ). Must define: candidate query (live `relation_contains` on `🗺️ Projects` with the resolved project id, paginated, no Status/Class filter, skip if zero candidates), the per-candidate Choice question (state = masked text + project name; options `match`/`maybe`/`no`; keyed by page id), the decision rule in code (`T_link` 0.90, `T_hint` 0.50, both config), duplicate normalized names → hint not link, zero-to-many links, `deliverable_link_enabled` default off (shadow mode: compute and hint, link nothing), failure = retry once inline then blank + one ops line, never blocks the write, no backfill, ledger stores model id, prompt tag, candidate snapshot, probabilities and token counts. Regression fixtures: Moonglow JO #32 → `Moonglow FTR SCR`, SOMSOM #0155 → `Someone Someday WK11 VFX`, Mag-Iina JO 30 → `Mag-Iina FTR SCR`. Resolve R8 before writing the request/response shapes.
 
 ### 3.12 Verification checks
-All nine checks, each with its trigger condition, the ops wording, and whether Leizette is tagged: unresolved person/project, unknown department, duplicate/reused JO number, non-`user` forward origin, classifier `unsure`, deadline in the past, deadline expected but missing, blank Task or Title, header date vs posting date mismatch. Plus the additional ops-producing events that are not "checks": `multiple_jo_suspected`, fuzzy person match, shift-deadline 23:59 default, ASAP high priority, Deliverable hint, matcher skipped, edit after capture, stale cache > 24 h, retry exhaustion. Binary severity, immediate posting, never blocks the write. Resolve R5, R7 and R9.
+All nine checks, each with its trigger condition, the ops wording, and whether Leizette is tagged: unresolved person/project, unknown department, duplicate/reused JO number, non-`user` forward origin, classifier `unsure`, deadline in the past, deadline expected but missing, blank Task or Title, header date vs posting date mismatch. Plus the additional ops-producing events that are not "checks": `multiple_jo_suspected`, fuzzy person match, shift-deadline 23:59 default, ASAP high priority, Deliverable hint, matcher skipped, edit after capture, read-back mismatch, duplicate `Telegram Key` rows found during reconciliation, stale cache > 24 h, retry exhaustion (ID-10 lists the read-back and duplicate-key cases). Binary severity, immediate posting, never blocks the write. Resolve R5, R7 and R9.
 
 ### 3.13 Duplicates, re-posts, edits, idempotency
 From `reposts-duplicates-idempotency.md` and design §7: message-level idempotency via the ledger key; the `writing`-state reconciliation (after the first backoff delay ≥ 30 s, query Notion on `Telegram Key`; found → adopt, none → create, two found → ops line, never delete or merge); content-level duplicate check against the ledger on project + department + JO number as an integer, skipped when any part doesn't parse; exact re-post and reused number both create a new row and are flagged in ops and in Notes with a link to the earlier page; edits are reported "edited after capture, row not updated" and never applied.
@@ -131,19 +155,25 @@ Endpoints used (retrieve data source schema, query data source, create page, ret
 - Logging: JSON lines to stdout and a rotated file next to the ledger; fields: message key, state, stage, attempt, duration, returned model id; every line masked; raw text never logged.
 
 ### 3.17 Testing
-The four layers from design §14 with what each must cover: pure `core/` golden tests over all 77 corpus JOs; adapter contract tests on recorded fixtures (Notion schemas/pages, all four Telegram forward origins, DeepSeek and Jev responses), no network in CI; crash-injection tests (kill at every state boundary and after every external call; invariant: exactly one Notion row per Telegram key); `smoke.py` run by hand. Define the fixture directory layout and how corpus messages become fixtures.
+#28's Testing Decisions already list the four seams and most of their assertions in detail; do not shorten them. Reference them by number and add only what is missing:
+- The test philosophy from #28 item 1 (assert observable behavior and invariants, not private helpers) as a rule every test follows.
+- Fixture directory layout, naming, and how each corpus message becomes a golden fixture (input, expected extraction, expected plan). Start from the existing `tests/fixtures/redacted_corpus.json` and `tests/fakes.py`.
+- The inventory of recorded adapter fixtures #28 item 2 names (Telegram: text, caption, edit, four forward origins; Notion: schemas, paginated queries, create/retrieve, relation shapes, 400/429/5xx; DeepSeek: each verdict, empty content, invalid JSON, schema violation, timeout; Jev: Choice probabilities, malformed, unavailable), each with a file name and what it proves.
+- The crash-injection matrix for #28 item 2.3: one row per (state boundary or external call) × (crash before / after), with the expected recovery path.
+- The `smoke.py` steps, which section 3.20 covers.
+- How extraction accuracy on the ~60 held-out JOs is scored and what passes (R15).
 
 ### 3.18 Deployment and operations
 `python:3.12-slim`, non-root, Compose with `env_file`, `./data` bind mount (0700), `restart: unless-stopped`, `HEALTHCHECK` (define what it checks), deploy `git pull && docker compose up -d --build`, rollback to the previous image tag, straight to live with `dry_run` as an off-by-default rollback tool, 24 h Telegram retention as the accepted outage window. A one-time setup runbook: create bot, make it admin of the intake group, add it to the ops group, create the Notion integration with Read/Insert, share the four data sources, fill config.
 
 ### 3.19 Build plan
-The ten tracer-bullet tickets from `build-tickets.md`, each with acceptance criteria written as checkable statements, and the spec sections each one implements. Tickets 2 and 4 can run in parallel with 3.
+The ten tracer-bullet tickets, mapped to their issues (#18, #19 merged; #20–#27 open). For each: the issue number, the spec sections it implements, and its acceptance criteria **linked, not rewritten** — the issues own the criteria. Where a criterion needs a spec detail to be checkable (an exact template, a table row, a config key), point to it. Note any dependency the issue's "Blocked by" line misses. One is known: #21 (planning) owns End-of-Shift deadline resolution but is blocked only by #18, while the Contacts `End of Shift` and resolved assignees it needs come from #22 (resolution). Say how #21 handles this (for example, the deadline resolver takes resolved assignees and shift hours as inputs, tested with fixtures, and #22 wires the real data in).
 
 ### 3.20 Smoke-test checklist
 Every item from design §17 and map "Not yet specified", deduplicated, each with how to run it and what pass looks like.
 
 ### Appendices
-- A. Notion schemas: Job Orders, Contacts, Projects, Deliverables, with every property name, type and the option lists known (Status, Department, End of Shift).
+- A. Notion schemas: Job Orders, Contacts, Projects, Deliverables, with every property name and type, and the option lists known (Status, End of Shift). Department options may be listed only as informational: #28 forbids treating any observed Department list as a contract.
 - B. Corpus fixture index (message id/first line → which set: few-shot, eval, regression).
 - C. Open questions for the owner, each with the recommended default the build uses meanwhile.
 - D. Traceability: for every spec section, the source files and sections it came from.
@@ -182,5 +212,7 @@ These are the gaps and contradictions found in the sources. Each needs a resolut
 - [ ] Each of the ten build tickets has checkable acceptance criteria and maps to spec sections.
 - [ ] No secrets, tokens or real chat ids; corpus text stays redacted.
 - [ ] Nothing in `SPEC.md` contradicts merged code without an Appendix C entry saying so.
-- [ ] Each open build issue (#20–#27) can point at the spec sections it implements.
+- [ ] Each open build issue (#20–#27) can point at the spec sections it implements, and no issue acceptance criterion is contradicted or changed.
+- [ ] Every user story US-1 … US-118 in #28 is cited by at least one spec requirement, and every spec requirement cites at least one US or ID number (or is marked as an implementation detail #28 leaves open).
+- [ ] Nothing in `SPEC.md` restates #28 in different words where a citation would do.
 - [ ] A reader who has not opened `map/` could implement every ticket from `SPEC.md` alone.
