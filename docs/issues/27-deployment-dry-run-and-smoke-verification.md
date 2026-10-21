@@ -24,6 +24,7 @@ Package the complete watchdog for its always-on host, retain an off-by-default d
 - [ ] Smoke verification covers unknown-select behavior, Notion query visibility, Retry-After handling, live `relation_contains`, and reciprocal Job Order/Deliverable relation behavior.
 - [ ] Smoke verification covers all four forward origins where real fixtures exist, a real channel-origin link, the intake group’s available captured reaction, and the owner’s real Telegram handle.
 - [ ] Smoke verification confirms DeepSeek structured output, Jev typed Choice probabilities/model metadata, credential-mask positive and negative cases, and threshold tuning against the corpus.
+- [ ] The Jev smoke step sends one Decisions request through OpenRouter with `~typesafe/jev-latest`, and prints the returned snapshot id, whether a 429 carries `Retry-After` or `X-RateLimit-*`, and the probabilities for the three regression pairs.
 - [ ] Smoke verification exercises read-back mismatch reporting, outbox retry, heartbeat formatting, dry-run behavior, matcher failure, and Deliverable shadow mode.
 - [ ] The real-account smoke path is manual and excluded from CI; automated CI remains the pure-core, recorded-contract, and whole-pipeline crash seams.
 - [ ] Operator documentation states the accepted outage gap beyond Telegram’s 24-hour retention window and identifies a missing 07:00 heartbeat as the chosen human signal.
@@ -46,10 +47,10 @@ Every key below is validated at startup; a bad value fails the boot.
 | `contacts_data_source_id`, `projects_data_source_id`, `leizette_contact_page_id`, `cache_refresh_hours`, `cache_stale_alert_hours`, `fuzzy_min_score`, `fuzzy_min_lead`, `honorifics` | —, —, —, 6, 24, 90, 8, `[ate, kuya, sir]` | #22 |
 | `ops_chat_id`, `ops_topic_id`, `leizette_telegram_handle`, `header_date_tolerance_days` | —, —, —, 1 | #23 |
 | `owner_telegram_handle`, `retry_schedule_seconds`, `deadman_stale_minutes`, `heartbeat_time`, `timezone` | —, `[30,120,300,600,900]`, 10, `07:00`, `Asia/Manila` | #25 |
-| `deliverables_data_source_id`, `jev_base_url`, `jev_model`, `t_link`, `t_hint`, `deliverable_link_enabled` | —, —, `jev-latest`, 0.90, 0.50, false | #26 |
+| `deliverables_data_source_id`, `jev_url`, `jev_model`, `jev_timeout_seconds`, `t_link`, `t_hint`, `deliverable_link_enabled` | —, `https://openrouter.ai/api/alpha/decisions`, `~typesafe/jev-latest`, 30, 0.90, 0.50, false | #26 |
 | `dry_run` | false | #27 |
 
-Secrets in `.env`: `TELEGRAM_BOT_TOKEN`, `NOTION_API_KEY`, `DEEPSEEK_API_KEY`, `JEV_API_KEY`.
+Secrets in `.env`: `TELEGRAM_BOT_TOKEN`, `NOTION_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`.
 
 ### Container
 

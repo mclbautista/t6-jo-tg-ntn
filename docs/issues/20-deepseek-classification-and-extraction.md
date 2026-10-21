@@ -43,7 +43,7 @@ A single user message containing the masked text or caption, followed, for forwa
 
 - About 15 corpus Job Orders covering every header style become few-shot examples. Their ids are committed as `tests/fixtures/fewshot_ids.json`.
 - The remaining corpus Job Orders form the held-out extraction set. Never evaluate on a few-shot message.
-- The extraction report scores each extracted field as an exact match after whitespace normalization, against hand-written golden values in the fixtures. It reports per-field rates and is **not a CI gate** until the owner sets a pass bar (open question in #28).
+- The extraction report scores each extracted field as an exact match after whitespace normalization, against hand-written golden values in the fixtures. It reports per-field rates and is **not a CI gate**; the owner chose no pass bar (#28, Owner decisions).
 
 ### Failure classes
 

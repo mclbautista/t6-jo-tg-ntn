@@ -307,7 +307,7 @@ The watchdog will:
    - While linking is disabled, retain decisions and hints but write no Deliverable relation.
    - Automatic linking begins only when the owner enables the flag after reviewing live shadow-mode behavior.
    - Keep the three known real JO-to-Deliverable pairs as permanent regression fixtures.
-   - The Jev adapter exposes `match(state, project_name, candidates) -> MatchResult` with per-candidate `match`/`maybe`/`no` probabilities (#26). Its wire format is pinned by recorded fixtures once Jev's API documentation is supplied.
+   - The Jev adapter exposes `match(state, project_name, candidates) -> MatchResult` with per-candidate `match`/`maybe`/`no` probabilities (#26). Jev is called through OpenRouter's Decisions API (`POST /api/alpha/decisions`, model `~typesafe/jev-latest`), which returns Choice probabilities natively; #26 holds the request and response format.
    - Perform no automated backfill when a Deliverable is created after capture.
 
 10. **Verification and ops reporting**
@@ -391,7 +391,7 @@ The watchdog will:
     - Emit masked structured logs to stdout and a rotated persistent log.
     - Include message key, state, stage, attempt, duration, and returned model ID in structured logs.
     - Never log unmasked source text.
-    - Secrets are `TELEGRAM_BOT_TOKEN`, `NOTION_API_KEY`, `DEEPSEEK_API_KEY` and `JEV_API_KEY`. #27 holds the full configuration reference with defaults, and each ticket adds its own keys.
+    - Secrets are `TELEGRAM_BOT_TOKEN`, `NOTION_API_KEY`, `DEEPSEEK_API_KEY` and `OPENROUTER_API_KEY` (Jev). #27 holds the full configuration reference with defaults, and each ticket adds its own keys.
 
 15. **Deployment and rollout**
     - Package in a slim Python 3.12 image running as a non-root user.
@@ -480,7 +480,7 @@ The watchdog will:
 
 5. Classifier precision and recall cannot be meaningfully accepted from the all-Job-Order corpus alone. When real chatter and near-miss examples become available, add them as a disjoint evaluation set without delaying the current implementation.
 
-   Extraction is scored per field (exact match after whitespace normalization) on the held-out set and reported without gating CI until the owner sets a pass bar.
+   Extraction is scored per field (exact match after whitespace normalization) on the held-out set and reported without gating CI (owner decision: no pass bar).
 
 6. Test reports must distinguish supported Telegram limitations from resolution failures. A missing original-message link for `user`, `hidden_user`, or `chat` forwards is expected behavior, not a defect.
 
@@ -526,15 +526,14 @@ The watchdog will:
 - Outages longer than 24 hours are an accepted gap. The private ops topic’s human members noticing a missing 07:00 heartbeat is the chosen detector.
 - Build-time values include the real intake and ops chat/topic IDs, Leizette’s Contacts page ID, the owner’s real Telegram handle, and the captured reaction supported by the real group.
 
-## Open questions for the owner
+## Owner decisions (2026-10-21)
 
-Each has a default the build uses until it is answered.
-
-- **Jev API documentation**: endpoint and request/response format for typed Choice questions. Default: build #26 against the adapter interface with a fake until the docs arrive.
-- **Extraction pass bar**: the per-field accuracy the held-out set must reach. Default: report only, no gate.
-- **Date plus shift phrase**: confirm that `Aug 26, end of shift` means the shift end on Aug 26 (next morning for a shift ending before noon). Default: as stated in Implementation Decision 8.
+- **Extraction pass bar**: none. Per-field extraction accuracy is reported only and does not gate CI.
+- **Date plus shift phrase**: `Aug 26, end of shift` means the assignee's End of Shift hour on Aug 26, or the next morning for a shift ending before noon (Implementation Decision 8).
+- **Jev transport**: Jev is called through OpenRouter's Decisions API with `OPENROUTER_API_KEY`. #26 holds the request and response format.
 
 ## Revision log
 
 - 2026-10-21: resolved the gaps found when comparing this PRD with the design tickets: ledger migrations per ticket, Name and Notes formats, deadline year inference, date-plus-shift phrases and the full corpus deadline table, combined ops report wording, exact triggers for the unparsed-deadline and header-date checks, attempt accounting and manual retry, edit handling for uncaptured messages, the Jev adapter interface, reaction lookup via `getChat`, the health check, and the configuration reference. Details live in #20–#27; `docs/issues/` mirrors these issues.
+- 2026-10-21: owner accepted the defaults for the extraction pass bar and the date-plus-shift rule, and chose OpenRouter as Jev's transport (#26).
 

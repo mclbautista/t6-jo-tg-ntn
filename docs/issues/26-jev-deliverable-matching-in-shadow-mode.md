@@ -27,7 +27,7 @@ Add project-scoped Deliverable matching through Jev’s typed Choice interface w
 - [ ] The three known real JO-to-Deliverable pairs are permanent regression fixtures.
 - [ ] Recorded Jev contract tests cover typed responses, malformed responses, probability thresholds, candidate-key mapping, service failure, model metadata, duplicate names, zero/many matches, and shadow mode without network access in CI.
 - [ ] Whole-pipeline tests confirm matcher failure never delays capture and shadow mode never writes a relation.
-- [ ] The Jev adapter implements the interface under Technical details; its wire format is taken from Jev's API documentation and pinned down by recorded fixtures before the adapter is merged.
+- [ ] The Jev adapter implements the interface under Technical details and calls OpenRouter's Decisions API in the format specified there; recorded fixtures pin that format.
 
 ## Technical details
 
@@ -56,9 +56,62 @@ class DeliverableMatcher(Protocol):
                     candidates: list[Candidate]) -> MatchResult: ...
 ```
 
-The request carries one Choice question per candidate, keyed by `page_id`, with the candidate's name in the question text, options `match`, `maybe`, `no`. A response missing a candidate key, adding an unknown key, or with probabilities that don't sum to 1 ± 0.01 is a failure.
+A response missing a candidate, adding an unknown key, or with probabilities that don't sum to 1 ± 0.01 is a failure.
 
-**Open item:** the project documents don't record Jev's endpoint or request/response format. The owner supplies the API documentation link (see Open questions in #28). Until then, the adapter is built against this interface with a fake, and the HTTP layer waits for the docs.
+### Wire format: OpenRouter Decisions API
+
+Jev (TypeSafe) is served through OpenRouter's Decisions API, not chat completions: it has no `messages`, `temperature`, `response_format` or `logprobs`, and it returns per-option probabilities natively. Sources: [Jev model page](https://openrouter.ai/typesafe/jev-1.14), [Decisions API reference](https://openrouter.ai/docs/api/api-reference/alphadecisions/submit-a-decisions-questions-and-answers-request), [Jev tutorial](https://openrouter.ai/docs/guides/community/jev-tutorial). `typesafe/jev-router` is a different product (a chat router) and is not used.
+
+Request: `POST https://openrouter.ai/api/alpha/decisions` with `Authorization: Bearer OPENROUTER_API_KEY` and `Content-Type: application/json`.
+
+```json
+{
+  "model": "~typesafe/jev-latest",
+  "state": {
+    "project": "Moonglow",
+    "job_order": "masked message text"
+  },
+  "questions": {
+    "c0": {
+      "type": "choice",
+      "instructions": "Does this Job Order belong to the Deliverable 'Moonglow FTR SCR'?",
+      "criteria": {
+        "match": "The Job Order is clearly work for this Deliverable.",
+        "maybe": "The Job Order could be for this Deliverable, but the text doesn't make it clear.",
+        "no": "The Job Order is not for this Deliverable."
+      }
+    },
+    "c1": { "type": "choice", "instructions": "…'Mainpic DCP'?", "criteria": { "…": "same three options" } }
+  }
+}
+```
+
+- Question keys are local ids `c0`, `c1`, … mapped to Notion page ids in code, because the docs don't define a key format and the key is never shown to the model. The candidate's name goes in `instructions`.
+- All questions in one request are answered independently; one request per Job Order. The request limit is 64k tokens, far above a single project's Deliverables.
+- `criteria` wording above is part of the prompt and versioned by `prompt_tag` (e.g. `match-v1`).
+
+Response:
+
+```json
+{
+  "id": "gen-dec-…",
+  "model": "typesafe/jev-1.14-20261014",
+  "provider": "TypeSafe",
+  "answers": {
+    "c0": { "type": "choice", "choice": "match", "confidence": 0.86,
+            "probabilities": { "match": 0.93, "maybe": 0.06, "no": 0.01 } },
+    "c1": { "type": "choice", "choice": "no", "confidence": 0.95,
+            "probabilities": { "match": 0.0, "maybe": 0.03, "no": 0.97 } }
+  },
+  "usage": { "input_tokens": 240, "output_tokens": 40, "cost": 0.00001 }
+}
+```
+
+- Read probabilities by option name, never by position. `confidence` is ignored: it measures how concentrated the answer is, not whether it is right.
+- `model` is stored as `returned_model` (a dated snapshot); `usage.input_tokens` and `usage.output_tokens` fill the token columns.
+- Errors come back as `{"error": {"code": …, "message": …}}` with statuses 400, 401, 402, 403, 404, 413, 429, 500, 502, 503, 524, 529. Any error, timeout or invalid body counts as one failed matcher call (one inline retry, then `matcher_skipped`). On 429, honor `Retry-After` or `X-RateLimit-Reset` if present for the inline retry, capped at 30 seconds.
+- The endpoint is marked alpha; the Pydantic response model rejects anything that doesn't match the shape above.
+- Model alias: `~typesafe/jev-latest` follows the owner's "latest, no pinning" rule. It is OpenRouter's alias (newest release); TypeSafe's own `jev-latest` lags behind it, so the leading `~` matters. Probabilities can move a few hundredths between runs and versions, which shadow mode is there to observe.
 
 ### Decision rule (pure `core/`)
 
@@ -71,8 +124,8 @@ For each candidate: `link` if `p_match` is the highest of the three and `p_match
 
 ### Configuration and secrets
 
-- `.env`: `JEV_API_KEY`.
-- `config.yaml`: `deliverables_data_source_id` (`0a4ff084-3138-429c-8dbe-4d802aded74f`), `jev_base_url`, `jev_model` (`jev-latest`), `t_link` (0.90), `t_hint` (0.50), `deliverable_link_enabled` (false).
+- `.env`: `OPENROUTER_API_KEY`.
+- `config.yaml`: `deliverables_data_source_id` (`0a4ff084-3138-429c-8dbe-4d802aded74f`), `jev_url` (`https://openrouter.ai/api/alpha/decisions`), `jev_model` (`~typesafe/jev-latest`), `jev_timeout_seconds` (30), `t_link` (0.90), `t_hint` (0.50), `deliverable_link_enabled` (false).
 
 ## Blocked by
 
