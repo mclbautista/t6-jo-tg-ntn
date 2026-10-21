@@ -74,3 +74,17 @@ same outbound boundary. Ticket #3 adds `extracted` (DeepSeek output) between
 `received` and `planned` via migration 3. `writing` is the crash-window state:
 before the Notion create call a row moves to `writing`; on recovery the watchdog queries Notion by
 `Telegram Key` to adopt or create, so one message never yields two rows.
+
+## Planned migrations
+
+Migrations 3–7 are specified column by column in the build tickets and land with them:
+
+| Migration | Ticket | Adds |
+|---|---|---|
+| 3 | [#20](issues/20-deepseek-classification-and-extraction.md) | `extracted` and `ignored` states, retry columns, `stage_results`, `llm_calls` |
+| 4 | [#22](issues/22-live-notion-resolution-and-persisted-caches.md) | `cache_snapshot` |
+| 5 | [#23](issues/23-verification-and-durable-ops-reporting.md) | `outbox`, `findings_json`, `reaction_state` |
+| 6 | [#24](issues/24-forwards-edits-reposts-and-jo-number-reuse.md) | `jo_key`, `text_sha256`, `forward_origin_type`, `edits` |
+| 7 | [#25](issues/25-crash-safe-reliability-and-heartbeat.md) | `exhausted_at`, `runtime_state`, `heartbeats` |
+
+Move each into the Tables section above when it ships.

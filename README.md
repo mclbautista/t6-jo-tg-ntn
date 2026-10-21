@@ -47,5 +47,6 @@ TELEGRAM_BOT_TOKEN=... python smoke.py --full --config config.yaml
 ```
 
 See `docs/ledger-schema.md` for the versioned ledger contract and
-`docs/adr/` (once added) for decision records. Design sources live in the map
-tickets (`x_files/` and GitHub issues).
+`docs/adr/` (once added) for decision records. Design sources live in `map/`
+(mirrors of the closed design issues #1–#17). The PRD and open build tickets
+are mirrored in `docs/issues/` (issues #20–#28).
