@@ -12,3 +12,6 @@ config.yaml
 .pytest_cache/
 .ruff_cache/
 .worktrees/
+
+# Unredacted corpus: never commit (contains real credentials)
+old_files/sample-corpus.md
