@@ -12,6 +12,7 @@ import json
 import logging
 
 from jo_watchdog.adapters.protocols import NotionClient, TelegramClient
+from jo_watchdog.app.caches import CacheManager
 from jo_watchdog.app.config import Config
 from jo_watchdog.core.payload import (
     build_notion_payload,
@@ -33,11 +34,13 @@ class Worker:
         telegram: TelegramClient,
         notion: NotionClient,
         config: Config,
+        caches: CacheManager | None = None,
     ):
         self.ledger = ledger
         self.telegram = telegram
         self.notion = notion
         self.config = config
+        self.caches = caches
 
     # -- scope -------------------------------------------------------------
 
@@ -92,6 +95,11 @@ class Worker:
         msg = self.ledger.get_message(key)
         if msg is None:
             return
+        if self.caches is not None and not self.caches.ready:
+            # No People/Projects/Department snapshot has ever loaded: hold the
+            # message where it is (no attempt spent, no false unresolved finding).
+            # Once #20 lands this hold sits at `extracted`.
+            return
 
         # Plan is built and stored before any external call.
         plan = build_plan(name=msg["first_line"], telegram_key=key, raw_text=msg["text"])
@@ -128,7 +136,21 @@ class Worker:
 
     # -- loop --------------------------------------------------------------
 
+    async def refresh_caches(self) -> None:
+        if self.caches is None:
+            return
+        for stale in await self.caches.refresh_if_due():
+            # The ops-topic message for this is rendered and queued by #23.
+            log.warning(
+                "%s cache is stale: last refreshed %s (%.1f hours ago): %s",
+                stale.kind,
+                stale.fetched_at,
+                stale.hours_stale,
+                stale.error,
+            )
+
     async def run_once(self) -> None:
+        await self.refresh_caches()
         await self.poll_once()
         await self.drain_once()
 

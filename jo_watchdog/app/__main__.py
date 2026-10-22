@@ -12,6 +12,7 @@ import asyncio
 import sys
 from pathlib import Path
 
+from jo_watchdog.app.caches import CacheManager
 from jo_watchdog.app.config import load_config, notion_token, telegram_token
 from jo_watchdog.app.logging_config import configure_logging
 from jo_watchdog.app.worker import Worker
@@ -32,7 +33,11 @@ async def run(config_path: str) -> None:
     telegram = AiogramTelegramClient(bot)
     notion = NotionAdapter(notion_token())
 
-    worker = Worker(ledger=ledger, telegram=telegram, notion=notion, config=config)
+    caches = CacheManager(ledger=ledger, notion=notion, config=config)
+    caches.load_persisted()  # last good snapshots first, then the live refresh
+    worker = Worker(
+        ledger=ledger, telegram=telegram, notion=notion, config=config, caches=caches
+    )
 
     try:
         await worker.run()

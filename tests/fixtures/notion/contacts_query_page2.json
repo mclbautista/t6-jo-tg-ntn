@@ -1,0 +1,309 @@
+{
+ "object": "list",
+ "results": [
+  {
+   "object": "page",
+   "id": "c0000000-0000-4000-8000-000000000008",
+   "url": "https://www.notion.so/c0000000000040008000000000000008",
+   "parent": {
+    "type": "data_source_id",
+    "data_source_id": "77b2a701-71db-4e88-a694-37f07303e77e"
+   },
+   "properties": {
+    "Name": {
+     "type": "title",
+     "title": [
+      {
+       "type": "text",
+       "plain_text": "Rae Dizon",
+       "text": {
+        "content": "Rae Dizon"
+       }
+      }
+     ]
+    },
+    "TelegramUserID": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "TelegramHandle": {
+     "type": "rich_text",
+     "rich_text": [
+      {
+       "type": "text",
+       "plain_text": "@raedsss",
+       "text": {
+        "content": "@raedsss"
+       }
+      }
+     ]
+    },
+    "Aliases": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "End of Shift": {
+     "type": "select",
+     "select": {
+      "name": "8:00 PM"
+     }
+    },
+    "Email": {
+     "type": "email",
+     "email": null
+    }
+   }
+  },
+  {
+   "object": "page",
+   "id": "c0000000-0000-4000-8000-000000000009",
+   "url": "https://www.notion.so/c0000000000040008000000000000009",
+   "parent": {
+    "type": "data_source_id",
+    "data_source_id": "77b2a701-71db-4e88-a694-37f07303e77e"
+   },
+   "properties": {
+    "Name": {
+     "type": "title",
+     "title": [
+      {
+       "type": "text",
+       "plain_text": "Jason Direk",
+       "text": {
+        "content": "Jason Direk"
+       }
+      }
+     ]
+    },
+    "TelegramUserID": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "TelegramHandle": {
+     "type": "rich_text",
+     "rich_text": [
+      {
+       "type": "text",
+       "plain_text": "@Direkjson",
+       "text": {
+        "content": "@Direkjson"
+       }
+      }
+     ]
+    },
+    "Aliases": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "End of Shift": {
+     "type": "select",
+     "select": null
+    },
+    "Email": {
+     "type": "email",
+     "email": null
+    }
+   }
+  },
+  {
+   "object": "page",
+   "id": "c0000000-0000-4000-8000-000000000010",
+   "url": "https://www.notion.so/c0000000000040008000000000000010",
+   "parent": {
+    "type": "data_source_id",
+    "data_source_id": "77b2a701-71db-4e88-a694-37f07303e77e"
+   },
+   "properties": {
+    "Name": {
+     "type": "title",
+     "title": [
+      {
+       "type": "text",
+       "plain_text": "Alec Gaba",
+       "text": {
+        "content": "Alec Gaba"
+       }
+      }
+     ]
+    },
+    "TelegramUserID": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "TelegramHandle": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "Aliases": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "End of Shift": {
+     "type": "select",
+     "select": null
+    },
+    "Email": {
+     "type": "email",
+     "email": null
+    }
+   }
+  },
+  {
+   "object": "page",
+   "id": "c0000000-0000-4000-8000-000000000011",
+   "url": "https://www.notion.so/c0000000000040008000000000000011",
+   "parent": {
+    "type": "data_source_id",
+    "data_source_id": "77b2a701-71db-4e88-a694-37f07303e77e"
+   },
+   "properties": {
+    "Name": {
+     "type": "title",
+     "title": [
+      {
+       "type": "text",
+       "plain_text": "Kim Bautista",
+       "text": {
+        "content": "Kim Bautista"
+       }
+      }
+     ]
+    },
+    "TelegramUserID": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "TelegramHandle": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "Aliases": {
+     "type": "rich_text",
+     "rich_text": [
+      {
+       "type": "text",
+       "plain_text": "Kim",
+       "text": {
+        "content": "Kim"
+       }
+      }
+     ]
+    },
+    "End of Shift": {
+     "type": "select",
+     "select": null
+    },
+    "Email": {
+     "type": "email",
+     "email": null
+    }
+   }
+  },
+  {
+   "object": "page",
+   "id": "c0000000-0000-4000-8000-000000000012",
+   "url": "https://www.notion.so/c0000000000040008000000000000012",
+   "parent": {
+    "type": "data_source_id",
+    "data_source_id": "77b2a701-71db-4e88-a694-37f07303e77e"
+   },
+   "properties": {
+    "Name": {
+     "type": "title",
+     "title": [
+      {
+       "type": "text",
+       "plain_text": "Kim Ocampo",
+       "text": {
+        "content": "Kim Ocampo"
+       }
+      }
+     ]
+    },
+    "TelegramUserID": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "TelegramHandle": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "Aliases": {
+     "type": "rich_text",
+     "rich_text": [
+      {
+       "type": "text",
+       "plain_text": "Kim",
+       "text": {
+        "content": "Kim"
+       }
+      }
+     ]
+    },
+    "End of Shift": {
+     "type": "select",
+     "select": null
+    },
+    "Email": {
+     "type": "email",
+     "email": null
+    }
+   }
+  },
+  {
+   "object": "page",
+   "id": "c0000000-0000-4000-8000-000000000013",
+   "url": "https://www.notion.so/c0000000000040008000000000000013",
+   "parent": {
+    "type": "data_source_id",
+    "data_source_id": "77b2a701-71db-4e88-a694-37f07303e77e"
+   },
+   "properties": {
+    "Name": {
+     "type": "title",
+     "title": [
+      {
+       "type": "text",
+       "plain_text": "Lara Bautista",
+       "text": {
+        "content": "Lara Bautista"
+       }
+      }
+     ]
+    },
+    "TelegramUserID": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "TelegramHandle": {
+     "type": "rich_text",
+     "rich_text": [
+      {
+       "type": "text",
+       "plain_text": "@larabauts",
+       "text": {
+        "content": "@larabauts"
+       }
+      }
+     ]
+    },
+    "Aliases": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "End of Shift": {
+     "type": "select",
+     "select": null
+    },
+    "Email": {
+     "type": "email",
+     "email": null
+    }
+   }
+  }
+ ],
+ "has_more": false,
+ "next_cursor": null,
+ "type": "page_or_data_source",
+ "page_or_data_source": {}
+}

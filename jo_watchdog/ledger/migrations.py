@@ -60,5 +60,21 @@ MIGRATION_2 = [
     "ALTER TABLE messages ADD COLUMN masked_count INTEGER",
 ]
 
-# Ticket #3 can append MIGRATION_3 (adds `extracted` state + DeepSeek columns).
-MIGRATIONS: list[list[str]] = [MIGRATION_1, MIGRATION_2]
+# Persisted Notion cache snapshots (#22). The latest row per kind is live.
+MIGRATION_4 = [
+    """
+    CREATE TABLE cache_snapshot (
+        id INTEGER PRIMARY KEY,
+        kind TEXT NOT NULL CHECK (kind IN ('people', 'projects', 'departments')),
+        format_version INTEGER NOT NULL,
+        payload_json TEXT NOT NULL,
+        item_count INTEGER NOT NULL,
+        fetched_at TEXT NOT NULL
+    )
+    """,
+    "CREATE INDEX idx_cache_snapshot_kind_fetched ON cache_snapshot (kind, fetched_at)",
+]
+
+# Keyed by migration number so build tickets can land in any order; missing
+# numbers are applied in ascending order. Migration 3 belongs to #20.
+MIGRATIONS: dict[int, list[str]] = {1: MIGRATION_1, 2: MIGRATION_2, 4: MIGRATION_4}

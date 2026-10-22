@@ -26,6 +26,8 @@ from jo_watchdog.core.plan import build_plan
 from jo_watchdog.ledger.migrations import MIGRATIONS
 from jo_watchdog.ledger.states import State, can_transition
 
+CACHE_SNAPSHOTS_KEPT = 10
+
 
 def _now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -70,7 +72,7 @@ class Ledger:
             row["version"]
             for row in self._conn.execute("SELECT version FROM schema_version")
         } if self._table_exists("schema_version") else set()
-        for i, migration in enumerate(MIGRATIONS, start=1):
+        for i, migration in sorted(MIGRATIONS.items()):
             if i in applied:
                 continue
             with self._transaction():
@@ -300,6 +302,50 @@ class Ledger:
         return self.transition(key, State.WRITTEN, State.DONE)
 
     # -- lifecycle ---------------------------------------------------------
+
+    # -- cache snapshots -----------------------------------------------------
+
+    def save_cache_snapshot(
+        self,
+        kind: str,
+        format_version: int,
+        payload: list | dict,
+        item_count: int,
+        fetched_at: str,
+        *,
+        keep: int = CACHE_SNAPSHOTS_KEPT,
+    ) -> None:
+        """Insert a successful refresh, then prune that kind to the last ``keep`` rows."""
+        with self._transaction():
+            self._conn.execute(
+                "INSERT INTO cache_snapshot"
+                " (kind, format_version, payload_json, item_count, fetched_at)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (kind, format_version, json.dumps(payload), item_count, fetched_at),
+            )
+            self._conn.execute(
+                "DELETE FROM cache_snapshot WHERE kind = ? AND id NOT IN ("
+                " SELECT id FROM cache_snapshot WHERE kind = ?"
+                " ORDER BY fetched_at DESC, id DESC LIMIT ?)",
+                (kind, kind, keep),
+            )
+
+    def latest_cache_snapshot(self, kind: str) -> dict | None:
+        """The live snapshot for ``kind``: its newest row, payload decoded."""
+        row = self._conn.execute(
+            "SELECT * FROM cache_snapshot WHERE kind = ? ORDER BY fetched_at DESC, id DESC LIMIT 1",
+            (kind,),
+        ).fetchone()
+        if row is None:
+            return None
+        snapshot = dict(row)
+        snapshot["payload"] = json.loads(snapshot.pop("payload_json"))
+        return snapshot
+
+    def cache_snapshot_count(self, kind: str) -> int:
+        return self._conn.execute(
+            "SELECT COUNT(*) FROM cache_snapshot WHERE kind = ?", (kind,)
+        ).fetchone()[0]
 
     def close(self) -> None:
         self._conn.close()
