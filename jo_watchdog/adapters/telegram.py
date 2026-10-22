@@ -23,13 +23,15 @@ class AiogramTelegramClient:
         updates = await self._bot.get_updates(
             offset=offset,
             timeout=timeout,
-            allowed_updates=["message"],
+            allowed_updates=["message", "edited_message"],
         )
         result: list[IncomingUpdate] = []
         for update in updates:
-            message = update.message
+            message = update.message or update.edited_message
             if message is None:
                 continue
+            edited = update.message is None
+            raw = update.model_dump(mode="json")
             result.append(
                 IncomingUpdate(
                     update_id=update.update_id,
@@ -37,7 +39,11 @@ class AiogramTelegramClient:
                     message_id=message.message_id,
                     message_thread_id=getattr(message, "message_thread_id", None),
                     text=message.text or message.caption or "",
-                    raw=update.model_dump(mode="json"),
+                    raw=raw,
+                    edited=edited,
+                    edit_date=(raw.get("edited_message") or {}).get("edit_date")
+                    if edited
+                    else None,
                 )
             )
         return result

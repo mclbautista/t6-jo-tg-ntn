@@ -23,6 +23,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import NamedTuple
 
+from jo_watchdog.core.duplicates import text_sha256
 from jo_watchdog.core.masker import outbound_text
 from jo_watchdog.core.plan import build_plan
 from jo_watchdog.ledger.migrations import MIGRATIONS, REBUILDS_TABLES
@@ -60,6 +61,17 @@ def _now() -> str:
 
 def telegram_key(chat_id: int, message_id: int) -> str:
     return f"{chat_id}:{message_id}"
+
+
+def _forward_origin_type(raw_source: str) -> str | None:
+    """``forward_origin.type`` from a stored update, or None for a non-forward."""
+    try:
+        raw = json.loads(raw_source)
+    except (TypeError, ValueError):
+        return None
+    message = raw.get("message") if isinstance(raw, dict) else None
+    origin = message.get("forward_origin") if isinstance(message, dict) else None
+    return origin.get("type") if isinstance(origin, dict) else None
 
 
 class Ledger:
@@ -237,8 +249,8 @@ class Ledger:
                 "INSERT INTO messages"
                 " (chat_id, message_id, telegram_key, update_id, raw_source, text,"
                 "  first_line, masked_text, masker_version, masked_count, state,"
-                "  posted_at, created_at, updated_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "  posted_at, text_sha256, forward_origin_type, created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     chat_id,
                     message_id,
@@ -252,6 +264,8 @@ class Ledger:
                     masked.withheld_count,
                     State.RECEIVED.value,
                     posted_at,
+                    text_sha256(text),
+                    _forward_origin_type(raw_source),
                     now,
                     now,
                 ),
@@ -264,9 +278,7 @@ class Ledger:
         return self.get_message(key) is not None
 
     def get_message(self, key: str) -> dict | None:
-        row = self._conn.execute(
-            "SELECT * FROM messages WHERE telegram_key = ?", (key,)
-        ).fetchone()
+        row = self._conn.execute("SELECT * FROM messages WHERE telegram_key = ?", (key,)).fetchone()
         return dict(row) if row else None
 
     def pending(self, state: State | str) -> list[str]:
@@ -445,11 +457,22 @@ class Ledger:
         )
         return cur.rowcount == 1
 
-    def store_plan(self, key: str, plan: dict) -> None:
+    def store_plan(self, key: str, plan: dict, *, jo_key: str | None = None) -> None:
+        """Store the exact plan, and the content-duplicate key it was planned with."""
         self._conn.execute(
-            "UPDATE messages SET plan_json = ?, updated_at = ? WHERE telegram_key = ?",
-            (json.dumps(plan, ensure_ascii=False), _now(), key),
+            "UPDATE messages SET plan_json = ?, jo_key = ?, updated_at = ? WHERE telegram_key = ?",
+            (json.dumps(plan, ensure_ascii=False), jo_key, _now(), key),
         )
+
+    def earlier_captures(self, key: str, *, text_sha: str, jo_key: str | None) -> list[dict]:
+        """Other rows with a Notion page that share this text or JO key, oldest first."""
+        rows = self._conn.execute(
+            "SELECT telegram_key, text_sha256, jo_key, notion_page_id, posted_at, created_at"
+            " FROM messages WHERE notion_page_id IS NOT NULL AND telegram_key != ?"
+            " AND (text_sha256 = ? OR (? IS NOT NULL AND jo_key = ?)) ORDER BY id",
+            (key, text_sha, jo_key, jo_key),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     def mark_writing(self, key: str) -> bool:
         return self.transition(key, State.PLANNED, State.WRITING)
@@ -495,6 +518,12 @@ class Ledger:
             ).fetchone()["id"]
             for report in reports:
                 self._insert_outbox(report, message_row_id=row_id, now=now)
+            # Edits that arrived mid-pipeline are reported with this capture.
+            self._conn.execute(
+                "UPDATE edits SET outcome = 'reported'"
+                " WHERE telegram_key = ? AND outcome = 'pending_capture'",
+                (key,),
+            )
         self._protect_files()
         return True
 
@@ -517,11 +546,61 @@ class Ledger:
     def mark_done(self, key: str) -> bool:
         return self.transition(key, State.WRITTEN, State.DONE)
 
+    # -- edits (#24) -------------------------------------------------------
+
+    def edit_seen(self, update_id: int) -> bool:
+        """True when this edit update was already recorded (offset N+1 redelivery)."""
+        row = self._conn.execute("SELECT 1 FROM edits WHERE update_id = ?", (update_id,)).fetchone()
+        return row is not None
+
+    def has_pending_edits(self, key: str) -> bool:
+        row = self._conn.execute(
+            "SELECT 1 FROM edits WHERE telegram_key = ? AND outcome = 'pending_capture'",
+            (key,),
+        ).fetchone()
+        return row is not None
+
+    def edits_for(self, key: str) -> list[dict]:
+        rows = self._conn.execute(
+            "SELECT * FROM edits WHERE telegram_key = ? ORDER BY id", (key,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def record_edit(
+        self,
+        key: str,
+        update_id: int,
+        *,
+        edited_at: str,
+        outcome: str,
+        report: OutboxMessage | None = None,
+    ) -> None:
+        """Record an edit, its ops post if any, and advance the offset atomically.
+
+        The Notion row and the stored plan are never touched.
+        """
+        if outcome not in ("reported", "pending_capture", "ignored_message"):
+            raise ValueError(f"unknown edit outcome {outcome!r}")
+        if report is not None and report.kind not in OUTBOX_KINDS:
+            raise ValueError(f"unknown outbox kind {report.kind!r}")
+        now = _now()
+        with self._transaction():
+            self._conn.execute(
+                "INSERT INTO edits (telegram_key, update_id, edited_at, outcome, created_at)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (key, update_id, edited_at, outcome, now),
+            )
+            if report is not None:
+                row = self._conn.execute(
+                    "SELECT id FROM messages WHERE telegram_key = ?", (key,)
+                ).fetchone()
+                self._insert_outbox(report, message_row_id=row["id"] if row else None, now=now)
+            self._advance_offset(update_id)
+        self._protect_files()
+
     # -- ops outbox --------------------------------------------------------
 
-    def _insert_outbox(
-        self, report: OutboxMessage, *, message_row_id: int | None, now: str
-    ) -> int:
+    def _insert_outbox(self, report: OutboxMessage, *, message_row_id: int | None, now: str) -> int:
         cur = self._conn.execute(
             "INSERT INTO outbox (message_id, kind, chat_id, topic_id, text, state,"
             " attempts, created_at) VALUES (?, ?, ?, ?, ?, 'pending', 0, ?)",
