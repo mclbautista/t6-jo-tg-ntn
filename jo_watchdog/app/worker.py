@@ -15,6 +15,7 @@ import logging
 from datetime import UTC, datetime, timedelta, timezone
 
 from jo_watchdog.adapters.protocols import Classifier, NotionClient, TelegramClient
+from jo_watchdog.app.caches import CacheManager
 from jo_watchdog.app.config import Config
 from jo_watchdog.core.extraction import forward_origin_lines
 from jo_watchdog.core.payload import (
@@ -62,12 +63,14 @@ class Worker:
         notion: NotionClient,
         classifier: Classifier,
         config: Config,
+        caches: CacheManager | None = None,
     ):
         self.ledger = ledger
         self.telegram = telegram
         self.notion = notion
         self.classifier = classifier
         self.config = config
+        self.caches = caches
 
     # -- scope -------------------------------------------------------------
 
@@ -171,6 +174,10 @@ class Worker:
                 return
         elif msg["state"] != State.EXTRACTED.value:
             return
+        if self.caches is not None and not self.caches.ready:
+            # No People/Projects/Department snapshot has ever loaded: hold at
+            # `extracted` (no attempt spent, no false unresolved finding).
+            return
 
         # Plan is built and stored before any external call.
         plan = build_plan(name=msg["first_line"], telegram_key=key, raw_text=msg["text"])
@@ -207,7 +214,21 @@ class Worker:
 
     # -- loop --------------------------------------------------------------
 
+    async def refresh_caches(self) -> None:
+        if self.caches is None:
+            return
+        for stale in await self.caches.refresh_if_due():
+            # The ops-topic message for this is rendered and queued by #23.
+            log.warning(
+                "%s cache is stale: last refreshed %s (%.1f hours ago): %s",
+                stale.kind,
+                stale.fetched_at,
+                stale.hours_stale,
+                stale.error,
+            )
+
     async def run_once(self) -> None:
+        await self.refresh_caches()
         await self.poll_once()
         await self.drain_once()
 

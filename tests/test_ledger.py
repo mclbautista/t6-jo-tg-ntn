@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 from jo_watchdog.ledger.db import Ledger
-from jo_watchdog.ledger.migrations import MIGRATION_1, MIGRATION_2
+from jo_watchdog.ledger.migrations import MIGRATION_1, MIGRATION_2, MIGRATIONS
 from jo_watchdog.ledger.states import State
 
 
@@ -259,7 +259,7 @@ class Migration3Tests(unittest.TestCase):
         self.assertEqual(msg["posted_at"], "2026-09-28T11:00:00+08:00")
         self.assertEqual(msg["attempts"], 0)
         versions = [r[0] for r in ledger._conn.execute("SELECT version FROM schema_version")]
-        self.assertEqual(versions, [1, 2, 3])
+        self.assertEqual(versions, sorted(MIGRATIONS))  # every migration, 3 included
 
     def test_new_states_and_tables(self):
         ledger = self.open()

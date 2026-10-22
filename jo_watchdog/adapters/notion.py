@@ -106,3 +106,22 @@ class NotionAdapter:
             has_more=data.get("has_more", False),
             next_cursor=data.get("next_cursor"),
         )
+
+    async def retrieve_data_source(self, data_source_id: str) -> dict:
+        """Retrieve a data source's schema (property names, types, select options)."""
+        return await self._request("GET", f"/data_sources/{data_source_id}")
+
+    async def query_all(
+        self, data_source_id: str, *, filter: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
+        """Query every page of a data source, following ``next_cursor`` to the end."""
+        results: list[dict[str, Any]] = []
+        cursor: str | None = None
+        while True:
+            page = await self.query_data_source(
+                data_source_id, QueryRequest(start_cursor=cursor, filter=filter)
+            )
+            results.extend(page.results)
+            if not page.has_more or not page.next_cursor:
+                return results
+            cursor = page.next_cursor

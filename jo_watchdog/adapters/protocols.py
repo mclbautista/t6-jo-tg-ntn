@@ -67,6 +67,15 @@ class NotionClient(Protocol):
 
 
 @runtime_checkable
+class NotionReader(Protocol):
+    """The read side the six-hour caches need."""
+
+    async def query_all(self, data_source_id: str) -> list[dict[str, Any]]: ...
+
+    async def retrieve_data_source(self, data_source_id: str) -> dict: ...
+
+
+@runtime_checkable
 class Classifier(Protocol):
     async def classify(
         self, masked_text: str, origin_lines: list[str] | None

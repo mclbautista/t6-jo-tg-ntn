@@ -196,10 +196,30 @@ def _migration_3(conn: sqlite3.Connection) -> None:
 
 MIGRATION_3 = _migration_3
 
+# Persisted Notion cache snapshots (#22). The latest row per kind is live.
+MIGRATION_4 = [
+    """
+    CREATE TABLE cache_snapshot (
+        id INTEGER PRIMARY KEY,
+        kind TEXT NOT NULL CHECK (kind IN ('people', 'projects', 'departments')),
+        format_version INTEGER NOT NULL,
+        payload_json TEXT NOT NULL,
+        item_count INTEGER NOT NULL,
+        fetched_at TEXT NOT NULL
+    )
+    """,
+    "CREATE INDEX idx_cache_snapshot_kind_fetched ON cache_snapshot (kind, fetched_at)",
+]
+
 Migration = list[str] | Callable[[sqlite3.Connection], None]
 
 # Keyed by number and applied in ascending order of the numbers not yet recorded.
-MIGRATIONS: dict[int, Migration] = {1: MIGRATION_1, 2: MIGRATION_2, 3: MIGRATION_3}
+MIGRATIONS: dict[int, Migration] = {
+    1: MIGRATION_1,
+    2: MIGRATION_2,
+    3: MIGRATION_3,
+    4: MIGRATION_4,
+}
 
 # Migrations that rebuild a referenced table run with foreign-key enforcement off.
 REBUILDS_TABLES: frozenset[int] = frozenset({3})
