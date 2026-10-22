@@ -23,6 +23,12 @@ class Config(BaseModel):
     intake_topic_id: int
     captured_reaction: str = "✅"
 
+    # Ops topic (#23): where capture reports and system messages go
+    ops_chat_id: int
+    ops_topic_id: int
+    leizette_telegram_handle: str | None = None
+    header_date_tolerance_days: int = Field(default=1, ge=0)
+
     # Polling
     poll_timeout: int = Field(default=50, ge=1, le=50)  # Telegram long-poll seconds
     poll_interval: float = Field(default=1.0, gt=0)
@@ -38,6 +44,8 @@ class Config(BaseModel):
     def _require_intake_ids(self) -> "Config":
         if not self.intake_chat_id or not self.intake_topic_id:
             raise ValueError("intake_chat_id and intake_topic_id must be set")
+        if not self.ops_chat_id or not self.ops_topic_id:
+            raise ValueError("ops_chat_id and ops_topic_id must be set")
         return self
 
 

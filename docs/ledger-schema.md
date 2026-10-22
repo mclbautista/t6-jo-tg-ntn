@@ -38,6 +38,8 @@ One row per accepted Telegram message, keyed by `telegram_key`.
 | plan_json          | TEXT    | the exact stored plan (Name, Telegram Key, blocks) |
 | notion_page_id     | TEXT    | Notion page id after a successful create           |
 | readback_mismatch  | TEXT    | mismatch detail from read-back comparison          |
+| findings_json      | TEXT    | v5: final findings (`[{code, params}]`), plan plus read-back |
+| reaction_state     | TEXT    | v5: captured reaction, `pending` \| `set` \| `failed` |
 | created_at         | TEXT    | ISO-8601 UTC                                       |
 | updated_at         | TEXT    | ISO-8601 UTC                                       |
 
@@ -64,6 +66,37 @@ One row per out-of-scope update (wrong chat or topic, or no text later).
 | first_line | TEXT    | masked-ready first line        |
 | created_at | TEXT    | ISO-8601 UTC                   |
 
+### `outbox` (v5)
+
+The durable ops-topic outbox. A capture's report is inserted as `pending` in the
+same transaction that moves its message to `written`, so a crash can never
+separate a capture from its findings. Delivery is at-least-once: a crash after
+Telegram accepts a post but before the row is marked `sent` re-posts it.
+
+| column              | type    | notes                                                  |
+|---------------------|---------|--------------------------------------------------------|
+| id                  | INTEGER | PK (autoinc); logged with every send, for tracing      |
+| message_id          | INTEGER | `messages(id)`; null for system messages               |
+| kind                | TEXT    | `capture_report`, `edit_after_capture`, `stale_cache`, `outage_alert`, `heartbeat`, `dry_run_plan` |
+| chat_id             | INTEGER | ops chat id                                            |
+| topic_id            | INTEGER | ops forum topic id                                     |
+| text                | TEXT    | rendered Telegram HTML; every source field masked      |
+| state               | TEXT    | `pending` \| `sent` \| `failed`                         |
+| attempts            | INTEGER | send attempts so far (default 0)                       |
+| next_attempt_at     | TEXT    | ISO-8601 UTC; null = due now                           |
+| last_error          | TEXT    | masked error of the last failed attempt                |
+| telegram_message_id | INTEGER | id of the posted ops message once `sent`               |
+| created_at          | TEXT    | ISO-8601 UTC                                           |
+| sent_at             | TEXT    | ISO-8601 UTC                                           |
+
+Index `outbox_state_next_attempt` on `(state, next_attempt_at)`. A failed post
+retries after 30 s, 2 min, 5 min and 10 min; the fifth failure sets `failed`.
+
+## Migration order
+
+Each build ticket owns its migration number (#28), so `MIGRATIONS` is keyed by
+number and any missing numbers are applied in ascending order on open.
+
 ## Pipeline states
 
 `received` → `planned` → `writing` → `written` → `done`
@@ -77,13 +110,12 @@ before the Notion create call a row moves to `writing`; on recovery the watchdog
 
 ## Planned migrations
 
-Migrations 3–7 are specified column by column in the build tickets and land with them:
+Migration 5 (#23) has shipped and is documented above. Migrations 3, 4, 6 and 7 are specified column by column in the build tickets and land with them:
 
 | Migration | Ticket | Adds |
 |---|---|---|
 | 3 | [#20](issues/20-deepseek-classification-and-extraction.md) | `extracted` and `ignored` states, retry columns, `stage_results`, `llm_calls` |
 | 4 | [#22](issues/22-live-notion-resolution-and-persisted-caches.md) | `cache_snapshot` |
-| 5 | [#23](issues/23-verification-and-durable-ops-reporting.md) | `outbox`, `findings_json`, `reaction_state` |
 | 6 | [#24](issues/24-forwards-edits-reposts-and-jo-number-reuse.md) | `jo_key`, `text_sha256`, `forward_origin_type`, `edits` |
 | 7 | [#25](issues/25-crash-safe-reliability-and-heartbeat.md) | `exhausted_at`, `runtime_state`, `heartbeats` |
 

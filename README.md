@@ -15,7 +15,8 @@ verification, reliability, and Deliverable matching arrive in later tickets.
 
 ```
 jo_watchdog/
-  core/       pure: plan builder, payload builder, read-back compare, masker seam
+  core/       pure: plan builder, payload builder, read-back compare, masker seam,
+              verification findings, ops-report rendering
   ledger/     SQLite (WAL, versioned schema), offsets, state machine
   adapters/   Telegram (aiogram-as-client), Notion (httpx, pinned version)
   app/        config, worker loop, entry point
@@ -27,7 +28,7 @@ docs/         ledger schema contract
 ## Run
 
 ```sh
-cp config.example.yaml config.yaml   # fill in intake chat/topic ids
+cp config.example.yaml config.yaml   # fill in intake and ops chat/topic ids
 cp .env.example .env                 # fill in secrets
 pip install -e '.[dev]'
 python -m jo_watchdog.app --config config.yaml

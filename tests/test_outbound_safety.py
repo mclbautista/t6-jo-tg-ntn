@@ -25,6 +25,8 @@ def make_config() -> Config:
     return Config(
         intake_chat_id=-100123,
         intake_topic_id=5,
+        ops_chat_id=-100999,
+        ops_topic_id=7,
         captured_reaction="✅",
         job_orders_data_source_id="ds-1",
     )

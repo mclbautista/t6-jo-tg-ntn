@@ -52,3 +52,15 @@ class AiogramTelegramClient:
             message_id=message_id,
             reaction=[ReactionTypeEmoji(emoji=emoji)],
         )
+
+    async def send_message(self, chat_id: int, topic_id: int, text: str) -> int:
+        from aiogram.types import LinkPreviewOptions
+
+        sent = await self._bot.send_message(
+            chat_id=chat_id,
+            message_thread_id=topic_id,
+            text=text,
+            parse_mode="HTML",
+            link_preview_options=LinkPreviewOptions(is_disabled=True),
+        )
+        return sent.message_id
