@@ -1,18 +1,66 @@
 # Non-secret configuration. Copy to config.yaml and fill in the real values.
-# Secrets (Telegram bot token, Notion integration token) go in .env, never here.
+# Secrets (TELEGRAM_BOT_TOKEN, NOTION_API_KEY, DEEPSEEK_API_KEY,
+# OPENROUTER_API_KEY) go in .env, never here.
+#
+# Every key is validated at startup; a bad or unknown key fails the boot.
+# Values marked FILL IN are placeholders the service must not run with.
 
-# --- Telegram scope filter (build-time values, supplied by the owner) ---
-intake_chat_id: -1000000000000      # the intake supergroup's chat id
-intake_topic_id: 0                  # the intake forum topic's message_thread_id
-captured_reaction: "✅"             # emoji picked from the real group's reactions
+# --- Telegram intake (#18) ---
+intake_chat_id: -1000000000000      # FILL IN: the intake supergroup's chat id
+intake_topic_id: 1                  # FILL IN: the intake forum topic's message_thread_id
+captured_reaction: "✅"             # pick from the list smoke.py prints
 
-# --- Polling ---
+# --- Polling (#18) ---
 poll_timeout: 50                    # Telegram long-poll timeout (seconds, max 50)
 poll_interval: 1.0                  # pause between poll+drain cycles (seconds)
 
-# --- Notion ---
+# --- Notion (#18) ---
 job_orders_data_source_id: "3d8fb4d5-9e59-8073-a0d0-000b77632947"
 notion_version: "2026-03-11"        # pinned API version (do not change casually)
 
-# --- Ledger ---
-ledger_path: "./data/ledger.db"
+# --- Ledger (#18) ---
+ledger_path: "./data/ledger.db"     # the container uses /app/data (bind-mounted)
+
+# --- DeepSeek classify/extract (#20) ---
+deepseek_base_url: "https://api.deepseek.com"
+deepseek_model: "deepseek-chat"     # the "latest" alias; never pin a dated model
+deepseek_timeout_seconds: 60
+
+# --- Planning (#21) ---
+department_aliases:                 # header token -> Notion Department option
+  TO: TOC
+
+# --- Resolution and caches (#22) ---
+contacts_data_source_id: "77b2a701-71db-4e88-a694-37f07303e77e"
+projects_data_source_id: "cc1dc02a-8f32-4c97-81e4-dc1e08d7f134"
+leizette_contact_page_id: "00000000-0000-0000-0000-000000000000"  # FILL IN: Leizette's Contacts page id
+cache_refresh_hours: 6
+cache_stale_alert_hours: 24
+fuzzy_min_score: 90
+fuzzy_min_lead: 8
+honorifics: [ate, kuya, sir]
+
+# --- Ops reporting (#23) ---
+ops_chat_id: -1000000000001         # FILL IN: the ops supergroup's chat id
+ops_topic_id: 1                     # FILL IN: the ops forum topic's message_thread_id
+leizette_telegram_handle: "@leizette_handle"  # FILL IN
+header_date_tolerance_days: 1
+
+# --- Reliability and heartbeat (#25) ---
+owner_telegram_handle: "@owner_handle"        # FILL IN
+retry_schedule_seconds: [30, 120, 300, 600, 900]
+deadman_stale_minutes: 10
+heartbeat_time: "07:00"
+timezone: "Asia/Manila"
+
+# --- Deliverable matching via Jev (#26) ---
+deliverables_data_source_id: "0a4ff084-3138-429c-8dbe-4d802aded74f"
+jev_url: "https://openrouter.ai/api/alpha/decisions"
+jev_model: "~typesafe/jev-latest"   # OpenRouter's alias; the leading ~ matters
+jev_timeout_seconds: 30
+t_link: 0.90
+t_hint: 0.50
+deliverable_link_enabled: false     # shadow mode until the owner turns it on
+
+# --- Rollback control (#27) ---
+dry_run: false                      # true = stop at `planned`, post the plan, write nothing

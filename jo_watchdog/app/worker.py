@@ -13,12 +13,13 @@ import logging
 
 from jo_watchdog.adapters.protocols import NotionClient, TelegramClient
 from jo_watchdog.app.config import Config
+from jo_watchdog.core.masker import outbound_text
 from jo_watchdog.core.payload import (
     build_notion_payload,
     extract_readback_fields,
     verify_readback,
 )
-from jo_watchdog.core.plan import build_plan, first_line_of
+from jo_watchdog.core.plan import Plan, build_plan, first_line_of
 from jo_watchdog.ledger.db import Ledger, telegram_key
 from jo_watchdog.ledger.states import State
 
@@ -85,6 +86,11 @@ class Worker:
     # -- draining (pipeline) ----------------------------------------------
 
     async def drain_once(self) -> None:
+        # Plans held while dry-run was on resume once it is off; `planned` is
+        # before any external call, so resuming is safe.
+        if not self.config.dry_run:
+            for key in self.ledger.pending(State.PLANNED):
+                await self.process(key)
         for key in self.ledger.pending(State.RECEIVED):
             await self.process(key)
 
@@ -93,11 +99,19 @@ class Worker:
         if msg is None:
             return
 
-        # Plan is built and stored before any external call.
-        plan = build_plan(name=msg["first_line"], telegram_key=key, raw_text=msg["text"])
-        if not self.ledger.transition(key, State.RECEIVED, State.PLANNED):
+        if msg["state"] == State.RECEIVED.value:
+            # Plan is built and stored before any external call.
+            plan = build_plan(name=msg["first_line"], telegram_key=key, raw_text=msg["text"])
+            if not self.ledger.transition(key, State.RECEIVED, State.PLANNED):
+                return
+            self.ledger.store_plan(key, plan.model_dump())
+            if self.config.dry_run:
+                self.report_dry_run(key, plan)
+                return
+        elif msg["state"] == State.PLANNED.value and msg["plan_json"]:
+            plan = Plan.model_validate_json(msg["plan_json"])
+        else:
             return
-        self.ledger.store_plan(key, plan.model_dump())
 
         # Move to `writing` before the create call (closes the crash window).
         if not self.ledger.mark_writing(key):
@@ -126,6 +140,15 @@ class Worker:
         )
         self.ledger.mark_done(key)
 
+    def report_dry_run(self, key: str, plan: Plan) -> None:
+        """Dry-run stops at `planned`: show the masked plan, write nothing.
+
+        The `dry_run_plan` outbox kind lands with #23; until then the plan is
+        reported through the masked log.
+        """
+        text = outbound_text(render_dry_run_plan(key, plan)).text
+        log.info("dry_run_plan %s", text)
+
     # -- loop --------------------------------------------------------------
 
     async def run_once(self) -> None:
@@ -139,3 +162,14 @@ class Worker:
             except Exception:
                 log.exception("pipeline cycle failed; retrying next cycle")
             await asyncio.sleep(self.config.poll_interval)
+
+
+def render_dry_run_plan(key: str, plan: Plan) -> str:
+    """The human-readable dry-run plan (Name, then each planned property)."""
+    lines = [f"🧪 Dry run — would capture {key}", f"Name: {plan.name}"]
+    for field, value in plan.model_dump().items():
+        if field in ("name", "body_blocks"):
+            continue
+        lines.append(f"{field}: {value}")
+    lines.append(f"Body: {len(plan.body_blocks)} block(s)")
+    return "\n".join(lines)
