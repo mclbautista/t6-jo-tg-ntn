@@ -222,3 +222,18 @@ def render_stale_cache(
             f"Last error: {_field(error or 'unknown')}",
         ]
     )
+
+
+DRY_RUN_HEADER = "🧪 Dry run — planned, not written to Notion"
+
+
+def render_dry_run_plan(*, plan: dict, intake_url: str) -> str:
+    """The masked stored plan, one line per planned property (#27)."""
+    lines = [DRY_RUN_HEADER, f"<code>{_field(plan.get('name', ''))}</code>", ""]
+    for key, value in plan.items():
+        if key in ("name", "telegram_key", "body_blocks") or value in (None, "", [], {}):
+            continue
+        lines.append(f"{_field(key)}: {_field(value)}")
+    lines.append(f"Body: {len(plan.get('body_blocks') or [])} block(s)")
+    lines += ["", _link("Telegram message", intake_url)]
+    return "\n".join(lines)

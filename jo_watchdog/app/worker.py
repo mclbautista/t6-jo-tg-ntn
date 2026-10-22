@@ -39,6 +39,7 @@ from jo_watchdog.core.report import (
     forward_origin_from_raw,
     intake_link,
     render_capture_report,
+    render_dry_run_plan,
     render_edit_after_capture,
     render_stale_cache,
 )
@@ -215,6 +216,11 @@ class Worker:
     # -- draining (pipeline) ----------------------------------------------
 
     async def drain_once(self) -> None:
+        # Plans held while dry-run was on resume once it is off; `planned` is
+        # before any external call, so resuming is safe.
+        if not self.config.dry_run:
+            for key in self.ledger.pending(State.PLANNED):
+                await self.process(key)
         for key in self.ledger.due(State.RECEIVED):
             await self.process(key)
         for key in self.ledger.pending(State.EXTRACTED):
@@ -265,27 +271,36 @@ class Worker:
         msg = self.ledger.get_message(key)
         if msg is None:
             return
-        if msg["state"] == State.RECEIVED.value:
-            if await self.classify(msg) is not State.EXTRACTED:
+        if msg["state"] == State.PLANNED.value:
+            # A plan held by dry-run: write exactly what was stored.
+            if self.config.dry_run or not msg["plan_json"]:
                 return
-        elif msg["state"] != State.EXTRACTED.value:
-            return
-        if self.caches is not None and not self.caches.ready:
-            # No People/Projects/Department snapshot has ever loaded: hold at
-            # `extracted` (no attempt spent, no false unresolved finding).
-            return
+            plan = Plan.model_validate_json(msg["plan_json"])
+        else:
+            if msg["state"] == State.RECEIVED.value:
+                if await self.classify(msg) is not State.EXTRACTED:
+                    return
+            elif msg["state"] != State.EXTRACTED.value:
+                return
+            if self.caches is not None and not self.caches.ready:
+                # No People/Projects/Department snapshot has ever loaded: hold at
+                # `extracted` (no attempt spent, no false unresolved finding).
+                return
 
-        # Plan is built and stored before any external call.
-        plan = build_plan(
-            name=msg["first_line"],
-            telegram_key=key,
-            raw_text=msg["text"],
-            source_block=self._source_block(msg),
-        )
-        dup_key = self._annotate_duplicate(msg, plan)
-        if not self.ledger.transition(key, State.EXTRACTED, State.PLANNED):
-            return
-        self.ledger.store_plan(key, plan.model_dump(), jo_key=dup_key)
+            # Plan is built and stored before any external call.
+            plan = build_plan(
+                name=msg["first_line"],
+                telegram_key=key,
+                raw_text=msg["text"],
+                source_block=self._source_block(msg),
+            )
+            dup_key = self._annotate_duplicate(msg, plan)
+            if not self.ledger.transition(key, State.EXTRACTED, State.PLANNED):
+                return
+            self.ledger.store_plan(key, plan.model_dump(), jo_key=dup_key)
+            if self.config.dry_run:
+                self._report_dry_run(msg, plan)
+                return
 
         # Move to `writing` before the create call (closes the crash window).
         if not self.ledger.mark_writing(key):
@@ -337,6 +352,23 @@ class Worker:
         else:
             self.ledger.set_reaction_state(key, "set")
         self.ledger.mark_done(key)
+
+    def _report_dry_run(self, msg: dict, plan: Plan) -> None:
+        """Dry-run stops at `planned`: post the masked plan to ops, write nothing."""
+        text = render_dry_run_plan(
+            plan=plan.model_dump(),
+            intake_url=intake_link(msg["chat_id"], self.config.intake_topic_id, msg["message_id"]),
+        )
+        self.ledger.enqueue_system(
+            OutboxMessage(
+                kind="dry_run_plan",
+                chat_id=self.config.ops_chat_id,
+                topic_id=self.config.ops_topic_id,
+                text=text,
+            ),
+            key=msg["telegram_key"],
+        )
+        log.info("dry run: %s held at planned", msg["telegram_key"])
 
     def _source_block(self, msg: dict) -> str:
         """The provenance block that leads the body (#24)."""
