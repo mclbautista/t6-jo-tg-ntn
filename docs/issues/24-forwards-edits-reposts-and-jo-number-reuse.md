@@ -66,3 +66,4 @@ The block always shows `Posted by: <sender display name> (@username)`, `Posted a
 ## Blocked by
 
 - #23
+- #39
