@@ -14,7 +14,7 @@ from jo_watchdog.app.config import Config
 from jo_watchdog.app.worker import Worker
 from jo_watchdog.ledger.db import Ledger
 from jo_watchdog.ledger.states import State
-from tests.fakes import FakeNotion, FakeTelegram, update
+from tests.fakes import FakeClassifier, FakeNotion, FakeTelegram, update
 
 NOTION = Path(__file__).parent / "fixtures" / "notion"
 CONTACTS = "77b2a701-71db-4e88-a694-37f07303e77e"
@@ -225,17 +225,21 @@ class EmptyCacheHoldTests(CacheTestCase):
         caches = self.manager()
         telegram = FakeTelegram([update(10, message_id=1, text="MFG - TOC - JO #74")])
         notion_writer = FakeNotion()
+        classifier = FakeClassifier()
         worker = Worker(
             ledger=self.ledger,
             telegram=telegram,
             notion=notion_writer,
+            classifier=classifier,
             config=config(),
             caches=caches,
         )
         await worker.run_once()
         self.assertFalse(caches.ready)
         msg = self.ledger.get_message("-100123:1")
-        self.assertEqual(msg["state"], State.RECEIVED.value)
+        self.assertEqual(msg["state"], State.EXTRACTED.value)
+        self.assertEqual(msg["attempts"], 0)
+        self.assertEqual(len(classifier.calls), 1)
         self.assertEqual(notion_writer.created, [])
         self.assertEqual(telegram.reactions, [])
 

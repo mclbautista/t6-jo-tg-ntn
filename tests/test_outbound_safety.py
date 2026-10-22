@@ -15,7 +15,7 @@ from jo_watchdog.app.config import Config
 from jo_watchdog.app.worker import Worker
 from jo_watchdog.core.plan import build_plan
 from jo_watchdog.ledger.db import Ledger
-from tests.fakes import FakeNotion, FakeTelegram, update
+from tests.fakes import FakeClassifier, FakeNotion, FakeTelegram, update
 
 SOURCE = "PW: swordfish-credential\nordinary detail"
 WITHHELD = "[password withheld – see Telegram message]"
@@ -58,6 +58,7 @@ class WalkingCaptureSafetyTests(unittest.IsolatedAsyncioTestCase):
             ledger=ledger,
             telegram=telegram,
             notion=notion,
+            classifier=FakeClassifier(),
             config=make_config(),
         )
 
@@ -92,6 +93,7 @@ class WalkingCaptureSafetyTests(unittest.IsolatedAsyncioTestCase):
             ledger=ledger,
             telegram=telegram,
             notion=FakeNotion(),
+            classifier=FakeClassifier(),
             config=make_config(),
         )
 

@@ -1,5 +1,5 @@
 # Non-secret configuration. Copy to config.yaml and fill in the real values.
-# Secrets (Telegram bot token, Notion integration token) go in .env, never here.
+# Secrets (Telegram bot token, Notion integration token, DeepSeek API key) go in .env, never here.
 
 # --- Telegram scope filter (build-time values, supplied by the owner) ---
 intake_chat_id: -1000000000000      # the intake supergroup's chat id
@@ -14,6 +14,11 @@ poll_interval: 1.0                  # pause between poll+drain cycles (seconds)
 job_orders_data_source_id: "3d8fb4d5-9e59-8073-a0d0-000b77632947"
 notion_version: "2026-03-11"        # pinned API version (do not change casually)
 
+# --- DeepSeek classify/extract (DEEPSEEK_API_KEY goes in .env) ---
+deepseek_base_url: "https://api.deepseek.com"
+deepseek_model: "deepseek-chat"     # the provider's latest alias; not pinned
+deepseek_timeout_seconds: 60
+
 # --- Live resolution caches (People, Projects, Department options) ---
 contacts_data_source_id: "77b2a701-71db-4e88-a694-37f07303e77e"
 projects_data_source_id: "cc1dc02a-8f32-4c97-81e4-dc1e08d7f134"
@@ -22,9 +27,11 @@ cache_refresh_hours: 6              # refresh at startup and on this interval
 cache_stale_alert_hours: 24         # ops finding once a failed refresh leaves a cache this old
 fuzzy_min_score: 90                 # rapidfuzz WRatio needed for a name-only match
 fuzzy_min_lead: 8                   # lead over the runner-up contact
-department_aliases:                 # header token -> Department option (then live validation)
-  TO: TOC
 honorifics: [ate, kuya, sir]        # dropped from mentions and Aliases before matching
 
 # --- Ledger ---
 ledger_path: "./data/ledger.db"
+
+# --- Planning ---
+department_aliases:                 # header Department token -> Department option
+  TO: TOC

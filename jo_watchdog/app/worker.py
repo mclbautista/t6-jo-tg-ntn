@@ -1,6 +1,8 @@
 """The worker: poll (commit-before-offset) then drain (capture pipeline).
 
-One asyncio process, one ledger, one Notion writer. The poller and drainer run
+One asyncio process, one ledger, one Notion writer. Draining classifies each
+``received`` message through DeepSeek, then plans and writes the ``extracted``
+ones. The poller and drainer run
 sequentially in ``run``/``run_once``; the commit-before-offset invariant lives
 entirely in ``Ledger.accept_message`` (single transaction).
 """
@@ -10,10 +12,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from datetime import UTC, datetime, timedelta, timezone
 
-from jo_watchdog.adapters.protocols import NotionClient, TelegramClient
+from jo_watchdog.adapters.protocols import Classifier, NotionClient, TelegramClient
 from jo_watchdog.app.caches import CacheManager
 from jo_watchdog.app.config import Config
+from jo_watchdog.core.extraction import forward_origin_lines
 from jo_watchdog.core.payload import (
     build_notion_payload,
     extract_readback_fields,
@@ -25,6 +29,30 @@ from jo_watchdog.ledger.states import State
 
 log = logging.getLogger("jo_watchdog.worker")
 
+MANILA = timezone(timedelta(hours=8))
+# Fixed classifier retry delay until #25 brings the 30s→15m schedule.
+CLASSIFIER_RETRY_SECONDS = 30
+_TRACE_FIELDS = (
+    "requested_model",
+    "returned_model",
+    "prompt_tag",
+    "input_tokens",
+    "output_tokens",
+    "latency_ms",
+)
+
+
+def posted_at_from_raw(raw: dict) -> str | None:
+    """Telegram's message date as ISO-8601 in Manila time (``+08:00``)."""
+    date = (raw.get("message") or {}).get("date")
+    if isinstance(date, int):
+        return datetime.fromtimestamp(date, MANILA).isoformat()
+    return None
+
+
+def _utc_after(seconds: int) -> str:
+    return (datetime.now(UTC) + timedelta(seconds=seconds)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
 
 class Worker:
     def __init__(
@@ -33,12 +61,14 @@ class Worker:
         ledger: Ledger,
         telegram: TelegramClient,
         notion: NotionClient,
+        classifier: Classifier,
         config: Config,
         caches: CacheManager | None = None,
     ):
         self.ledger = ledger
         self.telegram = telegram
         self.notion = notion
+        self.classifier = classifier
         self.config = config
         self.caches = caches
 
@@ -83,27 +113,75 @@ class Worker:
                 json.dumps(u.raw),
                 u.text,
                 first_line_of(u.text),
+                posted_at=posted_at_from_raw(u.raw),
             )
 
     # -- draining (pipeline) ----------------------------------------------
 
     async def drain_once(self) -> None:
-        for key in self.ledger.pending(State.RECEIVED):
+        for key in self.ledger.due(State.RECEIVED):
             await self.process(key)
+        for key in self.ledger.pending(State.EXTRACTED):
+            await self.process(key)
+
+    async def classify(self, msg: dict) -> State:
+        """Run the classify/extract stage for a ``received`` message; return its new state."""
+        key = msg["telegram_key"]
+        if not msg["text"].strip():
+            self.ledger.record_no_text(key)
+            return State.IGNORED
+
+        raw_message = json.loads(msg["raw_source"]).get("message") or {}
+        result = await self.classifier.classify(
+            msg["masked_text"], forward_origin_lines(raw_message)
+        )
+        trace = result.model_dump(exclude={"extraction"})
+        call = {
+            "provider": "deepseek",
+            "purpose": "classify_extract",
+            "masker_version": msg["masker_version"],
+            **trace,
+        }
+        if result.extraction is None:
+            # No repair call and no bare-row fallback: the message stays queued.
+            self.ledger.record_classifier_failure(
+                key, call=call, retry_at=_utc_after(CLASSIFIER_RETRY_SECONDS)
+            )
+            log.warning("classifier %s for %s; will retry", result.outcome, key)
+            return State.RECEIVED
+
+        extraction = result.extraction
+        findings: list[dict] = []
+        if extraction.verdict == "unsure":
+            findings.append({"code": "unsure", "reasons": extraction.reasons})
+        if extraction.multiple_jo_suspected and extraction.verdict != "not_jo":
+            # One row from the first extraction; the full source stays in the body.
+            findings.append({"code": "multiple_jo", "reasons": extraction.reasons})
+        stage_result = {
+            "extraction": extraction.model_dump(),
+            "findings": findings,
+            "trace": {field: trace[field] for field in _TRACE_FIELDS}
+            | {"masker_version": msg["masker_version"]},
+        }
+        return self.ledger.record_extraction(key, call=call, result=stage_result)
 
     async def process(self, key: str) -> None:
         msg = self.ledger.get_message(key)
         if msg is None:
             return
+        if msg["state"] == State.RECEIVED.value:
+            if await self.classify(msg) is not State.EXTRACTED:
+                return
+        elif msg["state"] != State.EXTRACTED.value:
+            return
         if self.caches is not None and not self.caches.ready:
-            # No People/Projects/Department snapshot has ever loaded: hold the
-            # message where it is (no attempt spent, no false unresolved finding).
-            # Once #20 lands this hold sits at `extracted`.
+            # No People/Projects/Department snapshot has ever loaded: hold at
+            # `extracted` (no attempt spent, no false unresolved finding).
             return
 
         # Plan is built and stored before any external call.
         plan = build_plan(name=msg["first_line"], telegram_key=key, raw_text=msg["text"])
-        if not self.ledger.transition(key, State.RECEIVED, State.PLANNED):
+        if not self.ledger.transition(key, State.EXTRACTED, State.PLANNED):
             return
         self.ledger.store_plan(key, plan.model_dump())
 
