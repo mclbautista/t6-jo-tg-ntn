@@ -52,6 +52,14 @@ keys before commit, so tables that reference `messages(id)` stay valid.
 | last_error         | TEXT    | masked `<failure class>: <detail>` of the last failed attempt (v3) |
 | verdict            | TEXT    | DeepSeek verdict: `jo`, `unsure` or `not_jo` (v3)  |
 | ignore_reason      | TEXT    | `not_jo` or `no_text` for `ignored` rows (v3)      |
+| jo_key             | TEXT    | v6: `<Project page id>\|<Department option>\|<jo_number_int>`, set at planning only when all three resolve; NULL otherwise |
+| text_sha256        | TEXT    | v6: SHA-256 of the whitespace-normalized original `text`; set on intake (backfilled) |
+| forward_origin_type| TEXT    | v6: `user`, `hidden_user`, `chat` or `channel`; NULL for a non-forward (backfilled from `raw_source`) |
+
+Indexes `messages_jo_key` on `jo_key` and `messages_text_sha256` on
+`text_sha256` (v6). An exact re-post is an earlier row with the same
+`text_sha256` and a `notion_page_id`; number reuse is an earlier row with the
+same `jo_key` and different text. Neither ever merges or suppresses a row.
 
 ### `stage_results` (v3)
 
@@ -113,7 +121,7 @@ moves to `ignored` (`not_jo` or `no_text`, with the masked first line).
 | chat_id    | INTEGER |                                |
 | message_id | INTEGER |                                |
 | update_id  | INTEGER |                                |
-| reason     | TEXT    | e.g. `out_of_scope_chat`       |
+| reason     | TEXT    | e.g. `out_of_scope_chat`, `edit_unknown_message` (v6) |
 | first_line | TEXT    | masked-ready first line        |
 | created_at | TEXT    | ISO-8601 UTC                   |
 
@@ -166,6 +174,27 @@ Telegram accepts a post but before the row is marked `sent` re-posts it.
 Index `outbox_state_next_attempt` on `(state, next_attempt_at)`. A failed post
 retries after 30 s, 2 min, 5 min and 10 min; the fifth failure sets `failed`.
 
+### `edits` (v6, #24)
+
+One row per in-scope `edited_message` update for a message in `messages`. An
+edit never changes the Notion row or the stored plan; a correction needs a new
+Telegram message. The row, any ops post, and the offset advance commit in one
+transaction. Edits to messages not in `messages` go to `ignore_log` with reason
+`edit_unknown_message` instead.
+
+| column       | type    | notes                                                    |
+|--------------|---------|----------------------------------------------------------|
+| id           | INTEGER | PK                                                       |
+| telegram_key | TEXT    | the edited message's key                                 |
+| update_id    | INTEGER | Telegram update id; a redelivered update is not re-recorded |
+| edited_at    | TEXT    | ISO-8601 UTC from Telegram's `edit_date`                 |
+| outcome      | TEXT    | `reported` (message `written`/`done`: `edit_after_capture` posted), `pending_capture` (still in the pipeline), `ignored_message` (message `ignored`) |
+| created_at   | TEXT    | ISO-8601 UTC                                             |
+
+A `pending_capture` edit becomes `reported` in the transaction that moves its
+message to `written`, which also queues one `edit_after_capture` post however
+many edits arrived. Index `edits_telegram_key` on `telegram_key`.
+
 ## Pipeline states
 
 `received` → `extracted` → `planned` → `writing` → `written` → `done`, and
@@ -185,11 +214,10 @@ not yet recorded in `schema_version`.
 
 ## Planned migrations
 
-Migrations 6–7 are specified column by column in the build tickets and land with them:
+Migration 7 is specified column by column in its build ticket and lands with it:
 
 | Migration | Ticket | Adds |
 |---|---|---|
-| 6 | [#24](issues/24-forwards-edits-reposts-and-jo-number-reuse.md) | `jo_key`, `text_sha256`, `forward_origin_type`, `edits` |
 | 7 | [#25](issues/25-crash-safe-reliability-and-heartbeat.md) | `exhausted_at`, `runtime_state`, `heartbeats` |
 
-Move each into the Tables section above when it ships.
+Move it into the Tables section above when it ships.

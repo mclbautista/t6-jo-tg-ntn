@@ -25,17 +25,16 @@ _CAPTURED = {"written", "done"}
 _IN_PIPELINE = {"received", "extracted", "planned", "writing"}
 
 
-def decide_edit(state: str | None, *, ignored: bool = False) -> EditAction:
+def decide_edit(state: str | None) -> EditAction:
     """Map the original message's ledger state to the edit action.
 
     ``state`` is the ``messages.state`` of the edited message, or ``None`` when
-    it is not in ``messages``. ``ignored`` is true when it is in the ledger as
-    an ignored message (``ignored`` state or an ``ignore_log`` row).
+    it is not in ``messages``.
     """
-    if ignored or state == "ignored":
-        return EditAction.IGNORED_MESSAGE
     if state is None:
         return EditAction.UNKNOWN
+    if state == "ignored":
+        return EditAction.IGNORED_MESSAGE
     if state in _CAPTURED:
         return EditAction.REPORT
     if state in _IN_PIPELINE:

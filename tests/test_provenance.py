@@ -6,14 +6,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from jo_watchdog.core.provenance import (
-    forward_origin_finding,
-    intake_link,
     intake_time,
-    original_message_link,
     originally_from,
     parse_forward_origin,
     source_block,
 )
+from jo_watchdog.core.report import forward_origin_from_raw
+
+INTAKE = "https://t.me/c/1234567890/77/{}"
 
 FIXTURES = json.loads(
     (Path(__file__).parent / "fixtures" / "telegram_updates.json").read_text(encoding="utf-8")
@@ -82,8 +82,11 @@ class OriginallyFromTests(unittest.TestCase):
 
 
 class LinkTests(unittest.TestCase):
+    """Original-message links come from #23's ``forward_origin_from_raw``."""
+
     def link(self, name):
-        return original_message_link(parse_forward_origin(message(name)))
+        summary = forward_origin_from_raw(message(name))
+        return summary.original_link if summary else None
 
     def test_public_channel_link(self):
         self.assertEqual(self.link("forward_channel_public"), "https://t.me/brandupdates/42")
@@ -99,9 +102,6 @@ class LinkTests(unittest.TestCase):
             with self.subTest(name):
                 self.assertIsNone(self.link(name))
 
-    def test_intake_link_uses_topic(self):
-        self.assertEqual(intake_link(-1001234567890, 77, 501), "https://t.me/c/1234567890/77/501")
-
 
 class TimeTests(unittest.TestCase):
     def test_intake_time_is_forward_time_not_original_time(self):
@@ -113,7 +113,7 @@ class TimeTests(unittest.TestCase):
 class SourceBlockTests(unittest.TestCase):
     def test_plain_message(self):
         self.assertEqual(
-            source_block(message("text")),
+            source_block(message("text"), intake_url=INTAKE.format(501)),
             "Posted by: Ana Reyes (@anareyes)\n"
             "Posted at: Fri, Sep 18 2026 10:53\n"
             "Origin: none\n"
@@ -122,7 +122,7 @@ class SourceBlockTests(unittest.TestCase):
 
     def test_user_forward_keeps_both_identities(self):
         self.assertEqual(
-            source_block(message("forward_user")),
+            source_block(message("forward_user"), intake_url=INTAKE.format(503)),
             "Posted by: Ana Reyes (@anareyes)\n"
             "Posted at: Fri, Sep 18 2026 10:53\n"
             "Origin: user\n"
@@ -132,29 +132,31 @@ class SourceBlockTests(unittest.TestCase):
         )
 
     def test_channel_forward_adds_original_link(self):
-        block = source_block(message("forward_channel_public"))
+        block = source_block(message("forward_channel_public"), intake_url=INTAKE.format(509))
         self.assertTrue(block.endswith("Original message: https://t.me/brandupdates/42"))
 
     def test_chat_forward_has_no_original_link(self):
-        self.assertNotIn("Original message", source_block(message("forward_chat")))
-
-
-class FindingTests(unittest.TestCase):
-    def finding(self, name):
-        return forward_origin_finding(parse_forward_origin(message(name)))
-
-    def test_user_and_plain_have_no_finding(self):
-        self.assertIsNone(self.finding("text"))
-        self.assertIsNone(self.finding("forward_user"))
-
-    def test_non_user_origins_report(self):
-        self.assertEqual(
-            self.finding("forward_hidden_user"),
-            {"code": "forward_origin", "params": {"kind": "hidden user", "name": "Dina Santos"}},
+        self.assertNotIn(
+            "Original message", source_block(message("forward_chat"), intake_url=INTAKE.format(507))
         )
-        self.assertEqual(self.finding("forward_chat")["params"]["kind"], "group")
-        self.assertEqual(self.finding("forward_channel_private")["params"]["kind"], "channel")
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AllOriginsSourceBlockTests(unittest.TestCase):
+    def test_every_fixture_has_truthful_posted_by_and_originally_from(self):
+        for name, update in FIXTURES.items():
+            if "message" not in update:
+                continue
+            with self.subTest(name):
+                msg = update["message"]
+                block = source_block(msg, intake_url=INTAKE.format(msg["message_id"]))
+                self.assertIn("Posted by: Ana Reyes (@anareyes)", block)
+                origin = parse_forward_origin(msg)
+                if origin is None:
+                    self.assertNotIn("Originally from", block)
+                else:
+                    self.assertIn(f"Originally from: {originally_from(origin)}", block)
+                    self.assertIn(f"Origin: {origin.type}", block)

@@ -236,6 +236,51 @@ MIGRATION_5 = [
     "ALTER TABLE messages ADD COLUMN reaction_state TEXT",
 ]
 
+
+# -- migration 6 (#24): content-duplicate keys, forward origin, edits ---------
+
+
+def _migration_6(conn: sqlite3.Connection) -> None:
+    """Add the duplicate keys and forward origin to ``messages``, and ``edits``.
+
+    ``text_sha256`` and ``forward_origin_type`` are backfilled for existing
+    rows; ``jo_key`` stays NULL until a message is planned, so earlier rows
+    never produce a number-reuse match from a guessed key.
+    """
+    from jo_watchdog.core.duplicates import text_sha256
+
+    conn.execute("ALTER TABLE messages ADD COLUMN jo_key TEXT")
+    conn.execute("ALTER TABLE messages ADD COLUMN text_sha256 TEXT")
+    conn.execute("ALTER TABLE messages ADD COLUMN forward_origin_type TEXT")
+    conn.execute("CREATE INDEX messages_jo_key ON messages (jo_key)")
+    conn.execute("CREATE INDEX messages_text_sha256 ON messages (text_sha256)")
+    for row in conn.execute("SELECT id, text FROM messages").fetchall():
+        conn.execute(
+            "UPDATE messages SET text_sha256 = ? WHERE id = ?", (text_sha256(row[1]), row[0])
+        )
+    conn.execute(
+        "UPDATE messages SET forward_origin_type ="
+        " CASE WHEN json_valid(raw_source)"
+        "      THEN json_extract(raw_source, '$.message.forward_origin.type') END"
+    )
+    conn.execute(
+        """
+        CREATE TABLE edits (
+            id INTEGER PRIMARY KEY,
+            telegram_key TEXT NOT NULL,
+            update_id INTEGER NOT NULL,
+            edited_at TEXT NOT NULL,
+            outcome TEXT NOT NULL
+                CHECK (outcome IN ('reported', 'pending_capture', 'ignored_message')),
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute("CREATE INDEX edits_telegram_key ON edits (telegram_key)")
+
+
+MIGRATION_6 = _migration_6
+
 Migration = list[str] | Callable[[sqlite3.Connection], None]
 
 # Keyed by number and applied in ascending order of the numbers not yet recorded.
@@ -245,6 +290,7 @@ MIGRATIONS: dict[int, Migration] = {
     3: MIGRATION_3,
     4: MIGRATION_4,
     5: MIGRATION_5,
+    6: MIGRATION_6,
 }
 
 # Migrations that rebuild a referenced table run with foreign-key enforcement off.

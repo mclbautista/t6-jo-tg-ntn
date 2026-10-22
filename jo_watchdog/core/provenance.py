@@ -1,9 +1,10 @@
-"""Pure core: Telegram provenance for the source block and forward findings.
+"""Pure core: Telegram provenance for the Job Order body's source block (#24).
 
 Reads the raw Bot API ``Message`` JSON (what the adapter stores in the ledger)
-and turns ``forward_origin`` into the truthful "posted by / originally from"
-lines, the intake link, and an original-message link only when Telegram gives
-a real message-level reference (#24). No I/O.
+and turns it into the truthful "posted by / originally from" block. The links
+and the ``forward_origin`` finding come from the ops-report code (#23), so a
+channel original is linked the same way everywhere and no other origin type
+ever gets a link. No I/O.
 
 Date and deadline math always use the intake time (``message.date``, when the
 message entered the topic). The forward's original time is context only.
@@ -13,16 +14,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any, Literal
-from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel
 
-MANILA = ZoneInfo("Asia/Manila")
+from jo_watchdog.core.report import forward_origin_from_raw
+from jo_watchdog.core.verify import MANILA
 
 OriginType = Literal["user", "hidden_user", "chat", "channel"]
-
-# Wording for the ``forward_origin`` finding line (#23 template).
-_FINDING_KIND = {"hidden_user": "hidden user", "chat": "group", "channel": "channel"}
 
 
 class TelegramUser(BaseModel):
@@ -36,17 +34,14 @@ class TelegramUser(BaseModel):
         return " ".join(p for p in (self.first_name, self.last_name) if p).strip()
 
 
-class ForwardOrigin(BaseModel):
-    """The four ``MessageOrigin`` variants, flattened to the fields we use."""
+class MessageOrigin(BaseModel):
+    """The four Bot API ``MessageOrigin`` variants, flattened to the fields we use."""
 
     type: OriginType
-    date: datetime
+    date: datetime | None = None  # always sent by Telegram; tolerated if missing
     sender_user: TelegramUser | None = None  # user
     sender_user_name: str | None = None  # hidden_user
-    chat_id: int | None = None  # chat (sender_chat) / channel (chat)
-    chat_title: str | None = None
-    chat_username: str | None = None
-    message_id: int | None = None  # channel only
+    chat_title: str | None = None  # chat (sender_chat) / channel (chat)
     author_signature: str | None = None  # chat / channel
 
 
@@ -69,29 +64,25 @@ def _user(data: dict | None) -> TelegramUser | None:
     )
 
 
-def parse_forward_origin(message: dict) -> ForwardOrigin | None:
+def parse_forward_origin(message: dict) -> MessageOrigin | None:
     """Return the message's forward origin, or ``None`` for a non-forward.
 
     An origin type this code does not know is treated as no forward rather
     than guessed at.
     """
     origin = message.get("forward_origin")
-    if not origin:
+    if not isinstance(origin, dict):
         return None
     kind = origin.get("type")
     if kind not in ("user", "hidden_user", "chat", "channel"):
         return None
-    chat = origin.get("sender_chat") if kind == "chat" else origin.get("chat")
-    chat = chat or {}
-    return ForwardOrigin(
+    chat = (origin.get("sender_chat") if kind == "chat" else origin.get("chat")) or {}
+    return MessageOrigin(
         type=kind,
-        date=_to_datetime(origin["date"]),
+        date=_to_datetime(origin["date"]) if origin.get("date") is not None else None,
         sender_user=_user(origin.get("sender_user")) if kind == "user" else None,
         sender_user_name=origin.get("sender_user_name") or None,
-        chat_id=chat.get("id"),
         chat_title=chat.get("title") or None,
-        chat_username=chat.get("username") or None,
-        message_id=origin.get("message_id") if kind == "channel" else None,
         author_signature=origin.get("author_signature") or None,
     )
 
@@ -126,7 +117,7 @@ def _with_signature(title: str | None, signature: str | None) -> str:
     return f"{title} — {signature}" if signature else title
 
 
-def originally_from(origin: ForwardOrigin | None, contact_name: str | None = None) -> str | None:
+def originally_from(origin: MessageOrigin | None, contact_name: str | None = None) -> str | None:
     """The best available original identity, or ``None`` for a non-forward.
 
     ``contact_name`` is the resolved Contact for a ``user`` origin whose id or
@@ -143,34 +134,12 @@ def originally_from(origin: ForwardOrigin | None, contact_name: str | None = Non
     return _with_signature(origin.chat_title, origin.author_signature)
 
 
-def _internal_chat_id(chat_id: int) -> str:
-    """``-1001234567890`` → ``1234567890`` for ``t.me/c/`` links."""
-    text = str(abs(chat_id))
-    return text[3:] if text.startswith("100") and len(text) > 3 else text
+def source_block(message: dict, *, intake_url: str, contact_name: str | None = None) -> str:
+    """The body's source block for a captured message (#24 table).
 
-
-def intake_link(chat_id: int, topic_id: int | None, message_id: int) -> str:
-    internal = _internal_chat_id(chat_id)
-    if topic_id is None:
-        return f"https://t.me/c/{internal}/{message_id}"
-    return f"https://t.me/c/{internal}/{topic_id}/{message_id}"
-
-
-def original_message_link(origin: ForwardOrigin | None) -> str | None:
-    """A link to the forwarded original: channel origins with chat and message id only."""
-    if origin is None or origin.type != "channel" or origin.message_id is None:
-        return None
-    if origin.chat_username:
-        return f"https://t.me/{origin.chat_username}/{origin.message_id}"
-    if origin.chat_id is not None:
-        return f"https://t.me/c/{_internal_chat_id(origin.chat_id)}/{origin.message_id}"
-    return None
-
-
-def source_block(message: dict, *, contact_name: str | None = None) -> str:
-    """The body's source block for a captured message (#24 table)."""
+    ``intake_url`` is the message's own link in the intake topic.
+    """
     origin = parse_forward_origin(message)
-    chat = message.get("chat") or {}
     lines = [
         f"Posted by: {posted_by(message)}",
         f"Posted at: {manila(intake_time(message))}",
@@ -178,22 +147,10 @@ def source_block(message: dict, *, contact_name: str | None = None) -> str:
     ]
     if origin is not None:
         lines.append(f"Originally from: {originally_from(origin, contact_name)}")
-        lines.append(f"Original time: {manila(origin.date)}")
-    lines.append(
-        f"Telegram message: "
-        f"{intake_link(chat['id'], message.get('message_thread_id'), message['message_id'])}"
-    )
-    link = original_message_link(origin)
-    if link:
-        lines.append(f"Original message: {link}")
+        if origin.date is not None:
+            lines.append(f"Original time: {manila(origin.date)}")
+    lines.append(f"Telegram message: {intake_url}")
+    summary = forward_origin_from_raw(message)
+    if summary is not None and summary.original_link:
+        lines.append(f"Original message: {summary.original_link}")
     return "\n".join(lines)
-
-
-def forward_origin_finding(origin: ForwardOrigin | None) -> dict | None:
-    """The non-blocking ops finding for a non-``user`` forward, else ``None``."""
-    if origin is None or origin.type == "user":
-        return None
-    return {
-        "code": "forward_origin",
-        "params": {"kind": _FINDING_KIND[origin.type], "name": originally_from(origin)},
-    }

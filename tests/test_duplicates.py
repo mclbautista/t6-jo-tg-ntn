@@ -5,14 +5,15 @@ from datetime import UTC, datetime, timedelta
 
 from jo_watchdog.core.duplicates import (
     EarlierCapture,
-    duplicate_finding,
+    append_watchdog_line,
     find_duplicate,
     jo_key,
-    jo_number_int,
     notes_line,
     text_sha256,
 )
 from jo_watchdog.core.edits import EditAction, decide_edit
+from jo_watchdog.core.header import parse_header, parse_number
+from jo_watchdog.core.job_order import WATCHDOG_MARKER
 
 NOW = datetime(2026, 9, 20, 4, 0, tzinfo=UTC)
 KEY = "proj-page|TOC|74"
@@ -24,7 +25,7 @@ def row(tg, text, key=KEY, url="https://notion.so/a", days=2):
         text_sha256=text_sha256(text),
         jo_key=key,
         page_url=url,
-        received_at=NOW - timedelta(days=days),
+        posted_at=NOW - timedelta(days=days),
     )
 
 
@@ -33,21 +34,21 @@ def find(text, earlier, key=KEY):
         telegram_key="-1001:900",
         text_sha=text_sha256(text),
         key=key,
-        received_at=NOW,
+        posted_at=NOW,
         earlier=earlier,
     )
 
 
 class KeyTests(unittest.TestCase):
-    def test_hash_and_leading_zero_variants_normalize(self):
-        for raw in ("#074", "074", "74", "# 74", " #0074 "):
+    def test_hash_and_leading_zero_variants_give_one_integer(self):
+        # #21's parser keeps the posted digits; the key uses their integer value.
+        for raw in ("JO #074", "#074", "074", "74", "JO 0074"):
             with self.subTest(raw):
-                self.assertEqual(jo_number_int(raw), 74)
-
-    def test_unparseable_numbers(self):
-        for raw in (None, "", "#", "74a", "JO 74-B"):
-            with self.subTest(raw):
-                self.assertIsNone(jo_number_int(raw))
+                self.assertEqual(int(parse_number(raw)), 74)
+        headers = ["MFG - TOC - JO #074", "MFG - TOC - #74", "MFG-TOC-JO 0074"]
+        numbers = {parse_header(h, {}).jo_number_int for h in headers}
+        self.assertEqual(numbers, {74})
+        self.assertEqual(parse_header(headers[0], {}).jo_number, "#074")
 
     def test_jo_key_needs_all_three(self):
         self.assertEqual(jo_key("p", "TOC", 74), "p|TOC|74")
@@ -114,36 +115,31 @@ class OutputTests(unittest.TestCase):
             "Earlier row: https://notion.so/a (possible number reuse)",
         )
 
-    def test_findings(self):
+    def test_watchdog_line_opens_or_extends_the_block(self):
+        line = "Earlier row: https://notion.so/a (exact re-post)"
+        self.assertEqual(append_watchdog_line("", line), f"{WATCHDOG_MARKER}\n{line}")
         self.assertEqual(
-            duplicate_finding(find("same", [row("-1001:1", "same")])),
-            {"code": "exact_repost", "params": {"url": "https://notion.so/a", "days": 2}},
+            append_watchdog_line("poster note", line), f"poster note\n\n{WATCHDOG_MARKER}\n{line}"
         )
-        self.assertEqual(
-            duplicate_finding(find("new", [row("-1001:1", "old")]), jo_number="#074"),
-            {
-                "code": "number_reuse",
-                "params": {"url": "https://notion.so/a", "days": 2, "jo_number": "#074"},
-            },
-        )
+        existing = f"poster note\n\n{WATCHDOG_MARKER}\nDeadline as posted: 1pm"
+        self.assertEqual(append_watchdog_line(existing, line), f"{existing}\n{line}")
 
 
 class EditTableTests(unittest.TestCase):
     def test_edit_table(self):
         cases = [
-            ("written", False, EditAction.REPORT),
-            ("done", False, EditAction.REPORT),
-            ("received", False, EditAction.PENDING_CAPTURE),
-            ("extracted", False, EditAction.PENDING_CAPTURE),
-            ("planned", False, EditAction.PENDING_CAPTURE),
-            ("writing", False, EditAction.PENDING_CAPTURE),
-            ("ignored", False, EditAction.IGNORED_MESSAGE),
-            (None, True, EditAction.IGNORED_MESSAGE),
-            (None, False, EditAction.UNKNOWN),
+            ("written", EditAction.REPORT),
+            ("done", EditAction.REPORT),
+            ("received", EditAction.PENDING_CAPTURE),
+            ("extracted", EditAction.PENDING_CAPTURE),
+            ("planned", EditAction.PENDING_CAPTURE),
+            ("writing", EditAction.PENDING_CAPTURE),
+            ("ignored", EditAction.IGNORED_MESSAGE),
+            (None, EditAction.UNKNOWN),
         ]
-        for state, ignored, expected in cases:
-            with self.subTest(state=state, ignored=ignored):
-                self.assertIs(decide_edit(state, ignored=ignored), expected)
+        for state, expected in cases:
+            with self.subTest(state=state):
+                self.assertIs(decide_edit(state), expected)
 
     def test_outcomes_match_the_edits_table_values(self):
         self.assertEqual(

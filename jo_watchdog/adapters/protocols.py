@@ -24,6 +24,10 @@ class IncomingUpdate(BaseModel):
     message_thread_id: int | None = None
     text: str = ""
     raw: dict[str, Any]
+    # An ``edited_message`` update (#24): ``raw`` holds ``edited_message``, and
+    # ``edit_date`` is Telegram's unix time of the edit.
+    edited: bool = False
+    edit_date: int | None = None
 
 
 class PageRef(BaseModel):

@@ -29,6 +29,7 @@ from jo_watchdog.core.resolve import (
     Person,
     ProjectEntry,
     ProjectResolution,
+    normalize_handle,
     resolve_department,
     resolve_people,
     resolve_project,
@@ -240,6 +241,23 @@ class CacheManager:
         return resolve_people(
             assignees_raw, cc_raw, self._people_index, self.settings, entities or []
         )
+
+    def contact_for_telegram_user(self, user_id: int | None, username: str | None) -> str | None:
+        """The one Contact whose TelegramUserID or TelegramHandle matches, else None.
+
+        Used only for the source block's bracketed name (#24); never a relation.
+        """
+        index = self._people_index
+        if index is None:
+            return None
+        ids: set[str] = set()
+        if user_id is not None:
+            ids = index.by_user_id.get(str(user_id), set())
+        if not ids and username:
+            ids = index.by_handle.get(normalize_handle(username), set())
+        if len(ids) != 1:
+            return None
+        return index.people[next(iter(ids))].name
 
     def resolve_project(self, project_raw: str | None) -> ProjectResolution:
         if self.projects is None:
