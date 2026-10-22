@@ -35,6 +35,15 @@ fuzzy_min_score: 90                 # rapidfuzz WRatio needed for a name-only ma
 fuzzy_min_lead: 8                   # lead over the runner-up contact
 honorifics: [ate, kuya, sir]        # dropped from mentions and Aliases before matching
 
+# --- Deliverable matching (Jev via OpenRouter, #26) ---
+deliverables_data_source_id: "0a4ff084-3138-429c-8dbe-4d802aded74f"
+jev_url: "https://openrouter.ai/api/alpha/decisions"
+jev_model: "~typesafe/jev-latest"   # OpenRouter's newest-release alias; never pinned
+jev_timeout_seconds: 30
+t_link: 0.90                        # link when `match` is top choice and >= this
+t_hint: 0.50                        # hint when match + maybe >= this
+deliverable_link_enabled: false     # shadow mode: decide and report, write no relation
+
 # --- Ledger ---
 ledger_path: "./data/ledger.db"
 

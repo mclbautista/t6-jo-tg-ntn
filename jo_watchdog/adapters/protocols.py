@@ -13,6 +13,7 @@ from typing import Any, Literal, Protocol, runtime_checkable
 from pydantic import BaseModel
 
 from jo_watchdog.core.extraction import Extraction
+from jo_watchdog.core.matching import Candidate, MatchResult
 
 
 class IncomingUpdate(BaseModel):
@@ -88,3 +89,21 @@ class Classifier(Protocol):
     async def classify(
         self, masked_text: str, origin_lines: list[str] | None
     ) -> ClassifyResult: ...
+
+
+@runtime_checkable
+class DeliverableMatcher(Protocol):
+    """Answers one match/maybe/no decision per candidate (#26)."""
+
+    async def match(
+        self, state: str, project_name: str, candidates: list[Candidate]
+    ) -> MatchResult: ...
+
+
+@runtime_checkable
+class DeliverableSource(Protocol):
+    """Live, project-scoped Deliverable candidates (#26)."""
+
+    async def query_project_deliverables(
+        self, data_source_id: str, project_page_id: str
+    ) -> list[Candidate]: ...

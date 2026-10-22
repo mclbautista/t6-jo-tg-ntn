@@ -18,7 +18,8 @@ jo_watchdog/
   core/       pure: plan builder, payload builder, read-back compare, masker seam,
               verification findings, ops-report rendering
   ledger/     SQLite (WAL, versioned schema), offsets, state machine
-  adapters/   Telegram (aiogram-as-client), Notion (httpx, pinned version), DeepSeek
+  adapters/   Telegram (aiogram-as-client), Notion (httpx, pinned version), DeepSeek,
+              Jev Deliverable matcher (OpenRouter Decisions API)
   prompts/    versioned few-shot turns for the classify/extract prompt
   app/        config, worker loop, entry point
 tests/        unittest (runs under pytest too); real SQLite + fake adapters
