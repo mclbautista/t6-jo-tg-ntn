@@ -24,6 +24,11 @@ class Plan(BaseModel):
     name: str
     telegram_key: str
     body_blocks: list[str] = Field(default_factory=list)
+    # Watchdog-only Notes (the earlier-row reference, #24); empty writes no Notes.
+    notes: str = ""
+    # The duplicate decision made at plan time (#24), replayed unchanged:
+    # ``{"code": "exact_repost" | "number_reuse", "url", "days", "jo_number"}``.
+    duplicate: dict | None = None
 
 
 def split_blocks(text: str, limit: int = BLOCK_LIMIT) -> list[str]:
@@ -67,12 +72,18 @@ def first_line_of(text: str) -> str:
     return ""
 
 
-def build_plan(name: str, telegram_key: str, raw_text: str) -> Plan:
-    """Build a plan after source-derived text crosses the outbound boundary."""
+def build_plan(name: str, telegram_key: str, raw_text: str, *, source_block: str = "") -> Plan:
+    """Build a plan after source-derived text crosses the outbound boundary.
+
+    ``source_block`` (the provenance lines, #24) leads the body when given.
+    """
     safe_name = outbound_text(name).text
     safe_source = outbound_text(raw_text).text
     return Plan(
         name=safe_name,
         telegram_key=telegram_key,
-        body_blocks=split_blocks(safe_source),
+        body_blocks=[
+            *split_blocks(outbound_text(source_block).text),
+            *split_blocks(safe_source),
+        ],
     )

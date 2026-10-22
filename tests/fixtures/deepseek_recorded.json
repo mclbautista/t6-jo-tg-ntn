@@ -1,0 +1,156 @@
+{
+ "_note": "Responses in the documented DeepSeek chat-completions shape, recorded for offline contract tests. No network access in CI.",
+ "jo": {
+  "status": 200,
+  "body": {
+   "id": "chatcmpl-rec",
+   "object": "chat.completion",
+   "created": 1790564401,
+   "model": "deepseek-chat",
+   "choices": [
+    {
+     "index": 0,
+     "message": {
+      "role": "assistant",
+      "content": "{\"verdict\": \"jo\", \"confidence\": \"high\", \"reasons\": \"Has a JO header, a task and an assignee.\", \"multiple_jo_suspected\": false, \"header_raw\": \"MFG - TOC - JO #74\", \"jo_number_raw\": \"JO #74\", \"project_raw\": \"MFG\", \"department_raw\": \"TOC\", \"header_date_raw\": \"September 28 / Monday\", \"title\": \"My Father's Girlfriend FTR\", \"task\": \"D14-15 Upload synced dailies\", \"purpose\": null, \"source\": null, \"watermark\": null, \"link_settings\": null, \"mode_of_transfer\": null, \"platform\": null, \"blocker\": null, \"pending\": null, \"notes\": null, \"deadline_raw\": \"September 29 / Tues 5AM\", \"assignees_raw\": \"Majo\", \"cc_raw\": \"@leizette\", \"subtitle\": null}"
+     },
+     "finish_reason": "stop"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 6180,
+    "completion_tokens": 214,
+    "total_tokens": 6394
+   }
+  }
+ },
+ "unsure": {
+  "status": 200,
+  "body": {
+   "id": "chatcmpl-rec",
+   "object": "chat.completion",
+   "created": 1790564401,
+   "model": "deepseek-chat",
+   "choices": [
+    {
+     "index": 0,
+     "message": {
+      "role": "assistant",
+      "content": "{\"header_raw\": \"pa export naman ng trailer bukas\", \"jo_number_raw\": null, \"project_raw\": null, \"department_raw\": null, \"header_date_raw\": null, \"title\": null, \"task\": null, \"purpose\": null, \"source\": null, \"watermark\": null, \"link_settings\": null, \"mode_of_transfer\": null, \"platform\": null, \"blocker\": null, \"pending\": null, \"notes\": null, \"deadline_raw\": null, \"assignees_raw\": null, \"cc_raw\": null, \"subtitle\": null, \"verdict\": \"unsure\", \"confidence\": \"low\", \"reasons\": \"Reads like a request but has no JO header or assignee.\", \"multiple_jo_suspected\": false}"
+     },
+     "finish_reason": "stop"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 6180,
+    "completion_tokens": 214,
+    "total_tokens": 6394
+   }
+  }
+ },
+ "not_jo": {
+  "status": 200,
+  "body": {
+   "id": "chatcmpl-rec",
+   "object": "chat.completion",
+   "created": 1790564401,
+   "model": "deepseek-chat",
+   "choices": [
+    {
+     "index": 0,
+     "message": {
+      "role": "assistant",
+      "content": "{\"header_raw\": \"Salamat po!\", \"jo_number_raw\": null, \"project_raw\": null, \"department_raw\": null, \"header_date_raw\": null, \"title\": null, \"task\": null, \"purpose\": null, \"source\": null, \"watermark\": null, \"link_settings\": null, \"mode_of_transfer\": null, \"platform\": null, \"blocker\": null, \"pending\": null, \"notes\": null, \"deadline_raw\": null, \"assignees_raw\": null, \"cc_raw\": null, \"subtitle\": null, \"verdict\": \"not_jo\", \"confidence\": \"high\", \"reasons\": \"A thank-you message with no request.\", \"multiple_jo_suspected\": false}"
+     },
+     "finish_reason": "stop"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 6180,
+    "completion_tokens": 214,
+    "total_tokens": 6394
+   }
+  }
+ },
+ "empty_content": {
+  "status": 200,
+  "body": {
+   "id": "chatcmpl-rec",
+   "object": "chat.completion",
+   "created": 1790564401,
+   "model": "deepseek-chat",
+   "choices": [
+    {
+     "index": 0,
+     "message": {
+      "role": "assistant",
+      "content": ""
+     },
+     "finish_reason": "stop"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 6180,
+    "completion_tokens": 214,
+    "total_tokens": 6394
+   }
+  }
+ },
+ "malformed_json": {
+  "status": 200,
+  "body": {
+   "id": "chatcmpl-rec",
+   "object": "chat.completion",
+   "created": 1790564401,
+   "model": "deepseek-chat",
+   "choices": [
+    {
+     "index": 0,
+     "message": {
+      "role": "assistant",
+      "content": "{\"verdict\": \"jo\", \"confidence\": "
+     },
+     "finish_reason": "stop"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 6180,
+    "completion_tokens": 214,
+    "total_tokens": 6394
+   }
+  }
+ },
+ "schema_mismatch": {
+  "status": 200,
+  "body": {
+   "id": "chatcmpl-rec",
+   "object": "chat.completion",
+   "created": 1790564401,
+   "model": "deepseek-chat",
+   "choices": [
+    {
+     "index": 0,
+     "message": {
+      "role": "assistant",
+      "content": "{\"verdict\": \"maybe\", \"confidence\": \"high\", \"reasons\": \"Has a JO header, a task and an assignee.\", \"multiple_jo_suspected\": false, \"header_raw\": \"MFG - TOC - JO #74\", \"jo_number_raw\": \"JO #74\", \"project_raw\": \"MFG\", \"department_raw\": \"TOC\", \"header_date_raw\": \"September 28 / Monday\", \"title\": \"My Father's Girlfriend FTR\", \"task\": \"D14-15 Upload synced dailies\", \"purpose\": null, \"source\": null, \"watermark\": null, \"link_settings\": null, \"mode_of_transfer\": null, \"platform\": null, \"blocker\": null, \"pending\": null, \"notes\": null, \"deadline_raw\": \"September 29 / Tues 5AM\", \"assignees_raw\": \"Majo\", \"cc_raw\": \"@leizette\", \"subtitle\": null, \"page_id\": \"abc\"}"
+     },
+     "finish_reason": "stop"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 6180,
+    "completion_tokens": 214,
+    "total_tokens": 6394
+   }
+  }
+ },
+ "provider_failure": {
+  "status": 503,
+  "body": {
+   "error": {
+    "message": "Service is too busy. Please try again later.",
+    "type": "server_busy"
+   }
+  }
+ }
+}

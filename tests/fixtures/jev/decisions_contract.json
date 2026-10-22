@@ -1,0 +1,92 @@
+{
+  "note": "The example request and response from issue #26, pinned as the wire contract.",
+  "project": {
+    "page_id": "proj-moonglow",
+    "name": "Moonglow"
+  },
+  "source_text": "masked message text",
+  "candidates": [
+    {
+      "page_id": "page-ftr-scr",
+      "name": "Moonglow FTR SCR"
+    },
+    {
+      "page_id": "page-mainpic-dcp",
+      "name": "Mainpic DCP"
+    }
+  ],
+  "expected_request": {
+    "model": "~typesafe/jev-latest",
+    "state": {
+      "project": "Moonglow",
+      "job_order": "masked message text"
+    },
+    "questions": {
+      "c0": {
+        "type": "choice",
+        "instructions": "Does this Job Order belong to the Deliverable 'Moonglow FTR SCR'?",
+        "criteria": {
+          "match": "The Job Order is clearly work for this Deliverable.",
+          "maybe": "The Job Order could be for this Deliverable, but the text doesn't make it clear.",
+          "no": "The Job Order is not for this Deliverable."
+        }
+      },
+      "c1": {
+        "type": "choice",
+        "instructions": "Does this Job Order belong to the Deliverable 'Mainpic DCP'?",
+        "criteria": {
+          "match": "The Job Order is clearly work for this Deliverable.",
+          "maybe": "The Job Order could be for this Deliverable, but the text doesn't make it clear.",
+          "no": "The Job Order is not for this Deliverable."
+        }
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "id": "gen-dec-example",
+      "model": "typesafe/jev-1.14-20261014",
+      "provider": "TypeSafe",
+      "answers": {
+        "c0": {
+          "type": "choice",
+          "choice": "match",
+          "confidence": 0.86,
+          "probabilities": {
+            "match": 0.93,
+            "maybe": 0.06,
+            "no": 0.01
+          }
+        },
+        "c1": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.95,
+          "probabilities": {
+            "match": 0.0,
+            "maybe": 0.03,
+            "no": 0.97
+          }
+        }
+      },
+      "usage": {
+        "input_tokens": 240,
+        "output_tokens": 40,
+        "cost": 1e-05
+      }
+    }
+  },
+  "error_response": {
+    "status": 429,
+    "headers": {
+      "Retry-After": "7"
+    },
+    "body": {
+      "error": {
+        "code": 429,
+        "message": "Rate limit exceeded"
+      }
+    }
+  }
+}

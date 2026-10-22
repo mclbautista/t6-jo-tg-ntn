@@ -1,0 +1,1213 @@
+{
+ "_comment": "Golden #21 planning results over tests/fixtures/redacted_corpus.json. Posting time = the posted date line at 10:00 Manila (2026); every corpus assignee is given End of Shift 7:00 PM; department_aliases = {TO: TOC}. Hand-checked against the deadline table in docs/issues/21-deterministic-job-order-planning.md.",
+ "headers": {
+  "MFG - TOC - JO #74": {
+   "project": "MFG",
+   "department": "TOC",
+   "number": "74"
+  },
+  "TWBTY - TOC - JO No. 15": {
+   "project": "TWBTY",
+   "department": "TOC",
+   "number": "15"
+  },
+  "TWBTY - TOC - JO No. 13": {
+   "project": "TWBTY",
+   "department": "TOC",
+   "number": "13"
+  },
+  "MFG - TOC - JO #69": {
+   "project": "MFG",
+   "department": "TOC",
+   "number": "69"
+  },
+  "MP-TOC-JO01": {
+   "project": "MP",
+   "department": "TOC",
+   "number": "01"
+  },
+  "MC7 - AE - #008": {
+   "project": "MC7",
+   "department": "AE",
+   "number": "008"
+  },
+  "MC7 - AE - #007": {
+   "project": "MC7",
+   "department": "AE",
+   "number": "007"
+  },
+  "MP-TOC-JO22": {
+   "project": "MP",
+   "department": "TOC",
+   "number": "22"
+  },
+  "MFG - TOC - JO #67": {
+   "project": "MFG",
+   "department": "TOC",
+   "number": "67"
+  },
+  "MFG - TOC - JO #66": {
+   "project": "MFG",
+   "department": "TOC",
+   "number": "66"
+  },
+  "MFG - TOC - JO #65": {
+   "project": "MFG",
+   "department": "TOC",
+   "number": "65"
+  },
+  "TOC - Job Order": null,
+  "SOY - TOC - JOB ORDER 31": {
+   "project": "SOY",
+   "department": "TOC",
+   "number": "31"
+  },
+  "TWBTY - AE - JO No. 10": {
+   "project": "TWBTY",
+   "department": "AE",
+   "number": "10"
+  },
+  "JOB ORDER": null,
+  "ALTA-TO-JO04": {
+   "project": "ALTA",
+   "department": "TOC",
+   "number": "04"
+  },
+  "MFG - TOC - JO #63": {
+   "project": "MFG",
+   "department": "TOC",
+   "number": "63"
+  },
+  "RMN - AE - #005": {
+   "project": "RMN",
+   "department": "AE",
+   "number": "005"
+  },
+  "ALTA-TO-JO03": {
+   "project": "ALTA",
+   "department": "TOC",
+   "number": "03"
+  },
+  "LSB-TOC-020": {
+   "project": "LSB",
+   "department": "TOC",
+   "number": "020"
+  },
+  "HADR - TOC - JOB ORDER #107": {
+   "project": "HADR",
+   "department": "TOC",
+   "number": "107"
+  },
+  "MC7 - AE - #004": {
+   "project": "MC7",
+   "department": "AE",
+   "number": "004"
+  },
+  "R23 - OE - JO #35": {
+   "project": "R23",
+   "department": "OE",
+   "number": "35"
+  },
+  "58 - TOC - #0044": {
+   "project": "58",
+   "department": "TOC",
+   "number": "0044"
+  },
+  "RMN - AE - #004": {
+   "project": "RMN",
+   "department": "AE",
+   "number": "004"
+  },
+  "MT - COOR - JOB ORDER - 033": {
+   "project": "MT",
+   "department": "COOR",
+   "number": "033"
+  },
+  "SOY - COOR - JOB ORDER - 30": {
+   "project": "SOY",
+   "department": "COOR",
+   "number": "30"
+  },
+  "TWBTY - TOC - JO No. 06": {
+   "project": "TWBTY",
+   "department": "TOC",
+   "number": "06"
+  },
+  "2VI-TOC-061": {
+   "project": "2VI",
+   "department": "TOC",
+   "number": "061"
+  },
+  "FS-TOC-008": {
+   "project": "FS",
+   "department": "TOC",
+   "number": "008"
+  },
+  "FS-AE-007": {
+   "project": "FS",
+   "department": "AE",
+   "number": "007"
+  },
+  "LSB-AE-018": {
+   "project": "LSB",
+   "department": "AE",
+   "number": "018"
+  },
+  "2VI-TOC-059": {
+   "project": "2VI",
+   "department": "TOC",
+   "number": "059"
+  },
+  "SOMSOM - TOC - #0163": {
+   "project": "SOMSOM",
+   "department": "TOC",
+   "number": "0163"
+  },
+  "RMN - AE - #002": {
+   "project": "RMN",
+   "department": "AE",
+   "number": "002"
+  },
+  "MFG - TOC - JOB ORDER 54": {
+   "project": "MFG",
+   "department": "TOC",
+   "number": "54"
+  },
+  "IMP - AE - JOB ORDER 37": {
+   "project": "IMP",
+   "department": "AE",
+   "number": "37"
+  },
+  "MM - AE - JO #36": {
+   "project": "MM",
+   "department": "AE",
+   "number": "36"
+  },
+  "MM - AE - JO #35": {
+   "project": "MM",
+   "department": "AE",
+   "number": "35"
+  },
+  "PTG - TOC - #045": {
+   "project": "PTG",
+   "department": "TOC",
+   "number": "045"
+  },
+  "SOMSOM - TOC - #0159": {
+   "project": "SOMSOM",
+   "department": "TOC",
+   "number": "0159"
+  },
+  "SOY - TOC - JOB ORDER 27": {
+   "project": "SOY",
+   "department": "TOC",
+   "number": "27"
+  },
+  "MFG - TOC - JO #031": {
+   "project": "MFG",
+   "department": "TOC",
+   "number": "031"
+  },
+  "JO CODE: INA-TOC-30": {
+   "project": "INA",
+   "department": "TOC",
+   "number": "30"
+  },
+  "SOY - AE - JOB ORDER 25": {
+   "project": "SOY",
+   "department": "AE",
+   "number": "25"
+  },
+  "JO CODE: MT-AE-32": {
+   "project": "MT",
+   "department": "AE",
+   "number": "32"
+  },
+  "58 - TOC - #0043": {
+   "project": "58",
+   "department": "TOC",
+   "number": "0043"
+  },
+  "MFG - TOC - JO #20": {
+   "project": "MFG",
+   "department": "TOC",
+   "number": "20"
+  },
+  "IMP - TOC - JOB ORDER 33": {
+   "project": "IMP",
+   "department": "TOC",
+   "number": "33"
+  },
+  "KB - AE - JOB ORDER 14": {
+   "project": "KB",
+   "department": "AE",
+   "number": "14"
+  },
+  "OLSEN'S - TOC - #007": {
+   "project": "OLSEN'S",
+   "department": "TOC",
+   "number": "007"
+  },
+  "JO CODE: APL-TOC-37": {
+   "project": "APL",
+   "department": "TOC",
+   "number": "37"
+  },
+  "SCM - AE - JOB ORDER 101": {
+   "project": "SCM",
+   "department": "AE",
+   "number": "101"
+  },
+  "HADR - TOC - JOB ORDER #106": {
+   "project": "HADR",
+   "department": "TOC",
+   "number": "106"
+  },
+  "HADR - TOC - JOB ORDER #104": {
+   "project": "HADR",
+   "department": "TOC",
+   "number": "104"
+  },
+  "SK-TOC-JO02": {
+   "project": "SK",
+   "department": "TOC",
+   "number": "02"
+  },
+  "SOY - TOC - JOB ORDER 22": {
+   "project": "SOY",
+   "department": "TOC",
+   "number": "22"
+  },
+  "LS - TOC - JOB ORDER 102": {
+   "project": "LS",
+   "department": "TOC",
+   "number": "102"
+  },
+  "LS - TOC - JOB ORDER 101": {
+   "project": "LS",
+   "department": "TOC",
+   "number": "101"
+  },
+  "OURS - TOC - #0002": {
+   "project": "OURS",
+   "department": "TOC",
+   "number": "0002"
+  },
+  "LSB-AE-JO13": {
+   "project": "LSB",
+   "department": "AE",
+   "number": "13"
+  },
+  "58 - TOC - #0041": {
+   "project": "58",
+   "department": "TOC",
+   "number": "0041"
+  },
+  "SUN - TOC - JO #3": {
+   "project": "SUN",
+   "department": "TOC",
+   "number": "3"
+  },
+  "MM - TOC - JO #32": {
+   "project": "MM",
+   "department": "TOC",
+   "number": "32"
+  },
+  "SB-AE-JO40": {
+   "project": "SB",
+   "department": "AE",
+   "number": "40"
+  },
+  "PAR - AE - #057": {
+   "project": "PAR",
+   "department": "AE",
+   "number": "057"
+  },
+  "[LATE JO]": null,
+  "JAG -COOR-JO#68": {
+   "project": "JAG",
+   "department": "COOR",
+   "number": "68"
+  },
+  "PTG - AE - #039": {
+   "project": "PTG",
+   "department": "AE",
+   "number": "039"
+  },
+  "MFG - TOC - JOB ORDER 11": {
+   "project": "MFG",
+   "department": "TOC",
+   "number": "11"
+  },
+  "PP EP 2 (APC) - TOC - #0004": {
+   "project": "PP EP 2 (APC)",
+   "department": "TOC",
+   "number": "0004"
+  },
+  "\\LS - AE - JOB ORDER 91": {
+   "project": "LS",
+   "department": "AE",
+   "number": "91"
+  },
+  "SCM - AE - JOB ORDER 96": {
+   "project": "SCM",
+   "department": "AE",
+   "number": "96"
+  }
+ },
+ "messages": [
+  {
+   "index": 0,
+   "name": "MFG - TOC - JO #74",
+   "jo_number": "#74",
+   "jo_number_int": 74,
+   "deadline_raw": "September 29 / Tues 5AM",
+   "posted_at": "2026-09-28T10:00:00+08:00",
+   "deadline": "2026-09-29T05:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 1,
+   "name": "MFG - TOC - JO #74",
+   "jo_number": "#74",
+   "jo_number_int": 74,
+   "deadline_raw": "within shift",
+   "posted_at": "2026-09-26T10:00:00+08:00",
+   "deadline": "2026-09-26T19:00:00+08:00",
+   "deadline_source": "shift",
+   "findings": []
+  },
+  {
+   "index": 2,
+   "name": "TWBTY - TOC - JO #15",
+   "jo_number": "#15",
+   "jo_number_int": 15,
+   "deadline_raw": "within shift",
+   "posted_at": "2026-09-26T10:00:00+08:00",
+   "deadline": "2026-09-26T19:00:00+08:00",
+   "deadline_source": "shift",
+   "findings": []
+  },
+  {
+   "index": 3,
+   "name": "TWBTY - TOC - JO #13",
+   "jo_number": "#13",
+   "jo_number_int": 13,
+   "deadline_raw": "within shift if kaya",
+   "posted_at": "2026-09-26T10:00:00+08:00",
+   "deadline": "2026-09-26T19:00:00+08:00",
+   "deadline_source": "shift",
+   "findings": []
+  },
+  {
+   "index": 4,
+   "name": "MFG - TOC - JO #69",
+   "jo_number": "#69",
+   "jo_number_int": 69,
+   "deadline_raw": "within shift",
+   "posted_at": "2026-09-25T10:00:00+08:00",
+   "deadline": "2026-09-25T19:00:00+08:00",
+   "deadline_source": "shift",
+   "findings": []
+  },
+  {
+   "index": 5,
+   "name": "MP - TOC - JO #01",
+   "jo_number": "#01",
+   "jo_number_int": 1,
+   "deadline_raw": "Sept 28 / Mon / within the day",
+   "posted_at": "2026-09-25T10:00:00+08:00",
+   "deadline": "2026-09-28T23:59:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 6,
+   "name": "MC7 - AE - JO #008",
+   "jo_number": "#008",
+   "jo_number_int": 8,
+   "deadline_raw": "September 26, 4PM",
+   "posted_at": "2026-09-25T10:00:00+08:00",
+   "deadline": "2026-09-26T16:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 7,
+   "name": "MC7 - AE - JO #007",
+   "jo_number": "#007",
+   "jo_number_int": 7,
+   "deadline_raw": "September 25, 7PM",
+   "posted_at": "2026-09-25T10:00:00+08:00",
+   "deadline": "2026-09-25T19:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 8,
+   "name": "MP - TOC - JO #22",
+   "jo_number": "#22",
+   "jo_number_int": 22,
+   "deadline_raw": "Sept 25 / within the day",
+   "posted_at": "2026-09-25T10:00:00+08:00",
+   "deadline": "2026-09-25T23:59:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 9,
+   "name": "MFG - TOC - JO #67",
+   "jo_number": "#67",
+   "jo_number_int": 67,
+   "deadline_raw": "September 27 / Sunday 5AM (pickup D16 shoot)",
+   "posted_at": "2026-09-24T10:00:00+08:00",
+   "deadline": "2026-09-27T05:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 10,
+   "name": "MFG - TOC - JO #66",
+   "jo_number": "#66",
+   "jo_number_int": 66,
+   "deadline_raw": "September 25 / Friday 5AM",
+   "posted_at": "2026-09-24T10:00:00+08:00",
+   "deadline": "2026-09-25T05:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 11,
+   "name": "MFG - TOC - JO #65",
+   "jo_number": "#65",
+   "jo_number_int": 65,
+   "deadline_raw": "September 25 / Fri 5AM",
+   "posted_at": "2026-09-24T10:00:00+08:00",
+   "deadline": "2026-09-25T05:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 12,
+   "name": "TOC - Job Order",
+   "jo_number": null,
+   "jo_number_int": null,
+   "deadline_raw": null,
+   "posted_at": "2026-09-24T10:00:00+08:00",
+   "deadline": null,
+   "deadline_source": "blank",
+   "findings": []
+  },
+  {
+   "index": 13,
+   "name": "SOY - TOC - JO #31",
+   "jo_number": "#31",
+   "jo_number_int": 31,
+   "deadline_raw": "September 25, 3pm",
+   "posted_at": "2026-09-25T10:00:00+08:00",
+   "deadline": "2026-09-25T15:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 14,
+   "name": "TWBTY - AE - JO #10",
+   "jo_number": "#10",
+   "jo_number_int": 10,
+   "deadline_raw": "end of shift",
+   "posted_at": "2026-09-24T10:00:00+08:00",
+   "deadline": "2026-09-24T19:00:00+08:00",
+   "deadline_source": "shift",
+   "findings": []
+  },
+  {
+   "index": 15,
+   "name": "JOB ORDER",
+   "jo_number": null,
+   "jo_number_int": null,
+   "deadline_raw": "Sept 24 / within the day",
+   "posted_at": "2026-09-23T10:00:00+08:00",
+   "deadline": "2026-09-24T23:59:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 16,
+   "name": "ALTA - TOC - JO #04",
+   "jo_number": "#04",
+   "jo_number_int": 4,
+   "deadline_raw": "Sept 23 / end of shift",
+   "posted_at": "2026-09-23T10:00:00+08:00",
+   "deadline": "2026-09-23T19:00:00+08:00",
+   "deadline_source": "shift",
+   "findings": []
+  },
+  {
+   "index": 17,
+   "name": "MFG - TOC - JO #63",
+   "jo_number": "#63",
+   "jo_number_int": 63,
+   "deadline_raw": null,
+   "posted_at": "2026-09-23T10:00:00+08:00",
+   "deadline": null,
+   "deadline_source": "blank",
+   "findings": []
+  },
+  {
+   "index": 18,
+   "name": "RMN - AE - JO #005",
+   "jo_number": "#005",
+   "jo_number_int": 5,
+   "deadline_raw": "September 26, Saturday, 7PM",
+   "posted_at": "2026-09-23T10:00:00+08:00",
+   "deadline": "2026-09-26T19:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 19,
+   "name": "ALTA - TOC - JO #03",
+   "jo_number": "#03",
+   "jo_number_int": 3,
+   "deadline_raw": "Sept 25 / end of shift",
+   "posted_at": "2026-09-23T10:00:00+08:00",
+   "deadline": "2026-09-25T19:00:00+08:00",
+   "deadline_source": "shift",
+   "findings": []
+  },
+  {
+   "index": 20,
+   "name": "LSB - TOC - JO #020",
+   "jo_number": "#020",
+   "jo_number_int": 20,
+   "deadline_raw": "end of shift",
+   "posted_at": "2026-09-23T10:00:00+08:00",
+   "deadline": "2026-09-23T19:00:00+08:00",
+   "deadline_source": "shift",
+   "findings": []
+  },
+  {
+   "index": 21,
+   "name": "HADR - TOC - JO #107",
+   "jo_number": "#107",
+   "jo_number_int": 107,
+   "deadline_raw": null,
+   "posted_at": "2026-09-23T10:00:00+08:00",
+   "deadline": null,
+   "deadline_source": "blank",
+   "findings": []
+  },
+  {
+   "index": 22,
+   "name": "MC7 - AE - JO #004",
+   "jo_number": "#004",
+   "jo_number_int": 4,
+   "deadline_raw": "September 25, 3PM",
+   "posted_at": "2026-09-23T10:00:00+08:00",
+   "deadline": "2026-09-25T15:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 23,
+   "name": "R23 - OE - JO #35",
+   "jo_number": "#35",
+   "jo_number_int": 35,
+   "deadline_raw": "September 23 / Wednesday 12:00 AM",
+   "posted_at": "2026-09-22T10:00:00+08:00",
+   "deadline": "2026-09-23T00:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 24,
+   "name": "58 - TOC - JO #0044",
+   "jo_number": "#0044",
+   "jo_number_int": 44,
+   "deadline_raw": "September 22, 7PM",
+   "posted_at": "2026-09-22T10:00:00+08:00",
+   "deadline": "2026-09-22T19:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 25,
+   "name": "RMN - AE - JO #004",
+   "jo_number": "#004",
+   "jo_number_int": 4,
+   "deadline_raw": "September 22, Tuesday, 7PM",
+   "posted_at": "2026-09-22T10:00:00+08:00",
+   "deadline": "2026-09-22T19:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 26,
+   "name": "MT - COOR - JO #033",
+   "jo_number": "#033",
+   "jo_number_int": 33,
+   "deadline_raw": "Sep 26",
+   "posted_at": "2026-09-22T10:00:00+08:00",
+   "deadline": "2026-09-26T23:59:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 27,
+   "name": "MT - COOR - JO #033",
+   "jo_number": "#033",
+   "jo_number_int": 33,
+   "deadline_raw": "Sep 26",
+   "posted_at": "2026-09-22T10:00:00+08:00",
+   "deadline": "2026-09-26T23:59:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 28,
+   "name": "SOY - COOR - JO #30",
+   "jo_number": "#30",
+   "jo_number_int": 30,
+   "deadline_raw": "Sep 24",
+   "posted_at": "2026-09-22T10:00:00+08:00",
+   "deadline": "2026-09-24T23:59:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 29,
+   "name": "TWBTY - TOC - JO #06",
+   "jo_number": "#06",
+   "jo_number_int": 6,
+   "deadline_raw": "1pm",
+   "posted_at": "2026-09-22T10:00:00+08:00",
+   "deadline": "2026-09-22T13:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 30,
+   "name": "2VI - TOC - JO #061",
+   "jo_number": "#061",
+   "jo_number_int": 61,
+   "deadline_raw": "Tonight",
+   "posted_at": "2026-09-21T10:00:00+08:00",
+   "deadline": "2026-09-21T23:59:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 31,
+   "name": "FS - TOC - JO #008",
+   "jo_number": "#008",
+   "jo_number_int": 8,
+   "deadline_raw": "end of shift",
+   "posted_at": "2026-09-21T10:00:00+08:00",
+   "deadline": "2026-09-21T19:00:00+08:00",
+   "deadline_source": "shift",
+   "findings": []
+  },
+  {
+   "index": 32,
+   "name": "FS - AE - JO #007",
+   "jo_number": "#007",
+   "jo_number_int": 7,
+   "deadline_raw": "If keri rin po today",
+   "posted_at": "2026-09-21T10:00:00+08:00",
+   "deadline": "2026-09-21T23:59:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 33,
+   "name": "LSB - AE - JO #018",
+   "jo_number": "#018",
+   "jo_number_int": 18,
+   "deadline_raw": "end of shift if kaya, if not tomorrow na po",
+   "posted_at": "2026-09-21T10:00:00+08:00",
+   "deadline": "2026-09-21T19:00:00+08:00",
+   "deadline_source": "shift",
+   "findings": []
+  },
+  {
+   "index": 34,
+   "name": "2VI - TOC - JO #059",
+   "jo_number": "#059",
+   "jo_number_int": 59,
+   "deadline_raw": "Wednesday September 23",
+   "posted_at": "2026-09-21T10:00:00+08:00",
+   "deadline": "2026-09-23T23:59:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 35,
+   "name": "SOMSOM - TOC - JO #0163",
+   "jo_number": "#0163",
+   "jo_number_int": 163,
+   "deadline_raw": "September 22, 3PM",
+   "posted_at": "2026-09-21T10:00:00+08:00",
+   "deadline": "2026-09-22T15:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 36,
+   "name": "RMN - AE - JO #002",
+   "jo_number": "#002",
+   "jo_number_int": 2,
+   "deadline_raw": "September 21, Monday, 7PM",
+   "posted_at": "2026-09-19T10:00:00+08:00",
+   "deadline": "2026-09-21T19:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 37,
+   "name": "MFG - TOC - JO #54",
+   "jo_number": "#54",
+   "jo_number_int": 54,
+   "deadline_raw": null,
+   "posted_at": "2026-09-18T10:00:00+08:00",
+   "deadline": null,
+   "deadline_source": "blank",
+   "findings": []
+  },
+  {
+   "index": 38,
+   "name": "IMP - AE - JO #37",
+   "jo_number": "#37",
+   "jo_number_int": 37,
+   "deadline_raw": "September 18 / 7pm",
+   "posted_at": "2026-09-18T10:00:00+08:00",
+   "deadline": "2026-09-18T19:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 39,
+   "name": "MM - AE - JO #36",
+   "jo_number": "#36",
+   "jo_number_int": 36,
+   "deadline_raw": "September 18, 7:00PM",
+   "posted_at": "2026-09-18T10:00:00+08:00",
+   "deadline": "2026-09-18T19:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 40,
+   "name": "MM - AE - JO #35",
+   "jo_number": "#35",
+   "jo_number_int": 35,
+   "deadline_raw": "September 18 / Friday 7pm",
+   "posted_at": "2026-09-18T10:00:00+08:00",
+   "deadline": "2026-09-18T19:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 41,
+   "name": "PTG - TOC - JO #045",
+   "jo_number": "#045",
+   "jo_number_int": 45,
+   "deadline_raw": "September 16, 2am",
+   "posted_at": "2026-09-15T10:00:00+08:00",
+   "deadline": "2026-09-16T02:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 42,
+   "name": "SOMSOM - TOC - JO #0159",
+   "jo_number": "#0159",
+   "jo_number_int": 159,
+   "deadline_raw": "September 15, 530PM",
+   "posted_at": "2026-09-15T10:00:00+08:00",
+   "deadline": "2026-09-15T17:30:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 43,
+   "name": "SOY - TOC - JO #27",
+   "jo_number": "#27",
+   "jo_number_int": 27,
+   "deadline_raw": "September 11, pm",
+   "posted_at": "2026-09-11T10:00:00+08:00",
+   "deadline": "2026-09-11T23:59:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 44,
+   "name": "MFG - TOC - JO #031",
+   "jo_number": "#031",
+   "jo_number_int": 31,
+   "deadline_raw": "September 10, 11pm",
+   "posted_at": "2026-09-10T10:00:00+08:00",
+   "deadline": "2026-09-10T23:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 45,
+   "name": "INA - TOC - JO #30",
+   "jo_number": "#30",
+   "jo_number_int": 30,
+   "deadline_raw": "Sep 10 / Thu",
+   "posted_at": "2026-09-10T10:00:00+08:00",
+   "deadline": "2026-09-10T23:59:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 46,
+   "name": "SOY - AE - JO #25",
+   "jo_number": "#25",
+   "jo_number_int": 25,
+   "deadline_raw": "September 10, asap",
+   "posted_at": "2026-09-10T10:00:00+08:00",
+   "deadline": "2026-09-10T19:00:00+08:00",
+   "deadline_source": "shift",
+   "findings": [
+    "asap"
+   ]
+  },
+  {
+   "index": 47,
+   "name": "MT - AE - JO #32",
+   "jo_number": "#32",
+   "jo_number_int": 32,
+   "deadline_raw": "Sep 8 / Tue",
+   "posted_at": "2026-09-08T10:00:00+08:00",
+   "deadline": "2026-09-08T23:59:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 48,
+   "name": "58 - TOC - JO #0043",
+   "jo_number": "#0043",
+   "jo_number_int": 43,
+   "deadline_raw": "September 9, 8PM (if keri)",
+   "posted_at": "2026-09-09T10:00:00+08:00",
+   "deadline": "2026-09-09T20:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 49,
+   "name": "MFG - TOC - JO #20",
+   "jo_number": "#20",
+   "jo_number_int": 20,
+   "deadline_raw": "September 8 / Tuesday 5AM",
+   "posted_at": "2026-09-07T10:00:00+08:00",
+   "deadline": "2026-09-08T05:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 50,
+   "name": "IMP - TOC - JO #33",
+   "jo_number": "#33",
+   "jo_number_int": 33,
+   "deadline_raw": "September 9 / 7pm",
+   "posted_at": "2026-09-09T10:00:00+08:00",
+   "deadline": "2026-09-09T19:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 51,
+   "name": "KB - AE - JO #14",
+   "jo_number": "#14",
+   "jo_number_int": 14,
+   "deadline_raw": null,
+   "posted_at": "2026-09-09T10:00:00+08:00",
+   "deadline": null,
+   "deadline_source": "blank",
+   "findings": []
+  },
+  {
+   "index": 52,
+   "name": "OLSEN'S - TOC - JO #007",
+   "jo_number": "#007",
+   "jo_number_int": 7,
+   "deadline_raw": null,
+   "posted_at": "2026-09-04T10:00:00+08:00",
+   "deadline": null,
+   "deadline_source": "blank",
+   "findings": []
+  },
+  {
+   "index": 53,
+   "name": "APL - TOC - JO #37",
+   "jo_number": "#37",
+   "jo_number_int": 37,
+   "deadline_raw": "Sep 3 / Thu",
+   "posted_at": "2026-09-03T10:00:00+08:00",
+   "deadline": "2026-09-03T23:59:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 54,
+   "name": "SCM - AE - JO #101",
+   "jo_number": "#101",
+   "jo_number_int": 101,
+   "deadline_raw": "September 2, within shift",
+   "posted_at": "2026-09-02T10:00:00+08:00",
+   "deadline": "2026-09-02T19:00:00+08:00",
+   "deadline_source": "shift",
+   "findings": []
+  },
+  {
+   "index": 55,
+   "name": "HADR - TOC - JO #106",
+   "jo_number": "#106",
+   "jo_number_int": 106,
+   "deadline_raw": null,
+   "posted_at": "2026-09-01T10:00:00+08:00",
+   "deadline": null,
+   "deadline_source": "blank",
+   "findings": []
+  },
+  {
+   "index": 56,
+   "name": "HADR - TOC - JO #104",
+   "jo_number": "#104",
+   "jo_number_int": 104,
+   "deadline_raw": null,
+   "posted_at": "2026-08-29T10:00:00+08:00",
+   "deadline": null,
+   "deadline_source": "blank",
+   "findings": []
+  },
+  {
+   "index": 57,
+   "name": "SK - TOC - JO #02",
+   "jo_number": "#02",
+   "jo_number_int": 2,
+   "deadline_raw": "Aug 28 / Fri / 2pm",
+   "posted_at": "2026-08-28T10:00:00+08:00",
+   "deadline": "2026-08-28T14:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 58,
+   "name": "SOY - TOC - JO #22",
+   "jo_number": "#22",
+   "jo_number_int": 22,
+   "deadline_raw": "August 27 / Thurs / before photoshoot",
+   "posted_at": "2026-08-27T10:00:00+08:00",
+   "deadline": "2026-08-27T23:59:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 59,
+   "name": "LS - TOC - JO #102",
+   "jo_number": "#102",
+   "jo_number_int": 102,
+   "deadline_raw": "kung kelan matapos yung render",
+   "posted_at": "2026-08-26T10:00:00+08:00",
+   "deadline": null,
+   "deadline_source": "blank",
+   "findings": [
+    "deadline_unparsed"
+   ]
+  },
+  {
+   "index": 60,
+   "name": "LS - TOC - JO #101",
+   "jo_number": "#101",
+   "jo_number_int": 101,
+   "deadline_raw": "Aug 26, end of shift",
+   "posted_at": "2026-08-26T10:00:00+08:00",
+   "deadline": "2026-08-26T19:00:00+08:00",
+   "deadline_source": "shift",
+   "findings": []
+  },
+  {
+   "index": 61,
+   "name": "LS - TOC - JO #101",
+   "jo_number": "#101",
+   "jo_number_int": 101,
+   "deadline_raw": "Aug 26, end of shift",
+   "posted_at": "2026-08-26T10:00:00+08:00",
+   "deadline": "2026-08-26T19:00:00+08:00",
+   "deadline_source": "shift",
+   "findings": []
+  },
+  {
+   "index": 62,
+   "name": "OURS - TOC - JO #0002",
+   "jo_number": "#0002",
+   "jo_number_int": 2,
+   "deadline_raw": "August 26, 5pm",
+   "posted_at": "2026-08-25T10:00:00+08:00",
+   "deadline": "2026-08-26T17:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 63,
+   "name": "LSB - AE - JO #13",
+   "jo_number": "#13",
+   "jo_number_int": 13,
+   "deadline_raw": "Aug 25 / Tues / 6pm",
+   "posted_at": "2026-08-25T10:00:00+08:00",
+   "deadline": "2026-08-25T18:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 64,
+   "name": "58 - TOC - JO #0041",
+   "jo_number": "#0041",
+   "jo_number_int": 41,
+   "deadline_raw": "August 26, 4PM",
+   "posted_at": "2026-08-25T10:00:00+08:00",
+   "deadline": "2026-08-26T16:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 65,
+   "name": "58 - TOC - JO #0041",
+   "jo_number": "#0041",
+   "jo_number_int": 41,
+   "deadline_raw": "August 26, 4PM",
+   "posted_at": "2026-08-25T10:00:00+08:00",
+   "deadline": "2026-08-26T16:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 66,
+   "name": "SUN - TOC - JO #3",
+   "jo_number": "#3",
+   "jo_number_int": 3,
+   "deadline_raw": "August 21 / Friday 5:00 AM",
+   "posted_at": "2026-08-20T10:00:00+08:00",
+   "deadline": "2026-08-21T05:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 67,
+   "name": "MM - TOC - JO #32",
+   "jo_number": "#32",
+   "jo_number_int": 32,
+   "deadline_raw": "August 21 / Friday 5:00 AM",
+   "posted_at": "2026-08-20T10:00:00+08:00",
+   "deadline": "2026-08-21T05:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 68,
+   "name": "SB - AE - JO #40",
+   "jo_number": "#40",
+   "jo_number_int": 40,
+   "deadline_raw": "August 20, Thurs (papadala ko tonight ke Che yung HD nya)",
+   "posted_at": "2026-08-20T10:00:00+08:00",
+   "deadline": "2026-08-20T23:59:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 69,
+   "name": "PAR - AE - JO #057",
+   "jo_number": "#057",
+   "jo_number_int": 57,
+   "deadline_raw": "August 20, 3PM",
+   "posted_at": "2026-08-20T10:00:00+08:00",
+   "deadline": "2026-08-20T15:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 70,
+   "name": "[LATE JO]",
+   "jo_number": null,
+   "jo_number_int": null,
+   "deadline_raw": "August 18, Tuesday, 8PM",
+   "posted_at": "2026-08-18T10:00:00+08:00",
+   "deadline": "2026-08-18T20:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 71,
+   "name": "JAG - COOR - JO #68",
+   "jo_number": "#68",
+   "jo_number_int": 68,
+   "deadline_raw": "Tonight if keri or tom",
+   "posted_at": "2026-08-18T10:00:00+08:00",
+   "deadline": "2026-08-18T23:59:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 72,
+   "name": "PTG - AE - JO #039",
+   "jo_number": "#039",
+   "jo_number_int": 39,
+   "deadline_raw": "August 15, Tuesday, 3PM",
+   "posted_at": "2026-08-17T10:00:00+08:00",
+   "deadline": "2026-08-15T15:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": [
+    "deadline_past"
+   ]
+  },
+  {
+   "index": 73,
+   "name": "MFG - TOC - JO #11",
+   "jo_number": "#11",
+   "jo_number_int": 11,
+   "deadline_raw": "Aug 17, 1pm",
+   "posted_at": "2026-08-17T10:00:00+08:00",
+   "deadline": "2026-08-17T13:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 74,
+   "name": "PP EP 2 (APC) - TOC - JO #0004",
+   "jo_number": "#0004",
+   "jo_number_int": 4,
+   "deadline_raw": "August 17, 11AM if keri",
+   "posted_at": "2026-08-17T10:00:00+08:00",
+   "deadline": "2026-08-17T11:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  },
+  {
+   "index": 75,
+   "name": "LS - AE - JO #91",
+   "jo_number": "#91",
+   "jo_number_int": 91,
+   "deadline_raw": "Aug 15,  end of shift",
+   "posted_at": "2026-08-15T10:00:00+08:00",
+   "deadline": "2026-08-15T19:00:00+08:00",
+   "deadline_source": "shift",
+   "findings": []
+  },
+  {
+   "index": 76,
+   "name": "SCM - AE - JO #96",
+   "jo_number": "#96",
+   "jo_number_int": 96,
+   "deadline_raw": "Aug 15, 5pm",
+   "posted_at": "2026-08-15T10:00:00+08:00",
+   "deadline": "2026-08-15T17:00:00+08:00",
+   "deadline_source": "stated",
+   "findings": []
+  }
+ ]
+}

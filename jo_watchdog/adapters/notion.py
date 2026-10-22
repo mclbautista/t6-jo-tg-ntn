@@ -13,9 +13,14 @@ import httpx
 from pydantic import BaseModel, Field
 
 from jo_watchdog.adapters.protocols import PageRef
+from jo_watchdog.core.matching import Candidate
 
 NOTION_VERSION = "2026-03-11"
 BASE_URL = "https://api.notion.com/v1"
+
+# Live Deliverables schema names (deliverable-matching research).
+DELIVERABLE_PROJECTS_PROPERTY = "🗺️ Projects"
+DELIVERABLE_TITLE_PROPERTY = "Name"
 
 
 class NotionError(Exception):
@@ -106,3 +111,46 @@ class NotionAdapter:
             has_more=data.get("has_more", False),
             next_cursor=data.get("next_cursor"),
         )
+
+    async def retrieve_data_source(self, data_source_id: str) -> dict:
+        """Retrieve a data source's schema (property names, types, select options)."""
+        return await self._request("GET", f"/data_sources/{data_source_id}")
+
+    async def query_all(
+        self, data_source_id: str, *, filter: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
+        """Query every page of a data source, following ``next_cursor`` to the end."""
+        results: list[dict[str, Any]] = []
+        cursor: str | None = None
+        while True:
+            page = await self.query_data_source(
+                data_source_id, QueryRequest(start_cursor=cursor, filter=filter)
+            )
+            results.extend(page.results)
+            if not page.has_more or not page.next_cursor:
+                return results
+            cursor = page.next_cursor
+
+    async def query_project_deliverables(
+        self, data_source_id: str, project_page_id: str
+    ) -> list[Candidate]:
+        """All Deliverables whose ``🗺️ Projects`` relation contains the Project.
+
+        A live, fully paginated query with no Status or Class filter (#26).
+        """
+        rows = await self.query_all(
+            data_source_id,
+            filter={
+                "property": DELIVERABLE_PROJECTS_PROPERTY,
+                "relation": {"contains": project_page_id},
+            },
+        )
+        return [_deliverable_candidate(row) for row in rows]
+
+
+def _deliverable_candidate(row: dict) -> Candidate:
+    title = row.get("properties", {}).get(DELIVERABLE_TITLE_PROPERTY, {}).get("title") or []
+    name = "".join(
+        item.get("plain_text") or item.get("text", {}).get("content", "") for item in title
+    )
+    return Candidate(page_id=row["id"], name=name)

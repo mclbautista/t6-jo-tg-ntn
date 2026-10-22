@@ -3,10 +3,10 @@
 A bad non-secret value fails boot (Pydantic validation) rather than failing a
 message later. Secrets never appear in the config file or in logs.
 
-Every key in the configuration reference (issue #27) is declared here. Keys
-with no sensible default (chat ids, page ids, handles, data source ids) are
-optional on the model so tests and partial tools can build a ``Config``, and
-``require_live_keys`` makes them mandatory when the service boots.
+Every key in the configuration reference (issue #27) is declared here. A few
+keys with no sensible default (page ids, handles) are optional on the model so
+tests and partial tools can build a ``Config``, and ``require_live_keys`` makes
+them mandatory when the service boots.
 """
 
 from __future__ import annotations
@@ -19,18 +19,16 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from jo_watchdog.adapters.deepseek import DEFAULT_BASE_URL, DEFAULT_MODEL
+from jo_watchdog.adapters.jev import JEV_MODEL, JEV_URL
 from jo_watchdog.adapters.notion import NOTION_VERSION
+from jo_watchdog.core.resolve import ResolveSettings
 
 _HANDLE_RE = re.compile(r"^@?[A-Za-z0-9_]{5,32}$")
 _HHMM_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 # Keys the running service cannot do without; checked by ``require_live_keys``.
 LIVE_REQUIRED_KEYS = (
-    "ops_chat_id",
-    "ops_topic_id",
-    "contacts_data_source_id",
-    "projects_data_source_id",
-    "deliverables_data_source_id",
     "leizette_contact_page_id",
     "leizette_telegram_handle",
     "owner_telegram_handle",
@@ -49,33 +47,33 @@ class Config(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    # Telegram scope filter (#18)
+    # Telegram scope filter
     intake_chat_id: int
     intake_topic_id: int
     captured_reaction: str = "✅"
 
-    # Polling (#18)
+    # Ops topic (#23): where capture reports and system messages go
+    ops_chat_id: int
+    ops_topic_id: int
+    leizette_telegram_handle: str | None = None
+    header_date_tolerance_days: int = Field(default=1, ge=0)
+
+    # Polling
     poll_timeout: int = Field(default=50, ge=1, le=50)  # Telegram long-poll seconds
     poll_interval: float = Field(default=1.0, gt=0)
 
-    # Notion (#18)
+    # Notion
     job_orders_data_source_id: str
     notion_version: str = NOTION_VERSION
 
-    # Ledger (#18)
-    ledger_path: str = "./data/ledger.db"
-
-    # DeepSeek classify/extract (#20)
-    deepseek_base_url: str = "https://api.deepseek.com"
-    deepseek_model: str = "deepseek-chat"  # the "latest" alias, never a pin
+    # DeepSeek classify/extract
+    deepseek_base_url: str = DEFAULT_BASE_URL
+    deepseek_model: str = DEFAULT_MODEL  # the "latest" alias, no pin
     deepseek_timeout_seconds: float = Field(default=60, gt=0)
 
-    # Planning (#21)
-    department_aliases: dict[str, str] = Field(default_factory=lambda: {"TO": "TOC"})
-
-    # Resolution and caches (#22)
-    contacts_data_source_id: str | None = None
-    projects_data_source_id: str | None = None
+    # Live resolution caches (#22)
+    contacts_data_source_id: str = "77b2a701-71db-4e88-a694-37f07303e77e"
+    projects_data_source_id: str = "cc1dc02a-8f32-4c97-81e4-dc1e08d7f134"
     leizette_contact_page_id: str | None = None
     cache_refresh_hours: float = Field(default=6, gt=0)
     cache_stale_alert_hours: float = Field(default=24, gt=0)
@@ -83,11 +81,11 @@ class Config(BaseModel):
     fuzzy_min_lead: float = Field(default=8, ge=0, le=100)
     honorifics: list[str] = Field(default_factory=lambda: ["ate", "kuya", "sir"])
 
-    # Ops reporting (#23)
-    ops_chat_id: int | None = None
-    ops_topic_id: int | None = None
-    leizette_telegram_handle: str | None = None
-    header_date_tolerance_days: int = Field(default=1, ge=0)
+    # Ledger
+    ledger_path: str = "./data/ledger.db"
+
+    # Planning: header Department token -> Department option (validated live in #22)
+    department_aliases: dict[str, str] = Field(default_factory=lambda: {"TO": "TOC"})
 
     # Reliability and heartbeat (#25)
     owner_telegram_handle: str | None = None
@@ -96,10 +94,10 @@ class Config(BaseModel):
     heartbeat_time: str = "07:00"
     timezone: str = "Asia/Manila"
 
-    # Deliverable matching via Jev (#26)
-    deliverables_data_source_id: str | None = None
-    jev_url: str = "https://openrouter.ai/api/alpha/decisions"
-    jev_model: str = "~typesafe/jev-latest"
+    # Deliverable matching (Jev via OpenRouter, #26)
+    deliverables_data_source_id: str = "0a4ff084-3138-429c-8dbe-4d802aded74f"
+    jev_url: str = JEV_URL
+    jev_model: str = JEV_MODEL
     jev_timeout_seconds: float = Field(default=30, gt=0)
     t_link: float = Field(default=0.90, ge=0, le=1)
     t_hint: float = Field(default=0.50, ge=0, le=1)
@@ -118,8 +116,9 @@ class Config(BaseModel):
     @field_validator("leizette_telegram_handle", "owner_telegram_handle")
     @classmethod
     def _telegram_handle(cls, value: str | None) -> str | None:
-        if value is None:
+        if value is None or not value.strip():
             return None
+        value = value.strip()
         if not _HANDLE_RE.match(value):
             raise ValueError(f"not a Telegram handle: {value!r}")
         return value if value.startswith("@") else f"@{value}"
@@ -163,11 +162,24 @@ class Config(BaseModel):
     def _cross_field(self) -> Config:
         if not self.intake_chat_id or not self.intake_topic_id:
             raise ValueError("intake_chat_id and intake_topic_id must be set")
+        if not self.ops_chat_id or not self.ops_topic_id:
+            raise ValueError("ops_chat_id and ops_topic_id must be set")
         if self.t_hint > self.t_link:
             raise ValueError("t_hint must not exceed t_link")
         if self.cache_stale_alert_hours < self.cache_refresh_hours:
             raise ValueError("cache_stale_alert_hours must be at least cache_refresh_hours")
         return self
+
+
+def resolve_settings(config: Config) -> ResolveSettings:
+    """The pure resolver's knobs, taken from the validated config."""
+    return ResolveSettings(
+        fuzzy_min_score=config.fuzzy_min_score,
+        fuzzy_min_lead=config.fuzzy_min_lead,
+        honorifics=tuple(config.honorifics),
+        department_aliases=config.department_aliases,
+        leizette_contact_page_id=config.leizette_contact_page_id,
+    )
 
 
 def require_live_keys(config: Config) -> None:
@@ -204,9 +216,9 @@ def notion_token() -> str:
     return _secret("NOTION_API_KEY")
 
 
-def deepseek_api_key() -> str:
+def deepseek_token() -> str:
     return _secret("DEEPSEEK_API_KEY")
 
 
-def openrouter_api_key() -> str:
+def openrouter_token() -> str:
     return _secret("OPENROUTER_API_KEY")

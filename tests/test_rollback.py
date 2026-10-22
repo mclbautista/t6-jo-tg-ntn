@@ -24,7 +24,8 @@ class RollbackTests(unittest.TestCase):
             current.accept_message(-100123, 42, 7, "{}", "PROJ - EDT - JO #1", "PROJ - EDT - JO #1")
             current.close()
 
-            with mock.patch.object(ledger_db, "MIGRATIONS", MIGRATIONS[:-1]):
+            prior_migrations = {v: MIGRATIONS[v] for v in sorted(MIGRATIONS)[:-1]}
+            with mock.patch.object(ledger_db, "MIGRATIONS", prior_migrations):
                 prior = Ledger(path)
                 try:
                     self.assertEqual(prior.pending(State.RECEIVED), ["-100123:42"])
@@ -36,7 +37,7 @@ class RollbackTests(unittest.TestCase):
                 finally:
                     prior.close()
             # The prior release neither re-applies nor removes the newer migration.
-            self.assertEqual(versions, list(range(1, len(MIGRATIONS) + 1)))
+            self.assertEqual(versions, sorted(MIGRATIONS))
 
 
 if __name__ == "__main__":

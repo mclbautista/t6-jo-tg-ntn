@@ -17,7 +17,9 @@ import sys
 from pathlib import Path
 
 from jo_watchdog.app import healthcheck
+from jo_watchdog.app.caches import CacheManager
 from jo_watchdog.app.config import (
+    deepseek_token,
     load_config,
     missing_secrets,
     notion_token,
@@ -40,19 +42,36 @@ async def run(config_path: str) -> None:
 
     from aiogram import Bot
 
+    from jo_watchdog.adapters.deepseek import DeepSeekClassifier
     from jo_watchdog.adapters.notion import NotionAdapter
     from jo_watchdog.adapters.telegram import AiogramTelegramClient
 
     bot = Bot(token=telegram_token())
     telegram = AiogramTelegramClient(bot)
     notion = NotionAdapter(notion_token())
+    classifier = DeepSeekClassifier(
+        deepseek_token(),
+        base_url=config.deepseek_base_url,
+        model=config.deepseek_model,
+        timeout_seconds=config.deepseek_timeout_seconds,
+    )
 
-    worker = Worker(ledger=ledger, telegram=telegram, notion=notion, config=config)
+    caches = CacheManager(ledger=ledger, notion=notion, config=config)
+    caches.load_persisted()  # last good snapshots first, then the live refresh
+    worker = Worker(
+        ledger=ledger,
+        telegram=telegram,
+        notion=notion,
+        classifier=classifier,
+        config=config,
+        caches=caches,
+    )
 
     try:
         await worker.run()
     finally:
         await notion.close()
+        await classifier.close()
         await bot.session.close()
         ledger.close()
 

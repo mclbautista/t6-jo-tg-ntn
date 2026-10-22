@@ -1,7 +1,8 @@
-"""Dry-run rollback control: stop at `planned`, show the masked plan, write nothing."""
+"""Dry-run rollback control: stop at `planned`, post the masked plan, write nothing."""
 
 import unittest
 
+from jo_watchdog.core.report import DRY_RUN_HEADER
 from tests.fakes import update
 from tests.test_worker import make_worker
 
@@ -14,9 +15,8 @@ class DryRunTests(unittest.IsolatedAsyncioTestCase):
             [update(7, message_id=42, text=SECRET_TEXT)], dry_run=True
         )
         self.addCleanup(cleanup)
-        with self.assertLogs("jo_watchdog.worker", level="INFO") as logs:
-            await worker.run_once()
-            await worker.drain_once()
+        await worker.run_once()
+        await worker.run_once()
 
         msg = ledger.get_message("-100123:42")
         self.assertEqual(msg["state"], "planned")
@@ -24,11 +24,16 @@ class DryRunTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(notion.created, [])
         self.assertEqual(telegram.reactions, [])
 
-        # Reported exactly once, masked.
-        reports = [line for line in logs.output if "dry_run_plan" in line]
-        self.assertEqual(len(reports), 1)
-        self.assertIn("Name: PROJ - EDT - JO #12", reports[0])
-        self.assertNotIn("hunter22", reports[0])
+        # One dry_run_plan ops post, masked, sent to the ops topic.
+        posts = [sent for sent in telegram.sent if DRY_RUN_HEADER in sent[2]]
+        self.assertEqual(len(posts), 1)
+        chat_id, topic_id, text = posts[0]
+        config = worker.config
+        self.assertEqual((chat_id, topic_id), (config.ops_chat_id, config.ops_topic_id))
+        self.assertIn("PROJ - EDT - JO #12", text)
+        self.assertNotIn("hunter22", text)
+        kinds = [row["kind"] for row in ledger._conn.execute("SELECT kind FROM outbox")]
+        self.assertEqual(kinds, ["dry_run_plan"])
 
     async def test_turning_dry_run_off_resumes_the_stored_plan(self):
         worker, ledger, telegram, notion, cleanup = make_worker(

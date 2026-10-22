@@ -24,8 +24,8 @@ Side effects, by step:
   the intake topic, captures it into the real ledger and Notion, reacts to it,
   and posts one smoke line to the ops topic.
 
-Steps whose code lands in a later build ticket report SKIP with the ticket
-number; wire each one in as its ticket merges.
+Checks that are covered by CI but not yet automated against the real accounts
+report SKIP with their ticket number; verify those by hand.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ from pathlib import Path
 import httpx
 
 from jo_watchdog.adapters.notion import NotionAdapter, NotionError, QueryRequest
-from jo_watchdog.adapters.protocols import IncomingUpdate
+from jo_watchdog.adapters.protocols import ClassifyResult, IncomingUpdate
 from jo_watchdog.app.config import (
     SECRET_KEYS,
     Config,
@@ -54,7 +54,9 @@ from jo_watchdog.app.config import (
     require_live_keys,
 )
 from jo_watchdog.app.worker import Worker
+from jo_watchdog.core.extraction import EXTRACTED_FIELDS, PROMPT_TAG, Extraction
 from jo_watchdog.core.masker import WITHHELD, outbound_text
+from jo_watchdog.core.report import DRY_RUN_HEADER
 from jo_watchdog.ledger.db import Ledger
 
 ROOT = Path(__file__).resolve().parent
@@ -82,6 +84,54 @@ JEV_CRITERIA = {
     "maybe": "The Job Order could be for this Deliverable, but the text doesn't make it clear.",
     "no": "The Job Order is not for this Deliverable.",
 }
+
+
+class RecordingTelegram:
+    """Records reactions and ops posts instead of sending them (no token needed)."""
+
+    def __init__(self, updates=()):
+        self.updates: list[IncomingUpdate] = list(updates)
+        self.reactions: list[tuple[int, int, str]] = []
+        self.sent: list[tuple[int, int, str]] = []
+
+    async def get_updates(self, offset: int, timeout: int) -> list[IncomingUpdate]:
+        batch, self.updates = [u for u in self.updates if u.update_id >= offset], []
+        return batch
+
+    async def set_reaction(self, chat_id: int, message_id: int, emoji: str) -> None:
+        self.reactions.append((chat_id, message_id, emoji))
+
+    async def send_message(self, chat_id: int, topic_id: int, text: str) -> int:
+        self.sent.append((chat_id, topic_id, text))
+        return len(self.sent)
+
+
+class AlwaysJoClassifier:
+    """Stands in for DeepSeek in the synthetic pipeline steps."""
+
+    async def classify(self, masked_text: str, origin_lines) -> ClassifyResult:
+        extraction = Extraction(
+            verdict="jo",
+            confidence="high",
+            reasons="Smoke test stub.",
+            multiple_jo_suspected=False,
+            **{field: None for field in EXTRACTED_FIELDS},
+        )
+        return ClassifyResult(
+            outcome="ok", extraction=extraction, requested_model="stub", prompt_tag=PROMPT_TAG
+        )
+
+
+def synthetic_update(config: Config, text: str) -> IncomingUpdate:
+    message_id = int(time.time() * 1000) % 2_000_000_000
+    return IncomingUpdate(
+        update_id=1,
+        chat_id=config.intake_chat_id,
+        message_id=message_id,
+        message_thread_id=config.intake_topic_id,
+        text=text,
+        raw={"update_id": 1, "smoke": True},
+    )
 
 
 # -- result plumbing ----------------------------------------------------------
@@ -360,39 +410,24 @@ async def step_masker(s: Smoke) -> Result:
 
 
 async def step_pipeline(s: Smoke) -> Result:
-    """Synthetic in-scope message through ledger, plan, Notion write and read-back."""
+    """Synthetic in-scope message through ledger, plan, Notion write, read-back and ops."""
     if not s.notion:
         return skip("NOTION_API_KEY not set")
-
-    class RecordingTelegram:
-        def __init__(self, updates):
-            self.updates, self.reactions = list(updates), []
-
-        async def get_updates(self, offset, timeout):
-            batch, self.updates = [u for u in self.updates if u.update_id >= offset], []
-            return batch
-
-        async def set_reaction(self, chat_id, message_id, emoji):
-            self.reactions.append((chat_id, message_id, emoji))
-
-    message_id = int(time.time())
-    text = f"{SMOKE_MARK}\nPurpose: smoke check\npw: smoke-secret"
-    synthetic = IncomingUpdate(
-        update_id=1,
-        chat_id=s.config.intake_chat_id,
-        message_id=message_id,
-        message_thread_id=s.config.intake_topic_id,
-        text=text,
-        raw={"update_id": 1, "smoke": True},
-    )
+    synthetic = synthetic_update(s.config, f"{SMOKE_MARK}\nPurpose: smoke check\npw: smoke-secret")
     config = s.config.model_copy(update={"dry_run": False})
     with tempfile.TemporaryDirectory() as tmp:
         ledger = Ledger(Path(tmp) / "smoke.db")
         telegram = RecordingTelegram([synthetic])
-        worker = Worker(ledger=ledger, telegram=telegram, notion=s.notion, config=config)
+        worker = Worker(
+            ledger=ledger,
+            telegram=telegram,
+            notion=s.notion,
+            classifier=AlwaysJoClassifier(),
+            config=config,
+        )
         try:
             await worker.run_once()
-            key = f"{synthetic.chat_id}:{message_id}"
+            key = f"{synthetic.chat_id}:{synthetic.message_id}"
             msg = ledger.get_message(key)
         finally:
             ledger.close()
@@ -405,7 +440,51 @@ async def step_pipeline(s: Smoke) -> Result:
     print(f"    created {page.get('url')} — delete it by hand")
     if "smoke-secret" in json.dumps(page):
         return fail("credential reached Notion properties")
-    return ok("planned, written, read back, reaction recorded")
+    return ok(
+        f"written, read back, reaction recorded, {len(telegram.sent)} ops post(s) rendered"
+    )
+
+
+async def step_dry_run(s: Smoke) -> Result:
+    """Dry-run stops at `planned`: one masked ops post, no Notion call, no reaction."""
+
+    class NoNotion:
+        async def create_page(self, payload):
+            raise AssertionError("dry run called Notion create")
+
+        async def retrieve_page(self, page_id):
+            raise AssertionError("dry run called Notion retrieve")
+
+    synthetic = synthetic_update(s.config, f"{SMOKE_MARK}\npw: smoke-secret")
+    config = s.config.model_copy(update={"dry_run": True})
+    with tempfile.TemporaryDirectory() as tmp:
+        ledger = Ledger(Path(tmp) / "smoke.db")
+        telegram = RecordingTelegram([synthetic])
+        worker = Worker(
+            ledger=ledger,
+            telegram=telegram,
+            notion=NoNotion(),
+            classifier=AlwaysJoClassifier(),
+            config=config,
+        )
+        try:
+            await worker.run_once()
+            msg = ledger.get_message(f"{synthetic.chat_id}:{synthetic.message_id}")
+        finally:
+            ledger.close()
+    posts = [text for _, _, text in telegram.sent if DRY_RUN_HEADER in text]
+    if msg["state"] != "planned" or telegram.reactions or len(posts) != 1:
+        return fail(f"state {msg['state']}, {len(telegram.reactions)} reaction(s), "
+                    f"{len(posts)} dry-run post(s)")
+    if "smoke-secret" in posts[0]:
+        return fail("dry-run post leaked a credential")
+    if s.bot and s.args.live_telegram:
+        await s.bot.send_message(
+            s.config.ops_chat_id, posts[0], message_thread_id=s.config.ops_topic_id,
+            parse_mode="HTML",
+        )
+        return ok("held at planned; masked plan posted to the ops topic")
+    return ok("held at planned; one masked plan rendered, no Notion call, no reaction")
 
 
 async def step_query_visibility(s: Smoke) -> Result:
@@ -450,33 +529,27 @@ async def step_deepseek(s: Smoke) -> Result:
     key = os.environ.get("DEEPSEEK_API_KEY")
     if not key:
         return skip("DEEPSEEK_API_KEY not set")
-    body = {
-        "model": s.config.deepseek_model,
-        "response_format": {"type": "json_object"},
-        "messages": [
-            {
-                "role": "system",
-                "content": 'Reply in json: {"is_job_order": true|false, "jo_number": string|null}',
-            },
-            {"role": "user", "content": "SOMSOM - TOC - #0163\nTask: conform reel 3"},
-        ],
-    }
-    async with httpx.AsyncClient(timeout=s.config.deepseek_timeout_seconds) as client:
-        resp = await client.post(
-            f"{s.config.deepseek_base_url.rstrip('/')}/chat/completions",
-            headers={"Authorization": f"Bearer {key}"},
-            json=body,
-        )
-    if resp.status_code != 200:
-        return fail(f"HTTP {resp.status_code}: {resp.text[:200]}")
-    data = resp.json()
+    from jo_watchdog.adapters.deepseek import DeepSeekClassifier
+
+    classifier = DeepSeekClassifier(
+        key,
+        base_url=s.config.deepseek_base_url,
+        model=s.config.deepseek_model,
+        timeout_seconds=s.config.deepseek_timeout_seconds,
+    )
     try:
-        answer = json.loads(data["choices"][0]["message"]["content"])
-    except (KeyError, ValueError) as exc:
-        return fail(f"no structured JSON in the reply: {exc}")
-    if "is_job_order" not in answer:
-        return fail(f"JSON missing is_job_order: {answer}")
-    return ok(f"model {data.get('model')} returned {answer}")
+        result = await classifier.classify(
+            outbound_text("SOMSOM - TOC - #0163\nTask: conform reel 3\npw: hunter22").text, []
+        )
+    finally:
+        await classifier.close()
+    if result.extraction is None:
+        return fail(f"{result.outcome}: {result.error}")
+    print(f"    returned model: {result.returned_model}; tokens "
+          f"{result.input_tokens}/{result.output_tokens}; {result.latency_ms} ms")
+    if result.extraction.verdict != "jo":
+        return manual(f"structured output OK but verdict {result.extraction.verdict!r}")
+    return ok(f"structured extraction from {result.returned_model}")
 
 
 def _jev_job_order_text(page: dict) -> tuple[str, str]:
@@ -577,14 +650,26 @@ async def step_live_telegram(s: Smoke) -> Result:
         return skip("pass --live-telegram, then post a test JO in the intake topic")
     if not s.bot or not s.notion:
         return skip("TELEGRAM_BOT_TOKEN and NOTION_API_KEY are both needed")
+    from jo_watchdog.adapters.deepseek import DeepSeekClassifier
     from jo_watchdog.adapters.telegram import AiogramTelegramClient
+    from jo_watchdog.app.config import deepseek_token
 
     ledger = Ledger(s.config.ledger_path)
+    classifier = DeepSeekClassifier(
+        deepseek_token(),
+        base_url=s.config.deepseek_base_url,
+        model=s.config.deepseek_model,
+        timeout_seconds=s.config.deepseek_timeout_seconds,
+    )
     try:
         before = ledger.last_committed_offset()
         print(f"    waiting up to {s.config.poll_timeout}s for a post in the intake topic…")
         worker = Worker(
-            ledger=ledger, telegram=AiogramTelegramClient(s.bot), notion=s.notion, config=s.config
+            ledger=ledger,
+            telegram=AiogramTelegramClient(s.bot),
+            notion=s.notion,
+            classifier=classifier,
+            config=s.config,
         )
         await worker.run_once()
         rows = ledger._conn.execute(
@@ -593,11 +678,14 @@ async def step_live_telegram(s: Smoke) -> Result:
             (before,),
         ).fetchall()
     finally:
+        await classifier.close()
         ledger.close()
     if not rows:
         return fail("no in-scope post arrived; check intake_chat_id/intake_topic_id")
     last = dict(rows[-1])
     expected = "planned" if s.config.dry_run else "done"
+    if last["state"] == "ignored":
+        return manual(f"{last['telegram_key']} was classified not-a-JO; post a real JO and re-run")
     if last["state"] != expected:
         return fail(f"{last['telegram_key']} stopped at {last['state']}, want {expected}")
     await s.bot.send_message(
@@ -610,7 +698,7 @@ async def step_live_telegram(s: Smoke) -> Result:
 
 def pending(ticket: str, what: str) -> Callable[[Smoke], Awaitable[Result]]:
     async def step(_: Smoke) -> Result:
-        return skip(f"{what} — wire in when {ticket} merges")
+        return skip(f"{what} — not automated yet ({ticket}); check by hand")
 
     return step
 
@@ -631,12 +719,11 @@ STEPS: list[tuple[str, Callable[[Smoke], Awaitable[Result]]]] = [
     ("unknown_select", step_unknown_select),
     ("deepseek", step_deepseek),
     ("jev", step_jev),
+    ("dry_run", step_dry_run),
     ("live_telegram", step_live_telegram),
-    ("classification", pending("#20", "DeepSeek classify/extract on the real post")),
     ("threshold_tuning", pending("#22/#26", "fuzzy and Deliverable thresholds against the corpus")),
     ("readback_mismatch", pending("#23", "read-back mismatch reporting to ops")),
     ("outbox_retry", pending("#23", "outbox retry after a failed ops post")),
-    ("dry_run_ops_post", pending("#23", "dry_run_plan outbox message in the ops topic")),
     ("forward_origins", pending("#24", "user, hidden_user, chat and channel forward origins")),
     ("channel_link", pending("#24", "real channel-origin message link")),
     ("notion_retry_after", pending("#25", "Notion 429 Retry-After handling")),

@@ -69,6 +69,8 @@ class HealthcheckTests(unittest.TestCase):
                 {
                     "intake_chat_id": -100123,
                     "intake_topic_id": 5,
+                    "ops_chat_id": -100999,
+                    "ops_topic_id": 9,
                     "job_orders_data_source_id": "ds-1",
                     "ledger_path": str(self.db),
                 }

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from jo_watchdog.core.masker import mask_text
-from jo_watchdog.core.plan import Plan
+from jo_watchdog.core.plan import BLOCK_LIMIT, Plan
 
 # The only Status the walking skeleton ever writes (job-order field mapping).
 STATUS_NEEDS_INTAKE_REVIEW = "Needs Intake Review"
@@ -33,15 +33,28 @@ def build_notion_payload(
         }
         for block in plan.body_blocks
     ]
+    properties = {
+        "Name": {"title": [_text(plan.name)]},
+        "Telegram Key": {"rich_text": [_text(plan.telegram_key)]},
+        "Status": {"status": {"name": status}},
+    }
+    if plan.notes:
+        properties["Notes"] = {
+            "rich_text": [
+                _text(plan.notes[i : i + BLOCK_LIMIT])
+                for i in range(0, len(plan.notes), BLOCK_LIMIT)
+            ]
+        }
     return {
         "parent": {"data_source_id": data_source_id},
-        "properties": {
-            "Name": {"title": [_text(plan.name)]},
-            "Telegram Key": {"rich_text": [_text(plan.telegram_key)]},
-            "Status": {"status": {"name": status}},
-        },
+        "properties": properties,
         "children": children,
     }
+
+
+def page_url_for(page_id: str) -> str:
+    """A working Notion URL for a page id, for rows whose create-time URL was not kept."""
+    return f"https://www.notion.so/{page_id.replace('-', '')}"
 
 
 def verify_readback(

@@ -8,9 +8,12 @@ maps an aiogram ``Update`` into.
 
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Literal, Protocol, runtime_checkable
 
 from pydantic import BaseModel
+
+from jo_watchdog.core.extraction import Extraction
+from jo_watchdog.core.matching import Candidate, MatchResult
 
 
 class IncomingUpdate(BaseModel):
@@ -22,6 +25,10 @@ class IncomingUpdate(BaseModel):
     message_thread_id: int | None = None
     text: str = ""
     raw: dict[str, Any]
+    # An ``edited_message`` update (#24): ``raw`` holds ``edited_message``, and
+    # ``edit_date`` is Telegram's unix time of the edit.
+    edited: bool = False
+    edit_date: int | None = None
 
 
 class PageRef(BaseModel):
@@ -31,11 +38,34 @@ class PageRef(BaseModel):
     url: str
 
 
+ClassifierOutcome = Literal[
+    "ok", "invalid_json", "schema_violation", "empty_content", "timeout", "api_error"
+]
+
+
+class ClassifyResult(BaseModel):
+    """One classify/extract call: the validated result or its failure class, plus trace."""
+
+    outcome: ClassifierOutcome
+    extraction: Extraction | None = None
+    error: str | None = None
+    requested_model: str
+    returned_model: str | None = None
+    prompt_tag: str
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    latency_ms: int | None = None
+
+
 @runtime_checkable
 class TelegramClient(Protocol):
     async def get_updates(self, offset: int, timeout: int) -> list[IncomingUpdate]: ...
 
     async def set_reaction(self, chat_id: int, message_id: int, emoji: str) -> None: ...
+
+    async def send_message(self, chat_id: int, topic_id: int, text: str) -> int:
+        """Post Telegram-HTML ``text`` to a forum topic; return the new message id."""
+        ...
 
 
 @runtime_checkable
@@ -43,3 +73,37 @@ class NotionClient(Protocol):
     async def create_page(self, payload: dict) -> PageRef: ...
 
     async def retrieve_page(self, page_id: str) -> dict: ...
+
+
+@runtime_checkable
+class NotionReader(Protocol):
+    """The read side the six-hour caches need."""
+
+    async def query_all(self, data_source_id: str) -> list[dict[str, Any]]: ...
+
+    async def retrieve_data_source(self, data_source_id: str) -> dict: ...
+
+
+@runtime_checkable
+class Classifier(Protocol):
+    async def classify(
+        self, masked_text: str, origin_lines: list[str] | None
+    ) -> ClassifyResult: ...
+
+
+@runtime_checkable
+class DeliverableMatcher(Protocol):
+    """Answers one match/maybe/no decision per candidate (#26)."""
+
+    async def match(
+        self, state: str, project_name: str, candidates: list[Candidate]
+    ) -> MatchResult: ...
+
+
+@runtime_checkable
+class DeliverableSource(Protocol):
+    """Live, project-scoped Deliverable candidates (#26)."""
+
+    async def query_project_deliverables(
+        self, data_source_id: str, project_page_id: str
+    ) -> list[Candidate]: ...

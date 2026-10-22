@@ -18,7 +18,13 @@ from jo_watchdog.app.config import (
 
 ROOT = Path(__file__).resolve().parent.parent
 
-MINIMAL = dict(intake_chat_id=-100123, intake_topic_id=5, job_orders_data_source_id="ds-1")
+MINIMAL = dict(
+    intake_chat_id=-100123,
+    intake_topic_id=5,
+    ops_chat_id=-100999,
+    ops_topic_id=9,
+    job_orders_data_source_id="ds-1",
+)
 
 
 def make(**overrides) -> Config:
