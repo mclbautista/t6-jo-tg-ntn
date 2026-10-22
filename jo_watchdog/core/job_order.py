@@ -1,0 +1,214 @@
+"""Pure core: the deterministic Job Order plan (#21).
+
+Turns a validated extraction into the exact Notion properties and body blocks
+for every Job Order field that needs no live relation resolution. The plan is
+stored before any write and replayed as-is: ``build_job_order_payload`` reads
+only the stored plan, never the extraction or the clock.
+"""
+
+from __future__ import annotations
+
+import re
+from collections.abc import Collection, Mapping, Sequence
+from datetime import datetime, time
+from typing import Any, Protocol
+
+from pydantic import BaseModel, Field
+
+from jo_watchdog.core.deadline import MANILA, DeadlineSource, resolve_deadline
+from jo_watchdog.core.findings import ASAP, Finding
+from jo_watchdog.core.header import (
+    canonical_name,
+    normalize_department,
+    parse_header,
+    parse_number,
+)
+from jo_watchdog.core.masker import mask_text, outbound_text
+from jo_watchdog.core.payload import STATUS_NEEDS_INTAKE_REVIEW
+from jo_watchdog.core.plan import BLOCK_LIMIT, first_line_of, split_blocks
+
+TIME_ZONE = "Asia/Manila"
+WATCHDOG_MARKER = "— added by the watchdog —"
+ASAP_NOTE = "ASAP — deprioritize other JOs"
+
+# Exact live property names, including the trailing space on `Blocker `.
+TEXT_PROPERTIES: dict[str, str] = {
+    "title": "Title",
+    "task": "Task",
+    "purpose": "Purpose",
+    "source": "Source / Source Drive",
+    "platform": "Platform",
+    "link_settings": "Link Settings",
+    "watermark": "Watermark",
+    "mode_of_transfer": "Mode of Transfer",
+    "blocker": "Blocker ",
+    "pending": "Pending",
+}
+
+_SUBTITLE = re.compile(r"^(?:Burned-in: \S.*|None)$")
+
+
+class Extraction(Protocol):
+    """The raw fields this slice reads from the #20 extraction result."""
+
+    header_raw: str | None
+    jo_number_raw: str | None
+    department_raw: str | None
+    title: str | None
+    task: str | None
+    purpose: str | None
+    source: str | None
+    platform: str | None
+    link_settings: str | None
+    watermark: str | None
+    mode_of_transfer: str | None
+    blocker: str | None
+    pending: str | None
+    notes: str | None
+    deadline_raw: str | None
+    subtitle: str | None
+
+
+class JobOrderPlan(BaseModel):
+    """The exact Notion payload pieces, stored at ``planned`` and replayed unchanged."""
+
+    telegram_key: str
+    name: str
+    properties: dict[str, Any]
+    body_blocks: list[str] = Field(default_factory=list)
+    jo_number_int: int | None = None
+    deadline_source: DeadlineSource = "blank"
+    findings: list[Finding] = Field(default_factory=list)
+
+
+def manila_iso(value: datetime) -> str:
+    """ISO-8601 with the explicit ``+08:00`` offset."""
+    return value.astimezone(MANILA).isoformat()
+
+
+def rich_text(value: str) -> list[dict]:
+    """Split a text value into Notion rich-text items of at most 2000 characters."""
+    return [
+        {"type": "text", "text": {"content": value[i : i + BLOCK_LIMIT]}}
+        for i in range(0, len(value), BLOCK_LIMIT)
+    ]
+
+
+def _clean(value: str | None) -> str:
+    """Trim a verbatim field and mask it; absent values stay blank."""
+    if value is None:
+        return ""
+    return outbound_text(value.replace("\xa0", " ").strip()).text
+
+
+def build_notes(poster_notes: str | None, deadline_raw: str | None, asap: bool) -> str:
+    """Poster notes verbatim, then the watchdog block when it has anything to add.
+
+    ``Earlier row:`` lines are appended by #24 after this block.
+    """
+    notes = _clean(poster_notes)
+    added: list[str] = []
+    deadline = _clean(deadline_raw)
+    if deadline:
+        added.append(f"Deadline as posted: {deadline}")
+    if asap:
+        added.append(ASAP_NOTE)
+    if not added:
+        return notes
+    block = "\n".join([WATCHDOG_MARKER, *added])
+    return f"{notes}\n\n{block}" if notes else block
+
+
+def plan_job_order(
+    extraction: Extraction,
+    *,
+    telegram_key: str,
+    raw_text: str,
+    posted_at: datetime,
+    source_block: str,
+    department_aliases: Mapping[str, str],
+    valid_departments: Collection[str] | None = None,
+    assignee_shifts: Sequence[tuple[str, str | time | None]] = (),
+) -> JobOrderPlan:
+    """Build the deterministic plan for one Job Order.
+
+    ``posted_at`` is the intake posting or forwarding time, never the forwarded
+    original's time. ``source_block`` is the rendered provenance block (#24's
+    ``provenance.source_block``); it is masked here like all source text.
+    ``valid_departments`` and ``assignee_shifts`` come from the
+    resolution slice (#22); ``None`` departments means validation has not run.
+    """
+    header_raw = extraction.header_raw or first_line_of(raw_text)
+    header = parse_header(header_raw, department_aliases)
+
+    department: str | None = None
+    if header is not None:
+        department = header.department
+    elif extraction.department_raw and extraction.department_raw.strip():
+        department = normalize_department(extraction.department_raw, department_aliases)
+    if valid_departments is not None and department not in valid_departments:
+        department = None
+
+    digits = header.number if header is not None else parse_number(extraction.jo_number_raw)
+
+    name = _clean(canonical_name(header, first_line_of(header_raw), valid_departments))
+
+    deadline = resolve_deadline(extraction.deadline_raw, posted_at, assignee_shifts)
+    asap = any(f.code == ASAP for f in deadline.findings)
+
+    properties: dict[str, Any] = {
+        "Name": {"title": rich_text(name)},
+        "Telegram Key": {"rich_text": rich_text(telegram_key)},
+        "Status": {"status": {"name": STATUS_NEEDS_INTAKE_REVIEW}},
+        "Date": {"date": {"start": manila_iso(posted_at), "time_zone": TIME_ZONE}},
+    }
+    if digits is not None:
+        properties["JO Number"] = {"rich_text": rich_text(f"#{digits}")}
+    if department:
+        properties["Department"] = {"select": {"name": department}}
+    if deadline.deadline is not None:
+        properties["Deadline"] = {
+            "date": {"start": manila_iso(deadline.deadline), "time_zone": TIME_ZONE}
+        }
+    for field, prop in TEXT_PROPERTIES.items():
+        value = _clean(getattr(extraction, field))
+        if value:
+            properties[prop] = {"rich_text": rich_text(value)}
+    subtitle = _clean(extraction.subtitle)
+    if _SUBTITLE.match(subtitle):
+        properties["Subtitle"] = {"rich_text": rich_text(subtitle)}
+    notes = build_notes(extraction.notes, extraction.deadline_raw, asap)
+    if notes:
+        properties["Notes"] = {"rich_text": rich_text(notes)}
+
+    body = [
+        *split_blocks(outbound_text(source_block).text),
+        *split_blocks(outbound_text(raw_text).text),
+    ]
+
+    return JobOrderPlan(
+        telegram_key=telegram_key,
+        name=name,
+        properties=properties,
+        body_blocks=body,
+        jo_number_int=int(digits) if digits is not None else None,
+        deadline_source=deadline.source,
+        findings=deadline.findings,
+    )
+
+
+def build_job_order_payload(plan: JobOrderPlan, *, data_source_id: str) -> dict:
+    """The exact create-page payload, built only from the stored plan."""
+    children = [
+        {
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {"rich_text": rich_text(mask_text(block))},
+        }
+        for block in plan.body_blocks
+    ]
+    return {
+        "parent": {"data_source_id": data_source_id},
+        "properties": plan.properties,
+        "children": children,
+    }

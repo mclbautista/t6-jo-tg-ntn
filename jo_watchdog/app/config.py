@@ -34,6 +34,9 @@ class Config(BaseModel):
     # Ledger
     ledger_path: str = "./data/ledger.db"
 
+    # Planning: header Department token -> Department option (validated live in #22)
+    department_aliases: dict[str, str] = Field(default_factory=lambda: {"TO": "TOC"})
+
     @model_validator(mode="after")
     def _require_intake_ids(self) -> "Config":
         if not self.intake_chat_id or not self.intake_topic_id:

@@ -16,3 +16,7 @@ notion_version: "2026-03-11"        # pinned API version (do not change casually
 
 # --- Ledger ---
 ledger_path: "./data/ledger.db"
+
+# --- Planning ---
+department_aliases:                 # header Department token -> Department option
+  TO: TOC
