@@ -8,6 +8,7 @@ only the stored plan, never the extraction or the clock.
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Collection, Mapping, Sequence
 from datetime import datetime, time
@@ -26,6 +27,12 @@ from jo_watchdog.core.header import (
 from jo_watchdog.core.masker import mask_text, outbound_text
 from jo_watchdog.core.payload import STATUS_NEEDS_INTAKE_REVIEW
 from jo_watchdog.core.plan import BLOCK_LIMIT, first_line_of, split_blocks
+from jo_watchdog.core.resolve import (
+    DepartmentResolution,
+    PeopleResolution,
+    ProjectResolution,
+    relation_properties,
+)
 
 TIME_ZONE = "Asia/Manila"
 WATCHDOG_MARKER = "— added by the watchdog —"
@@ -69,6 +76,24 @@ class Extraction(Protocol):
     subtitle: str | None
 
 
+class UnresolvedMention(BaseModel):
+    """A People mention the resolver left out of the relations."""
+
+    raw: str
+    role: str  # "assignee" | "cc"
+    status: str  # "unresolved" | "ambiguous"
+
+
+class PlanResolution(BaseModel):
+    """What resolution decided, stored with the plan so a resume never resolves again."""
+
+    project_page_id: str | None = None
+    department: str | None = None
+    assigned: list[str] = Field(default_factory=list)
+    cc: list[str] = Field(default_factory=list)
+    unresolved: list[UnresolvedMention] = Field(default_factory=list)
+
+
 class JobOrderPlan(BaseModel):
     """The exact Notion payload pieces, stored at ``planned`` and replayed unchanged."""
 
@@ -79,6 +104,32 @@ class JobOrderPlan(BaseModel):
     jo_number_int: int | None = None
     deadline_source: DeadlineSource = "blank"
     findings: list[Finding] = Field(default_factory=list)
+    # None when no caches are wired (nothing was resolved).
+    resolution: PlanResolution | None = None
+    # The duplicate decision made at plan time (#24), replayed unchanged:
+    # ``{"code": "exact_repost" | "number_reuse", "url", "days", "jo_number"}``.
+    duplicate: dict | None = None
+
+
+def load_plan(stored: str | dict) -> JobOrderPlan:
+    """Read a stored plan; a pre-#39 skeleton plan (no ``properties``) is upgraded in place."""
+    data = json.loads(stored) if isinstance(stored, str) else dict(stored)
+    if "properties" in data:
+        return JobOrderPlan.model_validate(data)
+    properties: dict[str, Any] = {
+        "Name": {"title": rich_text(data["name"])},
+        "Telegram Key": {"rich_text": rich_text(data["telegram_key"])},
+        "Status": {"status": {"name": STATUS_NEEDS_INTAKE_REVIEW}},
+    }
+    if data.get("notes"):
+        properties["Notes"] = {"rich_text": rich_text(data["notes"])}
+    return JobOrderPlan(
+        telegram_key=data["telegram_key"],
+        name=data["name"],
+        properties=properties,
+        body_blocks=data.get("body_blocks", []),
+        duplicate=data.get("duplicate"),
+    )
 
 
 def manila_iso(value: datetime) -> str:
@@ -194,6 +245,32 @@ def plan_job_order(
         jo_number_int=int(digits) if digits is not None else None,
         deadline_source=deadline.source,
         findings=deadline.findings,
+    )
+
+
+def apply_resolution(
+    plan: JobOrderPlan,
+    *,
+    people: PeopleResolution,
+    project: ProjectResolution,
+    department: DepartmentResolution,
+) -> None:
+    """Merge the #22 resolution into the plan: relations, findings and the stored decision."""
+    plan.properties.update(relation_properties(people, project))
+    plan.resolution = PlanResolution(
+        project_page_id=project.page_id,
+        department=department.department,
+        assigned=list(people.assigned),
+        cc=list(people.cc),
+        unresolved=[
+            UnresolvedMention(raw=m.raw, role=m.role, status=m.status)
+            for m in people.mentions
+            if m.status != "resolved"
+        ],
+    )
+    plan.findings.extend(
+        Finding(code=f.code, params=dict(f.params))
+        for f in (*people.findings, *project.findings, *department.findings)
     )
 
 

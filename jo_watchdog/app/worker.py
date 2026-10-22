@@ -21,22 +21,28 @@ from jo_watchdog.app.caches import CacheManager
 from jo_watchdog.app.config import Config
 from jo_watchdog.core.duplicates import (
     EarlierCapture,
-    append_watchdog_line,
+    add_earlier_row_line,
     find_duplicate,
     jo_key,
     notes_line,
 )
 from jo_watchdog.core.edits import EditAction, decide_edit
-from jo_watchdog.core.extraction import forward_origin_lines
-from jo_watchdog.core.header import parse_header, parse_number
+from jo_watchdog.core.extraction import Extraction, forward_origin_lines
+from jo_watchdog.core.header import parse_header
 from jo_watchdog.core.heartbeat import heartbeat_window
+from jo_watchdog.core.job_order import (
+    JobOrderPlan,
+    apply_resolution,
+    build_job_order_payload,
+    load_plan,
+    plan_job_order,
+)
 from jo_watchdog.core.payload import (
-    build_notion_payload,
     extract_readback_fields,
     page_url_for,
     verify_readback,
 )
-from jo_watchdog.core.plan import Plan, build_plan, first_line_of
+from jo_watchdog.core.plan import first_line_of
 from jo_watchdog.core.provenance import parse_forward_origin, source_block
 from jo_watchdog.core.report import (
     forward_origin_from_raw,
@@ -48,6 +54,7 @@ from jo_watchdog.core.report import (
     render_outage_alert,
     render_stale_cache,
 )
+from jo_watchdog.core.resolve import mention_entities
 from jo_watchdog.core.verify import MANILA, CaptureFacts, EarlierRow, Finding, verify
 from jo_watchdog.ledger.db import Ledger, OutboxMessage, fmt_utc, telegram_key
 from jo_watchdog.ledger.states import State
@@ -378,7 +385,7 @@ class Worker:
             # A plan held by dry-run: write exactly what was stored.
             if self.config.dry_run or not msg["plan_json"]:
                 return
-            plan = Plan.model_validate_json(msg["plan_json"])
+            plan = load_plan(msg["plan_json"])
         else:
             if msg["state"] == State.RECEIVED.value:
                 if await self.classify(msg) is not State.EXTRACTED:
@@ -390,16 +397,13 @@ class Worker:
                 # `extracted` (no attempt spent, no false unresolved finding).
                 return
 
-            # Plan is built and stored before any external call.
-            plan = build_plan(
-                name=msg["first_line"],
-                telegram_key=key,
-                raw_text=msg["text"],
-                source_block=self._source_block(msg),
-            )
+            # Plan and resolution are decided here, once, before any external call.
+            plan = self._build_plan(msg)
+            if plan is None:
+                return
             dup_key = self._annotate_duplicate(msg, plan)
             # State and plan commit together: a crash cannot leave `planned` empty.
-            if not self.ledger.plan_message(key, plan.model_dump(), jo_key=dup_key):
+            if not self.ledger.plan_message(key, plan.model_dump(mode="json"), jo_key=dup_key):
                 return
             if self.config.dry_run:
                 self._report_dry_run(msg, plan)
@@ -410,9 +414,54 @@ class Worker:
             return
         await self._create(msg, plan)
 
-    async def _create(self, msg: dict, plan: Plan) -> None:
+    def _build_plan(self, msg: dict) -> JobOrderPlan | None:
+        """Plan one extracted message: the #21 planner fed by the #22 resolvers.
+
+        Without caches nothing is resolved: no relations, no Department check
+        and no shift deadlines.
+        """
         key = msg["telegram_key"]
-        payload = build_notion_payload(
+        stored = (self.ledger.stage_result(key, "extract") or {}).get("extraction")
+        if not stored:
+            log.error("no stored extraction for %s; cannot plan", key)
+            return None
+        extraction = Extraction.model_validate(stored)
+        message = _raw_update(msg).get("message") or {}
+        caches = self.caches
+        aliases = caches.settings.department_aliases if caches is not None else {}
+
+        people = project = department = None
+        if caches is not None:
+            header = parse_header(extraction.header_raw or first_line_of(msg["text"]), aliases)
+            if header is not None:
+                project_raw, department_token = header.project, header.department
+            else:
+                project_raw, department_token = extraction.project_raw, extraction.department_raw
+            people = caches.resolve_people(
+                extraction.assignees_raw, extraction.cc_raw, mention_entities(message)
+            )
+            project = caches.resolve_project(project_raw)
+            department = caches.resolve_department(department_token)
+
+        plan = plan_job_order(
+            extraction,
+            telegram_key=key,
+            raw_text=msg["text"],
+            posted_at=_posted_at(msg, _raw_update(msg)) or _ledger_time(msg),
+            source_block=self._source_block(msg),
+            department_aliases=aliases,
+            valid_departments=caches.departments if caches is not None else None,
+            assignee_shifts=[(s.name, s.end_of_shift) for s in people.assignee_shifts]
+            if people is not None
+            else (),
+        )
+        if people is not None:
+            apply_resolution(plan, people=people, project=project, department=department)
+        return plan
+
+    async def _create(self, msg: dict, plan: JobOrderPlan) -> None:
+        key = msg["telegram_key"]
+        payload = build_job_order_payload(
             plan, data_source_id=self.config.job_orders_data_source_id
         )
         try:
@@ -435,7 +484,7 @@ class Worker:
         key = msg["telegram_key"]
         if not msg["plan_json"]:
             return
-        plan = Plan.model_validate_json(msg["plan_json"])
+        plan = load_plan(msg["plan_json"])
         if msg["notion_page_id"]:
             page_id = msg["notion_page_id"]
             await self._read_back(msg, plan, PageRef(id=page_id, url=page_url_for(page_id)))
@@ -456,7 +505,7 @@ class Worker:
         self.ledger.store_page_id(key, matches[0].id)
         await self._read_back(msg, plan, matches[0])
 
-    async def _read_back(self, msg: dict, plan: Plan, page_ref: PageRef) -> None:
+    async def _read_back(self, msg: dict, plan: JobOrderPlan, page_ref: PageRef) -> None:
         key = msg["telegram_key"]
         # Read back and compare; a mismatch is recorded, never rewritten.
         try:
@@ -514,10 +563,10 @@ class Worker:
                 self.ledger.set_reaction_state(key, "failed")
         self.ledger.mark_done(key)
 
-    def _report_dry_run(self, msg: dict, plan: Plan) -> None:
+    def _report_dry_run(self, msg: dict, plan: JobOrderPlan) -> None:
         """Dry-run stops at `planned`: post the masked plan to ops, write nothing."""
         text = render_dry_run_plan(
-            plan=plan.model_dump(),
+            plan=plan.model_dump(mode="json"),
             intake_url=intake_link(msg["chat_id"], self.config.intake_topic_id, msg["message_id"]),
         )
         self.ledger.enqueue_system(
@@ -548,40 +597,27 @@ class Worker:
             contact_name=contact,
         )
 
-    def _jo_key(self, msg: dict) -> tuple[str | None, str | None]:
-        """The content-duplicate key and the JO Number as posted.
+    @staticmethod
+    def _jo_key(plan: JobOrderPlan) -> tuple[str | None, str | None]:
+        """The content-duplicate key and the JO Number as posted, from the stored resolution.
 
         The key needs a resolved Project page, a live Department option and a
         parsed number; anything less returns no key, so reuse detection skips.
         """
-        if self.caches is None or not self.caches.ready:
+        if plan.resolution is None or plan.jo_number_int is None:
             return None, None
-        stage = self.ledger.stage_result(msg["telegram_key"], "extract") or {}
-        extraction = stage.get("extraction") or {}
-        header = parse_header(
-            extraction.get("header_raw") or msg["first_line"],
-            self.caches.settings.department_aliases,
-        )
-        if header is not None:
-            project_raw, department_token, digits = header.project, header.department, header.number
-        else:
-            project_raw = extraction.get("project_raw")
-            department_token = extraction.get("department_raw")
-            digits = parse_number(extraction.get("jo_number_raw"))
-        if digits is None:
-            return None, None
-        project = self.caches.resolve_project(project_raw)
-        department = self.caches.resolve_department(department_token)
-        return jo_key(project.page_id, department.department, int(digits)), f"#{digits}"
+        resolved = plan.resolution
+        key = jo_key(resolved.project_page_id, resolved.department, plan.jo_number_int)
+        return key, f"#{plan.jo_number_int}"
 
-    def _annotate_duplicate(self, msg: dict, plan: Plan) -> str | None:
+    def _annotate_duplicate(self, msg: dict, plan: JobOrderPlan) -> str | None:
         """Look for an earlier exact re-post or reused JO Number; return the jo_key.
 
         A match never blocks or merges: the new row is still written, with an
         ``Earlier row:`` Notes line and a finding stored in the plan.
         """
         key = msg["telegram_key"]
-        dup_key, jo_number = self._jo_key(msg)
+        dup_key, jo_number = self._jo_key(plan)
         posted_at = _ledger_time(msg)
         earlier = [
             EarlierCapture(
@@ -603,7 +639,7 @@ class Worker:
             earlier=earlier,
         )
         if match is not None:
-            plan.notes = append_watchdog_line(plan.notes, notes_line(match))
+            add_earlier_row_line(plan, notes_line(match))
             plan.duplicate = {
                 "code": match.kind,
                 "url": match.earlier.page_url,
@@ -617,13 +653,12 @@ class Worker:
 
         The extraction (#20) supplies the verdict, reasons, Title, Task and
         header date. Planner and resolver findings (#21, #22) join through
-        ``plan.findings`` once the pipeline plans with them; until then those
-        checks have no input and stay silent.
+        ``plan.findings``.
         """
         raw = _raw_update(msg)
         stage = self.ledger.stage_result(msg["telegram_key"], "extract") or {}
         extraction = stage.get("extraction") or {}
-        duplicate = getattr(plan, "duplicate", None) or {}
+        duplicate = plan.duplicate or {}
         earlier = (
             EarlierRow(
                 url=duplicate["url"], days=duplicate["days"], jo_number=duplicate.get("jo_number")
@@ -645,7 +680,7 @@ class Worker:
             readback_mismatches=mismatches,
             plan_findings=[
                 Finding.model_validate(f, from_attributes=True)
-                for f in getattr(plan, "findings", [])
+                for f in plan.findings
             ],
         )
 

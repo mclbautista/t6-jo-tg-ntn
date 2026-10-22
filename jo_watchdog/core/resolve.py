@@ -489,3 +489,32 @@ def relation_properties(people: PeopleResolution, project: ProjectResolution) ->
         "cc": {"relation": [{"id": page_id} for page_id in people.cc]},
         "Projects": {"relation": [{"id": project.page_id}] if project.page_id else []},
     }
+
+
+# -- Telegram entities ------------------------------------------------------------
+
+
+def mention_entities(message: Mapping) -> list[MentionEntity]:
+    """The ``mention`` and ``text_mention`` entities of a Telegram message.
+
+    Telegram offsets count UTF-16 code units, so the text is sliced there.
+    """
+    # A photo or document carries its text as a caption, with its own entities.
+    text = message.get("text") or message.get("caption") or ""
+    entities = message.get("entities") or message.get("caption_entities") or []
+    units = text.encode("utf-16-le")
+    out: list[MentionEntity] = []
+    for entity in entities:
+        kind = entity.get("type")
+        if kind not in ("mention", "text_mention"):
+            continue
+        start, length = entity.get("offset", 0), entity.get("length", 0)
+        shown = units[start * 2 : (start + length) * 2].decode("utf-16-le", errors="ignore")
+        if kind == "mention":
+            out.append(MentionEntity(text=shown, handle=shown.lstrip("@")))
+        else:
+            user_id = (entity.get("user") or {}).get("id")
+            out.append(
+                MentionEntity(text=shown, user_id=str(user_id) if user_id is not None else None)
+            )
+    return out

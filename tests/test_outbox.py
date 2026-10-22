@@ -11,12 +11,11 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from pydantic import Field
-
 from jo_watchdog.app.caches import StaleCache
 from jo_watchdog.app.config import Config
 from jo_watchdog.app.worker import Worker
-from jo_watchdog.core.plan import Plan, build_plan
+from jo_watchdog.core.findings import Finding
+from jo_watchdog.core.job_order import plan_job_order
 from jo_watchdog.ledger.db import OUTBOX_RETRY_SECONDS, Ledger, OutboxMessage
 from jo_watchdog.ledger.states import State
 from tests.fakes import FakeClassifier, FakeNotion, FakeTelegram, ok_result, update
@@ -199,17 +198,13 @@ class CaptureReportTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_plan_findings_tag_leizette(self):
         # #21 stores planner findings on the plan; they join the same report.
-        class PlanWithFindings(Plan):
-            findings: list[dict] = Field(default_factory=list)
-
-        def build(*args, **kwargs):
-            return PlanWithFindings(
-                **build_plan(*args, **kwargs).model_dump(),
-                findings=[{"code": "unknown_department", "params": {"token": "XYZ"}}],
-            )
+        def plan(*args, **kwargs):
+            planned = plan_job_order(*args, **kwargs)
+            planned.findings.append(Finding(code="unknown_department", params={"token": "XYZ"}))
+            return planned
 
         h = Harness(self, [update(1, message_id=42)])
-        with mock.patch("jo_watchdog.app.worker.build_plan", build):
+        with mock.patch("jo_watchdog.app.worker.plan_job_order", plan):
             await h.worker.run_once()
         [(_, _, text)] = h.telegram.sent
         self.assertIn('Department "XYZ" isn\'t a Notion option', text)

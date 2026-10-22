@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 from jo_watchdog.app import __main__, healthcheck
 from jo_watchdog.app.worker import DeadmanExit
 from jo_watchdog.core.heartbeat import heartbeat_window
+from jo_watchdog.core.resolve import DepartmentResolution, PeopleResolution, ProjectResolution
 from jo_watchdog.ledger.db import Ledger, OutboxMessage, fmt_utc
 from jo_watchdog.ledger.migrations import MIGRATIONS
 from tests.clockwork import KEY, OWNER, Crash, FakeClock, Pipeline
@@ -203,8 +204,10 @@ class RetryScheduleTests(unittest.IsolatedAsyncioTestCase):
         caches.ready = True
         caches.settings = SimpleNamespace(department_aliases={})
         caches.contact_for_telegram_user = lambda *a: None
-        caches.resolve_project = lambda raw: SimpleNamespace(page_id="proj")
-        caches.resolve_department = lambda raw: SimpleNamespace(department="TOC")
+        caches.departments = ["TOC"]
+        caches.resolve_people = lambda *a: PeopleResolution()
+        caches.resolve_project = lambda raw: ProjectResolution(page_id="proj")
+        caches.resolve_department = lambda raw: DepartmentResolution(department="TOC")
         await p.worker.run_once()
         self.assertEqual(p.message()["state"], "done")
 

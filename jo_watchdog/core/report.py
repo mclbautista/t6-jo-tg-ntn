@@ -227,11 +227,31 @@ def render_stale_cache(
 DRY_RUN_HEADER = "🧪 Dry run — planned, not written to Notion"
 
 
+def _plain_property(prop: dict) -> str:
+    """A Notion property value as the text a person would read."""
+    if "title" in prop or "rich_text" in prop:
+        items = prop.get("title") or prop.get("rich_text") or []
+        return "".join(item["text"]["content"] for item in items)
+    if "select" in prop or "status" in prop:
+        return (prop.get("select") or prop.get("status") or {}).get("name", "")
+    if "date" in prop:
+        return (prop["date"] or {}).get("start", "")
+    if "relation" in prop:
+        return ", ".join(item["id"] for item in prop["relation"])
+    return str(prop)
+
+
 def render_dry_run_plan(*, plan: dict, intake_url: str) -> str:
     """The masked stored plan, one line per planned property (#27)."""
     lines = [DRY_RUN_HEADER, f"<code>{_field(plan.get('name', ''))}</code>", ""]
     for key, value in plan.items():
         if key in ("name", "telegram_key", "body_blocks") or value in (None, "", [], {}):
+            continue
+        if key == "properties":
+            for prop, raw in value.items():
+                text = _plain_property(raw)
+                if prop not in ("Name", "Telegram Key") and text:
+                    lines.append(f"{_field(prop)}: {_field(text)}")
             continue
         lines.append(f"{_field(key)}: {_field(value)}")
     lines.append(f"Body: {len(plan.get('body_blocks') or [])} block(s)")
@@ -276,9 +296,7 @@ def _stamp(when: datetime) -> str:
     return f"{local.strftime('%b')} {local.day} {local.strftime('%H:%M')}"
 
 
-def render_heartbeat(
-    *, window_start: datetime, window_end: datetime, stats: dict
-) -> str:
+def render_heartbeat(*, window_start: datetime, window_end: datetime, stats: dict) -> str:
     """The daily heartbeat for ``[window_start, window_end)`` (#25), from ledger stats."""
     d = stats["deliverables"]
     lines = [
