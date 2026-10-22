@@ -1,0 +1,386 @@
+{
+ "object": "list",
+ "results": [
+  {
+   "object": "page",
+   "id": "c0000000-0000-4000-8000-000000000001",
+   "url": "https://www.notion.so/c0000000000040008000000000000001",
+   "parent": {
+    "type": "data_source_id",
+    "data_source_id": "77b2a701-71db-4e88-a694-37f07303e77e"
+   },
+   "properties": {
+    "Name": {
+     "type": "title",
+     "title": [
+      {
+       "type": "text",
+       "plain_text": "Leizette Sazon",
+       "text": {
+        "content": "Leizette Sazon"
+       }
+      }
+     ]
+    },
+    "TelegramUserID": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "TelegramHandle": {
+     "type": "rich_text",
+     "rich_text": [
+      {
+       "type": "text",
+       "plain_text": "@leizette",
+       "text": {
+        "content": "@leizette"
+       }
+      }
+     ]
+    },
+    "Aliases": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "End of Shift": {
+     "type": "select",
+     "select": null
+    },
+    "Email": {
+     "type": "email",
+     "email": null
+    }
+   }
+  },
+  {
+   "object": "page",
+   "id": "c0000000-0000-4000-8000-000000000002",
+   "url": "https://www.notion.so/c0000000000040008000000000000002",
+   "parent": {
+    "type": "data_source_id",
+    "data_source_id": "77b2a701-71db-4e88-a694-37f07303e77e"
+   },
+   "properties": {
+    "Name": {
+     "type": "title",
+     "title": [
+      {
+       "type": "text",
+       "plain_text": "Piolo Reyes",
+       "text": {
+        "content": "Piolo Reyes"
+       }
+      }
+     ]
+    },
+    "TelegramUserID": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "TelegramHandle": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "Aliases": {
+     "type": "rich_text",
+     "rich_text": [
+      {
+       "type": "text",
+       "plain_text": "Piolo",
+       "text": {
+        "content": "Piolo"
+       }
+      }
+     ]
+    },
+    "End of Shift": {
+     "type": "select",
+     "select": {
+      "name": "10:00 PM"
+     }
+    },
+    "Email": {
+     "type": "email",
+     "email": null
+    }
+   }
+  },
+  {
+   "object": "page",
+   "id": "c0000000-0000-4000-8000-000000000003",
+   "url": "https://www.notion.so/c0000000000040008000000000000003",
+   "parent": {
+    "type": "data_source_id",
+    "data_source_id": "77b2a701-71db-4e88-a694-37f07303e77e"
+   },
+   "properties": {
+    "Name": {
+     "type": "title",
+     "title": [
+      {
+       "type": "text",
+       "plain_text": "Majo Cruz",
+       "text": {
+        "content": "Majo Cruz"
+       }
+      }
+     ]
+    },
+    "TelegramUserID": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "TelegramHandle": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "Aliases": {
+     "type": "rich_text",
+     "rich_text": [
+      {
+       "type": "text",
+       "plain_text": "Majo, ate Majo",
+       "text": {
+        "content": "Majo, ate Majo"
+       }
+      }
+     ]
+    },
+    "End of Shift": {
+     "type": "select",
+     "select": {
+      "name": "Flexible / Variable"
+     }
+    },
+    "Email": {
+     "type": "email",
+     "email": null
+    }
+   }
+  },
+  {
+   "object": "page",
+   "id": "c0000000-0000-4000-8000-000000000004",
+   "url": "https://www.notion.so/c0000000000040008000000000000004",
+   "parent": {
+    "type": "data_source_id",
+    "data_source_id": "77b2a701-71db-4e88-a694-37f07303e77e"
+   },
+   "properties": {
+    "Name": {
+     "type": "title",
+     "title": [
+      {
+       "type": "text",
+       "plain_text": "Jade Santos",
+       "text": {
+        "content": "Jade Santos"
+       }
+      }
+     ]
+    },
+    "TelegramUserID": {
+     "type": "rich_text",
+     "rich_text": [
+      {
+       "type": "text",
+       "plain_text": "5550001",
+       "text": {
+        "content": "5550001"
+       }
+      }
+     ]
+    },
+    "TelegramHandle": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "Aliases": {
+     "type": "rich_text",
+     "rich_text": [
+      {
+       "type": "text",
+       "plain_text": "Jade",
+       "text": {
+        "content": "Jade"
+       }
+      }
+     ]
+    },
+    "End of Shift": {
+     "type": "select",
+     "select": {
+      "name": "6:00 AM"
+     }
+    },
+    "Email": {
+     "type": "email",
+     "email": null
+    }
+   }
+  },
+  {
+   "object": "page",
+   "id": "c0000000-0000-4000-8000-000000000005",
+   "url": "https://www.notion.so/c0000000000040008000000000000005",
+   "parent": {
+    "type": "data_source_id",
+    "data_source_id": "77b2a701-71db-4e88-a694-37f07303e77e"
+   },
+   "properties": {
+    "Name": {
+     "type": "title",
+     "title": [
+      {
+       "type": "text",
+       "plain_text": "Paul Garcia",
+       "text": {
+        "content": "Paul Garcia"
+       }
+      }
+     ]
+    },
+    "TelegramUserID": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "TelegramHandle": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "Aliases": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "End of Shift": {
+     "type": "select",
+     "select": {
+      "name": "9:00 PM"
+     }
+    },
+    "Email": {
+     "type": "email",
+     "email": null
+    }
+   }
+  },
+  {
+   "object": "page",
+   "id": "c0000000-0000-4000-8000-000000000006",
+   "url": "https://www.notion.so/c0000000000040008000000000000006",
+   "parent": {
+    "type": "data_source_id",
+    "data_source_id": "77b2a701-71db-4e88-a694-37f07303e77e"
+   },
+   "properties": {
+    "Name": {
+     "type": "title",
+     "title": [
+      {
+       "type": "text",
+       "plain_text": "Debbie Lim",
+       "text": {
+        "content": "Debbie Lim"
+       }
+      }
+     ]
+    },
+    "TelegramUserID": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "TelegramHandle": {
+     "type": "rich_text",
+     "rich_text": [
+      {
+       "type": "text",
+       "plain_text": "@debz0313",
+       "text": {
+        "content": "@debz0313"
+       }
+      }
+     ]
+    },
+    "Aliases": {
+     "type": "rich_text",
+     "rich_text": [
+      {
+       "type": "text",
+       "plain_text": "Debbie, Debz, KUYA debs",
+       "text": {
+        "content": "Debbie, Debz, KUYA debs"
+       }
+      }
+     ]
+    },
+    "End of Shift": {
+     "type": "select",
+     "select": {
+      "name": "11:00 PM"
+     }
+    },
+    "Email": {
+     "type": "email",
+     "email": null
+    }
+   }
+  },
+  {
+   "object": "page",
+   "id": "c0000000-0000-4000-8000-000000000007",
+   "url": "https://www.notion.so/c0000000000040008000000000000007",
+   "parent": {
+    "type": "data_source_id",
+    "data_source_id": "77b2a701-71db-4e88-a694-37f07303e77e"
+   },
+   "properties": {
+    "Name": {
+     "type": "title",
+     "title": [
+      {
+       "type": "text",
+       "plain_text": "Joshua Tan",
+       "text": {
+        "content": "Joshua Tan"
+       }
+      }
+     ]
+    },
+    "TelegramUserID": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "TelegramHandle": {
+     "type": "rich_text",
+     "rich_text": [
+      {
+       "type": "text",
+       "plain_text": "joshua0826",
+       "text": {
+        "content": "joshua0826"
+       }
+      }
+     ]
+    },
+    "Aliases": {
+     "type": "rich_text",
+     "rich_text": []
+    },
+    "End of Shift": {
+     "type": "select",
+     "select": {
+      "name": "2:00 AM"
+     }
+    },
+    "Email": {
+     "type": "email",
+     "email": null
+    }
+   }
+  }
+ ],
+ "has_more": true,
+ "next_cursor": "cursor-contacts-2",
+ "type": "page_or_data_source",
+ "page_or_data_source": {}
+}

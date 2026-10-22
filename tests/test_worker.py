@@ -14,13 +14,15 @@ from jo_watchdog.app.config import Config
 from jo_watchdog.ledger.db import Ledger
 from jo_watchdog.ledger.states import State
 
-from tests.fakes import FakeNotion, FakeTelegram, update
+from tests.fakes import FakeClassifier, FakeNotion, FakeTelegram, update
 
 
 def make_config(**overrides) -> Config:
     base = dict(
         intake_chat_id=-100123,
         intake_topic_id=5,
+        ops_chat_id=-100999,
+        ops_topic_id=7,
         captured_reaction="✅",
         job_orders_data_source_id="ds-1",
     )
@@ -28,7 +30,9 @@ def make_config(**overrides) -> Config:
     return Config(**base)
 
 
-def make_worker(updates, *, fail_create=False, wrong_name=False, **config_overrides):
+def make_worker(
+    updates, *, fail_create=False, wrong_name=False, classifier=None, **config_overrides
+):
     from jo_watchdog.app.worker import Worker
 
     tmp = tempfile.TemporaryDirectory()
@@ -39,6 +43,7 @@ def make_worker(updates, *, fail_create=False, wrong_name=False, **config_overri
         ledger=ledger,
         telegram=telegram,
         notion=notion,
+        classifier=classifier or FakeClassifier(),
         config=make_config(**config_overrides),
     )
 
