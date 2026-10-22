@@ -16,9 +16,17 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from jo_watchdog.adapters.protocols import Classifier, NotionClient, PageRef, TelegramClient
+from jo_watchdog.adapters.protocols import (
+    Classifier,
+    DeliverableMatcher,
+    DeliverableSource,
+    NotionClient,
+    PageRef,
+    TelegramClient,
+)
 from jo_watchdog.app.caches import CacheManager
 from jo_watchdog.app.config import Config
+from jo_watchdog.app.matching import ResolvedProject, run_match_stage, with_deliverable
 from jo_watchdog.core.duplicates import (
     EarlierCapture,
     add_earlier_row_line,
@@ -28,6 +36,7 @@ from jo_watchdog.core.duplicates import (
 )
 from jo_watchdog.core.edits import EditAction, decide_edit
 from jo_watchdog.core.extraction import Extraction, forward_origin_lines
+from jo_watchdog.core.findings import Finding as PlanFinding
 from jo_watchdog.core.header import parse_header
 from jo_watchdog.core.heartbeat import heartbeat_window
 from jo_watchdog.core.job_order import (
@@ -142,6 +151,8 @@ class Worker:
         classifier: Classifier,
         config: Config,
         caches: CacheManager | None = None,
+        matcher: DeliverableMatcher | None = None,
+        deliverables: DeliverableSource | None = None,
         clock: Callable[[], datetime] = _utcnow,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         deadman_interval: float = DEADMAN_CHECK_SECONDS,
@@ -152,6 +163,8 @@ class Worker:
         self.classifier = classifier
         self.config = config
         self.caches = caches
+        self.matcher = matcher
+        self.deliverables = deliverables
         self.clock = clock
         self.sleep = sleep
         self.deadman_interval = deadman_interval
@@ -402,8 +415,16 @@ class Worker:
             if plan is None:
                 return
             dup_key = self._annotate_duplicate(msg, plan)
-            # State and plan commit together: a crash cannot leave `planned` empty.
-            if not self.ledger.plan_message(key, plan.model_dump(mode="json"), jo_key=dup_key):
+            match = await self._match(msg, plan)
+            # State, plan and match records commit together: a crash cannot leave
+            # `planned` empty, and a resumed plan never repeats the Jev call.
+            if not self.ledger.plan_message(
+                key,
+                plan.model_dump(mode="json"),
+                jo_key=dup_key,
+                stage_results={"match": json.loads(match.stage_result_json())} if match else None,
+                llm_calls=[c.model_dump() for c in match.llm_calls] if match else None,
+            ):
                 return
             if self.config.dry_run:
                 self._report_dry_run(msg, plan)
@@ -458,6 +479,41 @@ class Worker:
         if people is not None:
             apply_resolution(plan, people=people, project=project, department=department)
         return plan
+
+    async def _match(self, msg: dict, plan: JobOrderPlan):
+        """Run the #26 Deliverable match stage and fold its outcome into the plan.
+
+        It never raises and never blocks the write: a matcher failure leaves
+        Deliverable blank and adds one ``matcher_skipped`` finding. In shadow
+        mode (the default) decisions and hints are kept but no relation is added.
+        """
+        if self.matcher is None or self.deliverables is None:
+            return None
+        project = None
+        page_id = plan.resolution.project_page_id if plan.resolution else None
+        name = self.caches.project_name(page_id) if self.caches is not None else None
+        if page_id and name:
+            project = ResolvedProject(page_id=page_id, name=name)
+        stage = await run_match_stage(
+            matcher=self.matcher,
+            deliverables=self.deliverables,
+            config=self.config,
+            source_text=msg["masked_text"],
+            project=project,
+            sleep=self.sleep,
+        )
+        plan.properties = with_deliverable({"properties": plan.properties}, stage)["properties"]
+        if stage.outcome == "skipped":
+            plan.findings.append(PlanFinding(code="matcher_skipped"))
+        for hint in stage.decision.hints if stage.decision else []:
+            plan.findings.append(
+                PlanFinding(
+                    code="deliverable_hint",
+                    params={"name": hint.name, "probability": hint.p_match},
+                )
+            )
+        plan.match = json.loads(stage.stage_result_json())
+        return stage
 
     async def _create(self, msg: dict, plan: JobOrderPlan) -> None:
         key = msg["telegram_key"]
