@@ -13,9 +13,14 @@ import httpx
 from pydantic import BaseModel, Field
 
 from jo_watchdog.adapters.protocols import PageRef
+from jo_watchdog.core.matching import Candidate
 
 NOTION_VERSION = "2026-03-11"
 BASE_URL = "https://api.notion.com/v1"
+
+# Live Deliverables schema names (deliverable-matching research).
+DELIVERABLE_PROJECTS_PROPERTY = "🗺️ Projects"
+DELIVERABLE_TITLE_PROPERTY = "Name"
 
 
 class NotionError(Exception):
@@ -106,3 +111,32 @@ class NotionAdapter:
             has_more=data.get("has_more", False),
             next_cursor=data.get("next_cursor"),
         )
+
+    async def query_project_deliverables(
+        self, data_source_id: str, project_page_id: str
+    ) -> list[Candidate]:
+        """All Deliverables whose ``🗺️ Projects`` relation contains the Project.
+
+        A live, fully paginated query with no Status or Class filter (#26).
+        """
+        candidates: list[Candidate] = []
+        request = QueryRequest(
+            filter={
+                "property": DELIVERABLE_PROJECTS_PROPERTY,
+                "relation": {"contains": project_page_id},
+            }
+        )
+        while True:
+            page = await self.query_data_source(data_source_id, request)
+            candidates.extend(_deliverable_candidate(row) for row in page.results)
+            if not page.has_more or not page.next_cursor:
+                return candidates
+            request = request.model_copy(update={"start_cursor": page.next_cursor})
+
+
+def _deliverable_candidate(row: dict) -> Candidate:
+    title = row.get("properties", {}).get(DELIVERABLE_TITLE_PROPERTY, {}).get("title") or []
+    name = "".join(
+        item.get("plain_text") or item.get("text", {}).get("content", "") for item in title
+    )
+    return Candidate(page_id=row["id"], name=name)

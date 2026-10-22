@@ -14,5 +14,14 @@ poll_interval: 1.0                  # pause between poll+drain cycles (seconds)
 job_orders_data_source_id: "3d8fb4d5-9e59-8073-a0d0-000b77632947"
 notion_version: "2026-03-11"        # pinned API version (do not change casually)
 
+# --- Deliverable matching (Jev via OpenRouter, #26) ---
+deliverables_data_source_id: "0a4ff084-3138-429c-8dbe-4d802aded74f"
+jev_url: "https://openrouter.ai/api/alpha/decisions"
+jev_model: "~typesafe/jev-latest"   # OpenRouter's newest-release alias; never pinned
+jev_timeout_seconds: 30
+t_link: 0.90                        # link when `match` is top choice and >= this
+t_hint: 0.50                        # hint when match + maybe >= this
+deliverable_link_enabled: false     # shadow mode: decide and report, write no relation
+
 # --- Ledger ---
 ledger_path: "./data/ledger.db"

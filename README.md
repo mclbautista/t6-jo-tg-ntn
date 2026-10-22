@@ -17,7 +17,8 @@ verification, reliability, and Deliverable matching arrive in later tickets.
 jo_watchdog/
   core/       pure: plan builder, payload builder, read-back compare, masker seam
   ledger/     SQLite (WAL, versioned schema), offsets, state machine
-  adapters/   Telegram (aiogram-as-client), Notion (httpx, pinned version)
+  adapters/   Telegram (aiogram-as-client), Notion (httpx, pinned version),
+              Jev Deliverable matcher (OpenRouter Decisions API)
   app/        config, worker loop, entry point
 tests/        unittest (runs under pytest too); real SQLite + fake adapters
 smoke.py      manual real-account smoke test (never in CI)
