@@ -21,3 +21,7 @@ deepseek_timeout_seconds: 60
 
 # --- Ledger ---
 ledger_path: "./data/ledger.db"
+
+# --- Planning ---
+department_aliases:                 # header Department token -> Department option
+  TO: TOC
