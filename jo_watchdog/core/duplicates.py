@@ -17,7 +17,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from jo_watchdog.core.job_order import WATCHDOG_MARKER
+from jo_watchdog.core.job_order import WATCHDOG_MARKER, JobOrderPlan, rich_text
 
 
 def jo_key(project_page_id: str | None, department: str | None, number: int | None) -> str | None:
@@ -100,3 +100,10 @@ def append_watchdog_line(notes: str, line: str) -> str:
         return f"{notes}\n{line}"
     block = f"{WATCHDOG_MARKER}\n{line}"
     return f"{notes}\n\n{block}" if notes else block
+
+
+def add_earlier_row_line(plan: JobOrderPlan, line: str) -> None:
+    """Append ``line`` to the plan's Notes property, inside the watchdog block."""
+    items = plan.properties.get("Notes", {}).get("rich_text", [])
+    notes = "".join(item["text"]["content"] for item in items)
+    plan.properties["Notes"] = {"rich_text": rich_text(append_watchdog_line(notes, line))}

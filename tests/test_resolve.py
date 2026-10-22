@@ -354,3 +354,24 @@ class CorpusTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MentionEntityTests(unittest.TestCase):
+    def test_slices_by_utf16_offsets_and_keeps_user_ids(self):
+        from jo_watchdog.core.resolve import mention_entities
+
+        message = {
+            "text": "😀 @raed and Benjamin",
+            "entities": [
+                {"type": "mention", "offset": 3, "length": 5},
+                {"type": "text_mention", "offset": 13, "length": 8, "user": {"id": 222}},
+                {"type": "bold", "offset": 0, "length": 2},
+            ],
+        }
+        self.assertEqual(
+            mention_entities(message),
+            [
+                MentionEntity(text="@raed", handle="raed"),
+                MentionEntity(text="Benjamin", user_id="222"),
+            ],
+        )

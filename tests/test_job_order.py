@@ -277,3 +277,26 @@ class ReplayTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LoadPlanTests(unittest.TestCase):
+    def test_a_skeleton_plan_is_upgraded_to_a_replayable_one(self):
+        from jo_watchdog.core.job_order import build_job_order_payload, load_plan
+
+        legacy = {
+            "name": "First line",
+            "telegram_key": "-100:1",
+            "body_blocks": ["body"],
+            "notes": "— added by the watchdog —\nEarlier row: x",
+            "duplicate": {"code": "exact_repost"},
+        }
+        plan = load_plan(legacy)
+        payload = build_job_order_payload(plan, data_source_id="ds")
+        self.assertEqual(
+            payload["properties"]["Status"], {"status": {"name": "Needs Intake Review"}}
+        )
+        self.assertEqual(payload["properties"]["Name"]["title"][0]["text"]["content"], "First line")
+        self.assertIn(
+            "Earlier row: x", payload["properties"]["Notes"]["rich_text"][0]["text"]["content"]
+        )
+        self.assertEqual(plan.duplicate, {"code": "exact_repost"})

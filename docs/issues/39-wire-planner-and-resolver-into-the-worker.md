@@ -8,7 +8,7 @@
 
 ## What to build
 
-Connect the #21 planner and the #22 resolver to the live pipeline. On `main`, `Worker.process` still plans with the walking-skeleton `build_plan(name=first_line, ...)`, so captured rows carry only Name, Telegram Key and Status. `plan_job_order` (`core/job_order.py`) and `CacheManager.resolve_people` / `resolve_project` / `resolve_department` (`app/caches.py`) exist and are tested, but nothing calls them, and `Worker._capture_facts` says planner and resolver findings join "once the pipeline plans with them". This ticket makes the pipeline plan with them, so every live capture gets the full property set, the resolved relations, the deadline, and the planner and resolver findings, and so #24 has the Project page id, Department and `jo_number_int` it needs for `jo_key`.
+Connect the #21 planner and the #22 resolver to the live pipeline. On `main`, `Worker.process` still plans with the walking-skeleton `build_plan(name=first_line, ...)`, so captured rows carry only Name, Telegram Key and Status. `plan_job_order` (`core/job_order.py`) and `CacheManager.resolve_people` / `resolve_project` / `resolve_department` (`app/caches.py`) exist and are tested, but nothing calls them, and `Worker._capture_facts` says planner and resolver findings join "once the pipeline plans with them". This ticket makes the pipeline plan with them, so every live capture gets the full property set, the resolved relations, the deadline, and the planner and resolver findings. #24 has since merged and resolves Project and Department itself in `Worker._jo_key`; this ticket makes that read the stored resolution instead of resolving a second time.
 
 This ticket wires existing code. It does not change parsing, resolution or verification rules.
 
@@ -20,14 +20,14 @@ This ticket wires existing code. It does not change parsing, resolution or verif
 - [ ] `relation_properties(people, project)` is merged into the plan's properties, so Assigned, cc (Leizette always included) and Projects are written; Coordinator stays blank.
 - [ ] Resolver findings (unresolved, ambiguous, fuzzy-only, unknown Department) and planner findings (deadline, ASAP, and so on) are all in `plan.findings`, and reach `verify()` through `_capture_facts`. The "once the pipeline plans with them" note is removed.
 - [ ] Planning still holds at `extracted` while `caches.ready` is false, without spending an attempt or producing an unresolved finding.
-- [ ] The source block passed to `plan_job_order` is built from what `main` already has (posted by, Manila timestamp, intake link, and `forward_origin_lines`). #24 later swaps in `provenance.source_block`; keep this behind one small function so that swap is a one-line change.
+- [ ] The source block passed to `plan_job_order` is #24's `Worker._source_block`.
 - [ ] The create payload is built from the stored plan with `build_job_order_payload`, and read-back compares at least Name and Telegram Key as today.
 
 ### Persisted plan (resume)
 
 - [ ] Everything resolution decided is stored in the plan at the `extracted` → `planned` transition, before any Notion call: the full `JobOrderPlan` (properties, body blocks, `jo_number_int`, `deadline_source`, findings) plus a `resolution` object holding the resolved Project page id (or null), the Department option (or null), Assigned and cc page ids, and the unresolved raw mentions.
 - [ ] A row at `planned` or `writing` is replayed from the stored plan only: it never re-runs extraction or resolution, so a cache refresh between crash and resume cannot change what gets written.
-- [ ] `jo_number_int`, the Project page id and the Department are readable from the stored plan by a ledger helper, so #24 can compute `jo_key` without parsing Notion properties.
+- [ ] `Worker._jo_key` computes the key from the stored plan's `resolution` and `jo_number_int`, not by resolving again, so a resumed row and its `jo_key` cannot disagree. No ledger helper is needed.
 - [ ] No ledger migration is needed (the plan lives in the existing `plan_json` column). If one turns out to be needed, it is numbered after the latest migration on `main` and documented here.
 
 ### Tests
@@ -39,8 +39,8 @@ This ticket wires existing code. It does not change parsing, resolution or verif
 
 ## Out of scope
 
-- Forward provenance, edits, reposts and `jo_key` itself (#24).
-- Retry/backoff loops and heartbeat for stuck `planned` or `writing` rows (#25).
+- Forward provenance, edits, reposts and the `jo_key` rules (#24, merged).
+- Retry/backoff loops and heartbeat for stuck `planned` or `writing` rows (#25, merged). Its resume paths replay the stored plan.
 - Jev matching (#26).
 
 ## Blocked by
@@ -51,4 +51,4 @@ This ticket wires existing code. It does not change parsing, resolution or verif
 
 ## Blocks
 
-- #24
+- Nothing. #24 merged without waiting for this ticket.
