@@ -8,9 +8,11 @@ maps an aiogram ``Update`` into.
 
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Literal, Protocol, runtime_checkable
 
 from pydantic import BaseModel
+
+from jo_watchdog.core.extraction import Extraction
 
 
 class IncomingUpdate(BaseModel):
@@ -31,6 +33,25 @@ class PageRef(BaseModel):
     url: str
 
 
+ClassifierOutcome = Literal[
+    "ok", "invalid_json", "schema_violation", "empty_content", "timeout", "api_error"
+]
+
+
+class ClassifyResult(BaseModel):
+    """One classify/extract call: the validated result or its failure class, plus trace."""
+
+    outcome: ClassifierOutcome
+    extraction: Extraction | None = None
+    error: str | None = None
+    requested_model: str
+    returned_model: str | None = None
+    prompt_tag: str
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    latency_ms: int | None = None
+
+
 @runtime_checkable
 class TelegramClient(Protocol):
     async def get_updates(self, offset: int, timeout: int) -> list[IncomingUpdate]: ...
@@ -43,3 +64,10 @@ class NotionClient(Protocol):
     async def create_page(self, payload: dict) -> PageRef: ...
 
     async def retrieve_page(self, page_id: str) -> dict: ...
+
+
+@runtime_checkable
+class Classifier(Protocol):
+    async def classify(
+        self, masked_text: str, origin_lines: list[str] | None
+    ) -> ClassifyResult: ...
