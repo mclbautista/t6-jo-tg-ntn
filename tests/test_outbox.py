@@ -25,6 +25,10 @@ KEY = "-100123:42"
 WITHHELD = "[password withheld – see Telegram message]"
 
 
+async def no_sleep(_seconds: float) -> None:
+    """Reaction retries wait 2s and 5s; tests do not."""
+
+
 def make_config(**overrides) -> Config:
     base = dict(
         intake_chat_id=-100123,
@@ -75,6 +79,7 @@ class Harness:
             notion=self.notion,
             classifier=self.classifier,
             config=self.config,
+            sleep=no_sleep,
         )
 
     def reopen(self):
@@ -282,10 +287,11 @@ class AtomicityTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(sqlite3.IntegrityError):
             await h.worker.drain_once()
         msg = h.ledger.get_message(KEY)
-        # Neither half committed: still `writing`, no findings, no outbox row.
+        # Neither half committed: still `writing`, no findings, no outbox row. The
+        # created page's id was kept (#25), so recovery retries only the read-back.
         self.assertEqual(msg["state"], State.WRITING.value)
         self.assertIsNone(msg["findings_json"])
-        self.assertIsNone(msg["notion_page_id"])
+        self.assertEqual(msg["notion_page_id"], "page-1")
         self.assertEqual(h.outbox(), [])
 
     def test_mark_written_requires_writing_state(self):
@@ -368,9 +374,9 @@ class AtLeastOnceTests(unittest.IsolatedAsyncioTestCase):
     async def test_failing_capture_does_not_starve_delivery(self):
         h = Harness(self, [update(1, message_id=42)], notion=FakeNotion(fail_create=True))
         h.ledger.enqueue_system(OutboxMessage("stale_cache", -100999, 7, "stale"))
-        with self.assertRaises(RuntimeError):
-            await h.worker.run_once()
+        await h.worker.run_once()
         self.assertEqual(h.telegram.sent, [(-100999, 7, "stale")])
+        self.assertEqual(h.ledger.get_message(KEY)["attempts"], 1)
 
 
 class ReactionIndependenceTests(unittest.IsolatedAsyncioTestCase):

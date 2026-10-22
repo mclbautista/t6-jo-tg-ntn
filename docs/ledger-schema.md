@@ -52,6 +52,7 @@ keys before commit, so tables that reference `messages(id)` stay valid.
 | last_error         | TEXT    | masked `<failure class>: <detail>` of the last failed attempt (v3) |
 | verdict            | TEXT    | DeepSeek verdict: `jo`, `unsure` or `not_jo` (v3)  |
 | ignore_reason      | TEXT    | `not_jo` or `no_text` for `ignored` rows (v3)      |
+| exhausted_at       | TEXT    | v7: ISO-8601 UTC when the retry schedule ran out; NULL otherwise. An exhausted row keeps its state and plan, is never picked up again, and is made eligible by `retry` |
 | jo_key             | TEXT    | v6: `<Project page id>\|<Department option>\|<jo_number_int>`, set at planning only when all three resolve; NULL otherwise |
 | text_sha256        | TEXT    | v6: SHA-256 of the whitespace-normalized original `text`; set on intake (backfilled) |
 | forward_origin_type| TEXT    | v6: `user`, `hidden_user`, `chat` or `channel`; NULL for a non-forward (backfilled from `raw_source`) |
@@ -195,6 +196,50 @@ A `pending_capture` edit becomes `reported` in the transaction that moves its
 message to `written`, which also queues one `edit_after_capture` post however
 many edits arrived. Index `edits_telegram_key` on `telegram_key`.
 
+### `runtime_state` (v7, #25)
+
+Small key/value facts about the running process.
+
+| column     | type | notes                                  |
+|------------|------|----------------------------------------|
+| key        | TEXT | PK; currently only `poller_alive_at`   |
+| value      | TEXT | ISO-8601 UTC                           |
+| updated_at | TEXT | ISO-8601 UTC                           |
+
+`poller_alive_at` is stamped at the start of every poll cycle, after the poll,
+and after each message the drain processes. The deadman exits the process
+non-zero when it is older than `deadman_stale_minutes` (10), and the container
+health check (#27) reads the same value.
+
+### `heartbeats` (v7, #25)
+
+One row per daily heartbeat window, so a window is reported once even across
+restarts.
+
+| column       | type    | notes                                                    |
+|--------------|---------|----------------------------------------------------------|
+| window_start | TEXT    | PK; ISO-8601 UTC start of the 24-hour window             |
+| window_end   | TEXT    | ISO-8601 UTC end (exclusive)                             |
+| outbox_id    | INTEGER | the queued `heartbeat` post; NULL for the window a brand-new ledger skipped |
+| created_at   | TEXT    | ISO-8601 UTC                                             |
+
+Every heartbeat figure is a query over `messages`, `ignore_log`, `outbox`,
+`stage_results` and `llm_calls` for that window; there are no counters.
+"Captured" is a message in `written` or `done` whose `updated_at` falls in the
+window (the reaction and `done` follow the write within the same cycle).
+
+## Attempt accounting
+
+A failed step increments `messages.attempts` and sets `next_attempt_at` to the
+failure time plus `retry_schedule_seconds[attempts - 1]` (30 s, 2 min, 5 min,
+10 min), or the provider's `Retry-After` when that is longer. The failure that
+uses up the schedule (the fifth) sets `exhausted_at` and queues one outage
+alert in the same transaction. Any successful state change, and storing the
+created page id, resets `attempts` to 0. `outbox.attempts` is a separate
+counter on the same schedule. A row left in `writing` by a crash has no
+`next_attempt_at`; it is picked up once it has been untouched for the first
+retry delay.
+
 ## Pipeline states
 
 `received` → `extracted` → `planned` → `writing` → `written` → `done`, and
@@ -206,18 +251,13 @@ same outbound boundary. Version 3 adds `extracted` (validated DeepSeek output)
 and `ignored` (`not_jo` and `no_text`). A failed classify call leaves the row in
 `received` with `attempts` incremented and `next_attempt_at` set; there is no
 partial-row fallback. `writing` is the crash-window state:
-before the Notion create call a row moves to `writing`; on recovery the watchdog queries Notion by
-`Telegram Key` to adopt or create, so one message never yields two rows.
+before the Notion create call a row moves to `writing`. The created page id is stored
+at once, so a later read-back failure retries only the retrieve. A `writing` row
+with no stored page id is uncertain: after at least the first retry delay the
+watchdog queries Notion by `Telegram Key`, adopts the one match, creates only
+when there is none, and reports (never merges or deletes) several. Normal
+success never queries by `Telegram Key`. The move to `planned` and the stored
+plan commit in one transaction.
 
 Migrations are keyed by number and applied in ascending order of the numbers
 not yet recorded in `schema_version`.
-
-## Planned migrations
-
-Migration 7 is specified column by column in its build ticket and lands with it:
-
-| Migration | Ticket | Adds |
-|---|---|---|
-| 7 | [#25](issues/25-crash-safe-reliability-and-heartbeat.md) | `exhausted_at`, `runtime_state`, `heartbeats` |
-
-Move it into the Tables section above when it ships.

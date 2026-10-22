@@ -17,6 +17,10 @@ from jo_watchdog.ledger.states import State
 from tests.fakes import FakeClassifier, FakeNotion, FakeTelegram, update
 
 
+async def no_sleep(_seconds: float) -> None:
+    """Reaction retries wait 2s and 5s; tests do not."""
+
+
 def make_config(**overrides) -> Config:
     base = dict(
         intake_chat_id=-100123,
@@ -45,6 +49,7 @@ def make_worker(
         notion=notion,
         classifier=classifier or FakeClassifier(),
         config=make_config(**config_overrides),
+        sleep=no_sleep,
     )
 
     def cleanup():
@@ -146,11 +151,11 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         )
         self.addCleanup(cleanup)
         await worker.poll_once()
-        with self.assertRaises(RuntimeError):
-            await worker.drain_once()
+        await worker.drain_once()  # the failed create is counted, not raised
         self.assertEqual(telegram.reactions, [])
         msg = ledger.get_message("-100123:42")
         self.assertEqual(msg["state"], "writing")  # recoverable, not done
+        self.assertEqual(msg["attempts"], 1)
 
     async def test_readback_mismatch_is_recorded_not_rewritten(self):
         worker, ledger, telegram, notion, cleanup = make_worker(

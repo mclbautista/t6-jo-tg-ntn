@@ -237,3 +237,71 @@ def render_dry_run_plan(*, plan: dict, intake_url: str) -> str:
     lines.append(f"Body: {len(plan.get('body_blocks') or [])} block(s)")
     lines += ["", _link("Telegram message", intake_url)]
     return "\n".join(lines)
+
+
+def render_outage_alert(
+    *,
+    step: str,
+    intake_url: str,
+    error: str,
+    attempts: int,
+    given_up_at: datetime,
+    telegram_key: str,
+    owner_handle: str | None,
+) -> str:
+    """The one owner-tagged alert after retry exhaustion (#25).
+
+    ``step`` is ``Classification``, ``Notion write``, ``Notion read-back`` or
+    ``Notion reconciliation``.
+    """
+    local = given_up_at.astimezone(MANILA)
+    lines = [
+        f"🔴 {_field(step)} failed after {attempts} attempts",
+        "Message still queued, not lost",
+        "",
+        f"Telegram message: {_link('link', intake_url)}",
+        f"Last error: {_field(error)} (attempt {attempts} of {attempts},"
+        f" given up at {local.strftime('%H:%M')})",
+        f"Will not retry automatically — run <code>retry {_field(telegram_key)}</code>"
+        " after fixing the cause",
+    ]
+    mention = handle_mention(owner_handle)
+    if mention:
+        lines += ["", mention]
+    return "\n".join(lines)
+
+
+def _stamp(when: datetime) -> str:
+    local = when.astimezone(MANILA)
+    return f"{local.strftime('%b')} {local.day} {local.strftime('%H:%M')}"
+
+
+def render_heartbeat(
+    *, window_start: datetime, window_end: datetime, stats: dict
+) -> str:
+    """The daily heartbeat for ``[window_start, window_end)`` (#25), from ledger stats."""
+    d = stats["deliverables"]
+    lines = [
+        f"📋 Daily heartbeat — {_stamp(window_start)} → {_stamp(window_end)}",
+        "",
+        f"Captured: {stats['captured']}",
+        f"Flagged: {stats['flagged']}",
+        f"Ignored (not a JO): {stats['ignored']}",
+        f"No-text forwards: {stats['no_text']}",
+        f"Passwords withheld: {stats['passwords_withheld']}",
+        f"Reaction failed: {stats['reaction_failed']}",
+        "",
+        f"Deliverables linked: {d['linked']}",
+        f"Deliverables hinted: {d['hinted']}",
+        f"Deliverables none: {d['none']}",
+        f"Deliverables skipped: {d['skipped']}",
+        "",
+        f"Queue: {stats['stuck']} stuck, {stats['pending_retry']} pending retry,"
+        f" {stats['ops_failed']} ops posts failed",
+    ]
+    for old, new in stats["models"].values():
+        lines.append(f"Model changed: {_field(old)} → {_field(new)}")
+    if stats["ignored_first_lines"]:
+        lines += ["", "Ignored, first lines:"]
+        lines += [f'"{_field(line)}"' for line in stats["ignored_first_lines"]]
+    return "\n".join(lines)

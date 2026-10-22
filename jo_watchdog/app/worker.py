@@ -12,9 +12,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
-from jo_watchdog.adapters.protocols import Classifier, NotionClient, TelegramClient
+from jo_watchdog.adapters.protocols import Classifier, NotionClient, PageRef, TelegramClient
 from jo_watchdog.app.caches import CacheManager
 from jo_watchdog.app.config import Config
 from jo_watchdog.core.duplicates import (
@@ -27,6 +29,7 @@ from jo_watchdog.core.duplicates import (
 from jo_watchdog.core.edits import EditAction, decide_edit
 from jo_watchdog.core.extraction import forward_origin_lines
 from jo_watchdog.core.header import parse_header, parse_number
+from jo_watchdog.core.heartbeat import heartbeat_window
 from jo_watchdog.core.payload import (
     build_notion_payload,
     extract_readback_fields,
@@ -41,16 +44,24 @@ from jo_watchdog.core.report import (
     render_capture_report,
     render_dry_run_plan,
     render_edit_after_capture,
+    render_heartbeat,
+    render_outage_alert,
     render_stale_cache,
 )
 from jo_watchdog.core.verify import MANILA, CaptureFacts, EarlierRow, Finding, verify
-from jo_watchdog.ledger.db import Ledger, OutboxMessage, telegram_key
+from jo_watchdog.ledger.db import Ledger, OutboxMessage, fmt_utc, telegram_key
 from jo_watchdog.ledger.states import State
 
 log = logging.getLogger("jo_watchdog.worker")
 
-# Fixed classifier retry delay until #25 brings the 30s→15m schedule.
-CLASSIFIER_RETRY_SECONDS = 30
+# A failed captured reaction is retried inline after these delays, then counted.
+REACTION_RETRY_SECONDS = (2, 5)
+DEADMAN_CHECK_SECONDS = 30.0
+
+CLASSIFICATION = "Classification"
+NOTION_WRITE = "Notion write"
+NOTION_READ_BACK = "Notion read-back"
+NOTION_RECONCILIATION = "Notion reconciliation"
 _TRACE_FIELDS = (
     "requested_model",
     "returned_model",
@@ -69,8 +80,21 @@ def posted_at_from_raw(raw: dict) -> str | None:
     return None
 
 
-def _utc_after(seconds: int) -> str:
-    return (datetime.now(UTC) + timedelta(seconds=seconds)).strftime("%Y-%m-%dT%H:%M:%SZ")
+class StepFailure(Exception):
+    """An external step failed; the message stays in its state and is retried (#25)."""
+
+    def __init__(self, step: str, cause: BaseException):
+        super().__init__(f"{step}: {type(cause).__name__}: {cause}")
+        self.step = step
+        self.cause = cause
+
+
+class DeadmanExit(Exception):
+    """The poller made no progress for too long; the process must exit non-zero."""
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
 
 
 def _raw_update(msg: dict) -> dict:
@@ -111,6 +135,9 @@ class Worker:
         classifier: Classifier,
         config: Config,
         caches: CacheManager | None = None,
+        clock: Callable[[], datetime] = _utcnow,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        deadman_interval: float = DEADMAN_CHECK_SECONDS,
     ):
         self.ledger = ledger
         self.telegram = telegram
@@ -118,6 +145,9 @@ class Worker:
         self.classifier = classifier
         self.config = config
         self.caches = caches
+        self.clock = clock
+        self.sleep = sleep
+        self.deadman_interval = deadman_interval
 
     # -- scope -------------------------------------------------------------
 
@@ -216,15 +246,23 @@ class Worker:
     # -- draining (pipeline) ----------------------------------------------
 
     async def drain_once(self) -> None:
+        now = self.clock()
+        stamp = fmt_utc(now)
+        # A row left in `writing` by a crash waits at least the first retry delay
+        # before it is reconciled against Notion (the create may still be landing).
+        settle = fmt_utc(now - timedelta(seconds=self.config.retry_schedule_seconds[0]))
+        due: list[str] = []
         # Plans held while dry-run was on resume once it is off; `planned` is
         # before any external call, so resuming is safe.
         if not self.config.dry_run:
-            for key in self.ledger.pending(State.PLANNED):
-                await self.process(key)
-        for key in self.ledger.due(State.RECEIVED):
+            due += self.ledger.due(State.PLANNED, stamp)
+        due += self.ledger.due(State.WRITING, stamp, settle_before=settle)
+        due += self.ledger.due(State.WRITTEN, stamp)
+        due += self.ledger.due(State.RECEIVED, stamp)
+        due += self.ledger.due(State.EXTRACTED, stamp)
+        for key in due:
             await self.process(key)
-        for key in self.ledger.pending(State.EXTRACTED):
-            await self.process(key)
+            self._beat()
 
     async def classify(self, msg: dict) -> State:
         """Run the classify/extract stage for a ``received`` message; return its new state."""
@@ -246,10 +284,17 @@ class Worker:
         }
         if result.extraction is None:
             # No repair call and no bare-row fallback: the message stays queued.
-            self.ledger.record_classifier_failure(
-                key, call=call, retry_at=_utc_after(CLASSIFIER_RETRY_SECONDS)
+            failure = self.ledger.record_classifier_failure(
+                key,
+                call=call,
+                schedule=self.config.retry_schedule_seconds,
+                now=self.clock(),
+                on_exhausted=self._outage_alert(msg, CLASSIFICATION),
             )
-            log.warning("classifier %s for %s; will retry", result.outcome, key)
+            if failure.exhausted:
+                log.error("classifier %s for %s; retries exhausted", result.outcome, key)
+            else:
+                log.warning("classifier %s for %s; will retry", result.outcome, key)
             return State.RECEIVED
 
         extraction = result.extraction
@@ -268,8 +313,66 @@ class Worker:
         return self.ledger.record_extraction(key, call=call, result=stage_result)
 
     async def process(self, key: str) -> None:
+        try:
+            await self._process(key)
+        except StepFailure as failure:
+            self._record_step_failure(key, failure)
+
+    def _outage_alert(self, msg: dict, step: str) -> Callable[[str, int], OutboxMessage]:
+        """Builds the one owner-tagged alert, inside the failure's own transaction."""
+
+        def build(error: str, attempts: int) -> OutboxMessage:
+            return OutboxMessage(
+                kind="outage_alert",
+                chat_id=self.config.ops_chat_id,
+                topic_id=self.config.ops_topic_id,
+                text=render_outage_alert(
+                    step=step,
+                    intake_url=intake_link(
+                        msg["chat_id"], self.config.intake_topic_id, msg["message_id"]
+                    ),
+                    error=error,
+                    attempts=attempts,
+                    given_up_at=self.clock(),
+                    telegram_key=msg["telegram_key"],
+                    owner_handle=self.config.owner_telegram_handle,
+                ),
+            )
+
+        return build
+
+    def _record_step_failure(self, key: str, failure: StepFailure) -> None:
         msg = self.ledger.get_message(key)
         if msg is None:
+            return
+        result = self.ledger.record_failure(
+            key,
+            error=f"{type(failure.cause).__name__}: {failure.cause}",
+            schedule=self.config.retry_schedule_seconds,
+            now=self.clock(),
+            retry_after=getattr(failure.cause, "retry_after", None),
+            on_exhausted=self._outage_alert(msg, failure.step),
+        )
+        if result.exhausted:
+            log.error("%s for %s failed %d times; given up", failure.step, key, result.attempts)
+        else:
+            log.warning(
+                "%s for %s failed (attempt %d); retry at %s",
+                failure.step,
+                key,
+                result.attempts,
+                result.next_attempt_at,
+            )
+
+    async def _process(self, key: str) -> None:
+        msg = self.ledger.get_message(key)
+        if msg is None:
+            return
+        if msg["state"] == State.WRITTEN.value:
+            await self._after_written(msg)
+            return
+        if msg["state"] == State.WRITING.value:
+            await self._resume_writing(msg)
             return
         if msg["state"] == State.PLANNED.value:
             # A plan held by dry-run: write exactly what was stored.
@@ -295,9 +398,9 @@ class Worker:
                 source_block=self._source_block(msg),
             )
             dup_key = self._annotate_duplicate(msg, plan)
-            if not self.ledger.transition(key, State.EXTRACTED, State.PLANNED):
+            # State and plan commit together: a crash cannot leave `planned` empty.
+            if not self.ledger.plan_message(key, plan.model_dump(), jo_key=dup_key):
                 return
-            self.ledger.store_plan(key, plan.model_dump(), jo_key=dup_key)
             if self.config.dry_run:
                 self._report_dry_run(msg, plan)
                 return
@@ -305,13 +408,61 @@ class Worker:
         # Move to `writing` before the create call (closes the crash window).
         if not self.ledger.mark_writing(key):
             return
+        await self._create(msg, plan)
+
+    async def _create(self, msg: dict, plan: Plan) -> None:
+        key = msg["telegram_key"]
         payload = build_notion_payload(
             plan, data_source_id=self.config.job_orders_data_source_id
         )
-        page_ref = await self.notion.create_page(payload)  # raises -> stays `writing`
+        try:
+            page_ref = await self.notion.create_page(payload)  # failure -> stays `writing`
+        except Exception as exc:
+            raise StepFailure(NOTION_WRITE, exc) from exc
+        # The id is kept while still `writing`: a later read-back failure then
+        # retries only the retrieve, never a second create.
+        self.ledger.store_page_id(key, page_ref.id)
+        await self._read_back(msg, plan, page_ref)
 
+    async def _resume_writing(self, msg: dict) -> None:
+        """Recover a row left in `writing` (crash or failed attempt).
+
+        With a stored page id only the read-back is outstanding. Without one the
+        create is uncertain, so ask Notion by `Telegram Key`: adopt the one match,
+        create only when there is none, and report (never merge or delete) more
+        than one.
+        """
+        key = msg["telegram_key"]
+        if not msg["plan_json"]:
+            return
+        plan = Plan.model_validate_json(msg["plan_json"])
+        if msg["notion_page_id"]:
+            page_id = msg["notion_page_id"]
+            await self._read_back(msg, plan, PageRef(id=page_id, url=page_url_for(page_id)))
+            return
+        try:
+            matches = await self.notion.find_pages_by_telegram_key(
+                self.config.job_orders_data_source_id, key
+            )
+        except Exception as exc:
+            raise StepFailure(NOTION_RECONCILIATION, exc) from exc
+        if not matches:
+            await self._create(msg, plan)
+            return
+        if len(matches) > 1:
+            self.ledger.record_stage_result(
+                key, "reconcile", {"duplicate_urls": [m.url for m in matches]}
+            )
+        self.ledger.store_page_id(key, matches[0].id)
+        await self._read_back(msg, plan, matches[0])
+
+    async def _read_back(self, msg: dict, plan: Plan, page_ref: PageRef) -> None:
+        key = msg["telegram_key"]
         # Read back and compare; a mismatch is recorded, never rewritten.
-        retrieved = await self.notion.retrieve_page(page_ref.id)
+        try:
+            retrieved = await self.notion.retrieve_page(page_ref.id)
+        except Exception as exc:
+            raise StepFailure(NOTION_READ_BACK, exc) from exc
         fields = extract_readback_fields(retrieved)
         mismatches = verify_readback(
             plan,
@@ -321,10 +472,10 @@ class Worker:
 
         # Verification annotates, never gates: findings and their report are
         # committed in the same transaction that marks the row written.
-        findings = verify(
-            self._capture_facts(msg, plan, mismatches),
-            header_date_tolerance_days=self.config.header_date_tolerance_days,
-        )
+        reconcile = self.ledger.stage_result(key, "reconcile") or {}
+        facts = self._capture_facts(msg, plan, mismatches)
+        facts.duplicate_key_urls = reconcile.get("duplicate_urls", [])
+        findings = verify(facts, header_date_tolerance_days=self.config.header_date_tolerance_days)
         reports = self._capture_reports(msg, plan, page_ref.url, findings)
         if self.ledger.has_pending_edits(key):
             # Edited while still in the pipeline: the row holds the original
@@ -339,18 +490,28 @@ class Worker:
         if mismatches:
             self.ledger.record_mismatch(key, "; ".join(mismatches))
             log.warning("read-back mismatch for %s: %s", key, "; ".join(mismatches))
+        await self._after_written(self.ledger.get_message(key))
 
-        # The captured reaction fires only after a confirmed write and read-back.
-        # Its failure never touches the outbox and never changes its meaning.
-        try:
-            await self.telegram.set_reaction(
-                msg["chat_id"], msg["message_id"], self.config.captured_reaction
-            )
-        except Exception as exc:
-            self.ledger.set_reaction_state(key, "failed")
-            log.warning("captured reaction failed for %s: %s", key, type(exc).__name__)
-        else:
-            self.ledger.set_reaction_state(key, "set")
+    async def _after_written(self, msg: dict) -> None:
+        """The captured reaction, then `done`; both are independent of the outbox."""
+        key = msg["telegram_key"]
+        # The reaction fires only after a confirmed write and read-back. Its
+        # failure never touches the outbox and never changes its meaning.
+        if msg["reaction_state"] != "set":
+            for delay in (0, *REACTION_RETRY_SECONDS):
+                if delay:
+                    await self.sleep(delay)
+                try:
+                    await self.telegram.set_reaction(
+                        msg["chat_id"], msg["message_id"], self.config.captured_reaction
+                    )
+                except Exception as exc:
+                    log.warning("captured reaction failed for %s: %s", key, type(exc).__name__)
+                else:
+                    self.ledger.set_reaction_state(key, "set")
+                    break
+            else:
+                self.ledger.set_reaction_state(key, "failed")
         self.ledger.mark_done(key)
 
     def _report_dry_run(self, msg: dict, plan: Plan) -> None:
@@ -523,7 +684,12 @@ class Worker:
                     row["chat_id"], row["topic_id"], row["text"]
                 )
             except Exception as exc:
-                state = self.ledger.outbox_failed_attempt(row["id"], str(exc))
+                state = self.ledger.outbox_failed_attempt(
+                    row["id"],
+                    str(exc),
+                    retry_seconds=self.config.retry_schedule_seconds,
+                    now=self.clock().timestamp(),
+                )
                 log.warning(
                     "ops post outbox=%s kind=%s failed (%s): now %s",
                     row["id"],
@@ -569,19 +735,94 @@ class Worker:
                 stale.error,
             )
 
+    # -- liveness (#25) ----------------------------------------------------
+
+    def _beat(self) -> None:
+        """Stamp the poller's liveness; the deadman and health check read it."""
+        self.ledger.stamp_alive(self.clock())
+
+    def check_deadman(self) -> None:
+        """Raise ``DeadmanExit`` when no progress was stamped for too long."""
+        alive = self.ledger.poller_alive_at()
+        limit = timedelta(minutes=self.config.deadman_stale_minutes)
+        if alive is not None and self.clock() - alive > limit:
+            raise DeadmanExit(
+                f"poller made no progress since {alive.isoformat()}"
+                f" (limit {self.config.deadman_stale_minutes} minutes)"
+            )
+
+    async def _deadman(self) -> None:
+        while True:
+            await asyncio.sleep(self.deadman_interval)
+            self.check_deadman()
+
+    # -- daily heartbeat (#25) -----------------------------------------------
+
+    def enqueue_heartbeat_if_due(self) -> bool:
+        """Queue the heartbeat for the latest 07:00 window, once per window."""
+        start, end = heartbeat_window(
+            self.clock(), self.config.heartbeat_time, ZoneInfo(self.config.timezone)
+        )
+        if self.ledger.heartbeat_exists(start):
+            return False
+        if not self.ledger.has_heartbeats():
+            # First start of a new ledger: there is no history to report, so this
+            # window is skipped and the first heartbeat follows at the next 07:00.
+            self.ledger.skip_heartbeat(start, end)
+            return False
+        text = render_heartbeat(
+            window_start=start,
+            window_end=end,
+            stats=self.ledger.heartbeat_stats(start, end),
+        )
+        return self.ledger.enqueue_heartbeat(
+            start,
+            end,
+            OutboxMessage(
+                kind="heartbeat",
+                chat_id=self.config.ops_chat_id,
+                topic_id=self.config.ops_topic_id,
+                text=text,
+            ),
+        )
+
     async def run_once(self) -> None:
+        self._beat()
         try:
             await self.refresh_caches()
             await self.poll_once()
+            self._beat()
             await self.drain_once()
         finally:
+            try:
+                self.enqueue_heartbeat_if_due()
+            except Exception:
+                log.exception("could not queue the daily heartbeat")
             # A capture stuck on a failing dependency must not starve ops posts.
             await self.deliver_outbox()
 
-    async def run(self) -> None:
+    async def _loop(self) -> None:
         while True:
             try:
                 await self.run_once()
             except Exception:
                 log.exception("pipeline cycle failed; retrying next cycle")
             await asyncio.sleep(self.config.poll_interval)
+
+    async def run(self) -> None:
+        """Run the pipeline with a deadman beside it.
+
+        If the poller stays stale for ``deadman_stale_minutes``, ``DeadmanExit``
+        propagates so the process exits non-zero and the container restarts it.
+        """
+        self._beat()
+        loop = asyncio.create_task(self._loop())
+        deadman = asyncio.create_task(self._deadman())
+        try:
+            done, _ = await asyncio.wait({loop, deadman}, return_when=asyncio.FIRST_COMPLETED)
+            for task in done:
+                task.result()
+        finally:
+            for task in (loop, deadman):
+                task.cancel()
+            await asyncio.gather(loop, deadman, return_exceptions=True)

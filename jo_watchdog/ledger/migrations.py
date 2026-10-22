@@ -281,6 +281,27 @@ def _migration_6(conn: sqlite3.Connection) -> None:
 
 MIGRATION_6 = _migration_6
 
+# Migration 7 (#25): the exhaustion marker, the poller's liveness stamp, and
+# one heartbeat per window.
+MIGRATION_7 = [
+    "ALTER TABLE messages ADD COLUMN exhausted_at TEXT",
+    """
+    CREATE TABLE runtime_state (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE heartbeats (
+        window_start TEXT PRIMARY KEY,
+        window_end TEXT NOT NULL,
+        outbox_id INTEGER REFERENCES outbox(id),
+        created_at TEXT NOT NULL
+    )
+    """,
+]
+
 Migration = list[str] | Callable[[sqlite3.Connection], None]
 
 # Keyed by number and applied in ascending order of the numbers not yet recorded.
@@ -291,6 +312,7 @@ MIGRATIONS: dict[int, Migration] = {
     4: MIGRATION_4,
     5: MIGRATION_5,
     6: MIGRATION_6,
+    7: MIGRATION_7,
 }
 
 # Migrations that rebuild a referenced table run with foreign-key enforcement off.

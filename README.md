@@ -106,6 +106,26 @@ read-only. Its health check runs `python -m jo_watchdog.app healthcheck` every
 60 seconds and turns unhealthy after 3 failures; it fails when
 `runtime_state.poller_alive_at` is older than 120 seconds.
 
+### Retries, outage alerts and the heartbeat
+
+Classifier, Notion and ops-post failures are retried at 30 seconds, 2 minutes,
+5 minutes and 10 minutes (longer if the provider sends `Retry-After`); the
+fifth failure gives up. The message stays queued with its plan, one alert
+tagged with `owner_telegram_handle` goes to the ops topic, and nothing is
+deleted or half-written. After fixing the cause, make it eligible again:
+
+```sh
+docker compose exec watchdog python -m jo_watchdog.app retry -100123:42 --config /app/config.yaml
+docker compose exec watchdog python -m jo_watchdog.app retry --all-exhausted --config /app/config.yaml
+```
+
+`retry` clears the attempt count and never changes the stored plan.
+
+If the poller stops making progress for `deadman_stale_minutes` (10), the
+process exits non-zero so the restart policy brings it back. At `heartbeat_time`
+(07:00 `Asia/Manila`) the ops topic gets a heartbeat for the preceding 24 hours,
+computed from the ledger. A brand-new ledger skips its first window.
+
 ### Rollback
 
 Start the previous image against the same ledger:
