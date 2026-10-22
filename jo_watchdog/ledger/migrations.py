@@ -211,6 +211,31 @@ MIGRATION_4 = [
     "CREATE INDEX idx_cache_snapshot_kind_fetched ON cache_snapshot (kind, fetched_at)",
 ]
 
+# Migration 5 (#23): the durable ops outbox, plus the final findings and the
+# captured-reaction state on each message.
+MIGRATION_5 = [
+    """
+    CREATE TABLE outbox (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_id INTEGER REFERENCES messages(id),
+        kind TEXT NOT NULL,
+        chat_id INTEGER NOT NULL,
+        topic_id INTEGER NOT NULL,
+        text TEXT NOT NULL,
+        state TEXT NOT NULL CHECK (state IN ('pending', 'sent', 'failed')),
+        attempts INTEGER NOT NULL DEFAULT 0,
+        next_attempt_at TEXT,
+        last_error TEXT,
+        telegram_message_id INTEGER,
+        created_at TEXT NOT NULL,
+        sent_at TEXT
+    )
+    """,
+    "CREATE INDEX outbox_state_next_attempt ON outbox (state, next_attempt_at)",
+    "ALTER TABLE messages ADD COLUMN findings_json TEXT",
+    "ALTER TABLE messages ADD COLUMN reaction_state TEXT",
+]
+
 Migration = list[str] | Callable[[sqlite3.Connection], None]
 
 # Keyed by number and applied in ascending order of the numbers not yet recorded.
@@ -219,6 +244,7 @@ MIGRATIONS: dict[int, Migration] = {
     2: MIGRATION_2,
     3: MIGRATION_3,
     4: MIGRATION_4,
+    5: MIGRATION_5,
 }
 
 # Migrations that rebuild a referenced table run with foreign-key enforcement off.

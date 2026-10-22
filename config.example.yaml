@@ -6,6 +6,12 @@ intake_chat_id: -1000000000000      # the intake supergroup's chat id
 intake_topic_id: 0                  # the intake forum topic's message_thread_id
 captured_reaction: "✅"             # emoji picked from the real group's reactions
 
+# --- Ops topic (private; capture reports and system messages) ---
+ops_chat_id: -1000000000000         # the ops supergroup's chat id
+ops_topic_id: 0                     # the ops forum topic's message_thread_id
+leizette_telegram_handle: ""        # tagged only on findings she has to act on
+header_date_tolerance_days: 1       # header date vs Manila post date, in days
+
 # --- Polling ---
 poll_timeout: 50                    # Telegram long-poll timeout (seconds, max 50)
 poll_interval: 1.0                  # pause between poll+drain cycles (seconds)

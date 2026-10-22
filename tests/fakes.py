@@ -79,12 +79,15 @@ class FakeClassifier:
 
 
 class FakeTelegram:
-    """Returns queued updates; records reactions."""
+    """Returns queued updates; records reactions and ops posts."""
 
-    def __init__(self, updates=None):
+    def __init__(self, updates=None, *, fail_reaction: bool = False, fail_send: int = 0):
         self.updates = list(updates or [])
         self.reactions: list[tuple[int, int, str]] = []
+        self.sent: list[tuple[int, int, str]] = []
         self.get_updates_calls: list[int] = []
+        self.fail_reaction = fail_reaction
+        self.fail_send = fail_send  # fail this many send_message calls first
 
     async def get_updates(self, offset: int, timeout: int) -> list[IncomingUpdate]:
         self.get_updates_calls.append(offset)
@@ -95,7 +98,16 @@ class FakeTelegram:
         return batch
 
     async def set_reaction(self, chat_id: int, message_id: int, emoji: str) -> None:
+        if self.fail_reaction:
+            raise RuntimeError("reaction not allowed")
         self.reactions.append((chat_id, message_id, emoji))
+
+    async def send_message(self, chat_id: int, topic_id: int, text: str) -> int:
+        if self.fail_send:
+            self.fail_send -= 1
+            raise RuntimeError("telegram send failed")
+        self.sent.append((chat_id, topic_id, text))
+        return 9000 + len(self.sent)
 
 
 class FakeNotion:

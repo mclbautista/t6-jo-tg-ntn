@@ -39,6 +39,8 @@ keys before commit, so tables that reference `messages(id)` stay valid.
 | plan_json          | TEXT    | the exact stored plan (Name, Telegram Key, blocks) |
 | notion_page_id     | TEXT    | Notion page id after a successful create           |
 | readback_mismatch  | TEXT    | mismatch detail from read-back comparison          |
+| findings_json      | TEXT    | v5: final findings (`[{code, params}]`), plan plus read-back |
+| reaction_state     | TEXT    | v5: captured reaction, `pending` \| `set` \| `failed` |
 | created_at         | TEXT    | ISO-8601 UTC                                       |
 | updated_at         | TEXT    | ISO-8601 UTC                                       |
 | masked_text        | TEXT    | outbound-safe representation of `text` (v2)        |
@@ -138,6 +140,31 @@ Payload items, format version 1:
 - `people`: `{page_id, name, telegram_user_id, telegram_handle, aliases, end_of_shift}` from Contacts `Name`, `TelegramUserID`, `TelegramHandle`, `Aliases`, `End of Shift` (raw select value).
 - `projects`: `{page_id, name, code}` from Projects `Name` and `Project Code`.
 - `departments`: the Job Orders `Department` select option names, as strings.
+### `outbox` (v5)
+
+The durable ops-topic outbox. A capture's report is inserted as `pending` in the
+same transaction that moves its message to `written`, so a crash can never
+separate a capture from its findings. Delivery is at-least-once: a crash after
+Telegram accepts a post but before the row is marked `sent` re-posts it.
+
+| column              | type    | notes                                                  |
+|---------------------|---------|--------------------------------------------------------|
+| id                  | INTEGER | PK (autoinc); logged with every send, for tracing      |
+| message_id          | INTEGER | `messages(id)`; null for system messages               |
+| kind                | TEXT    | `capture_report`, `edit_after_capture`, `stale_cache`, `outage_alert`, `heartbeat`, `dry_run_plan` |
+| chat_id             | INTEGER | ops chat id                                            |
+| topic_id            | INTEGER | ops forum topic id                                     |
+| text                | TEXT    | rendered Telegram HTML; every source field masked      |
+| state               | TEXT    | `pending` \| `sent` \| `failed`                         |
+| attempts            | INTEGER | send attempts so far (default 0)                       |
+| next_attempt_at     | TEXT    | ISO-8601 UTC; null = due now                           |
+| last_error          | TEXT    | masked error of the last failed attempt                |
+| telegram_message_id | INTEGER | id of the posted ops message once `sent`               |
+| created_at          | TEXT    | ISO-8601 UTC                                           |
+| sent_at             | TEXT    | ISO-8601 UTC                                           |
+
+Index `outbox_state_next_attempt` on `(state, next_attempt_at)`. A failed post
+retries after 30 s, 2 min, 5 min and 10 min; the fifth failure sets `failed`.
 
 ## Pipeline states
 
@@ -158,11 +185,10 @@ not yet recorded in `schema_version`.
 
 ## Planned migrations
 
-Migrations 5–7 are specified column by column in the build tickets and land with them:
+Migrations 6–7 are specified column by column in the build tickets and land with them:
 
 | Migration | Ticket | Adds |
 |---|---|---|
-| 5 | [#23](issues/23-verification-and-durable-ops-reporting.md) | `outbox`, `findings_json`, `reaction_state` |
 | 6 | [#24](issues/24-forwards-edits-reposts-and-jo-number-reuse.md) | `jo_key`, `text_sha256`, `forward_origin_type`, `edits` |
 | 7 | [#25](issues/25-crash-safe-reliability-and-heartbeat.md) | `exhausted_at`, `runtime_state`, `heartbeats` |
 

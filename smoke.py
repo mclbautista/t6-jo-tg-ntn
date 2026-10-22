@@ -34,10 +34,11 @@ from jo_watchdog.ledger.db import Ledger
 
 
 class RecordingTelegram:
-    """Records the reaction instead of sending it (no token needed)."""
+    """Records the reaction and ops posts instead of sending them (no token needed)."""
 
     def __init__(self):
         self.reactions: list[tuple[int, int, str]] = []
+        self.sent: list[tuple[int, int, str]] = []
         self.updates: list[IncomingUpdate] = []
 
     async def get_updates(self, offset: int, timeout: int) -> list[IncomingUpdate]:
@@ -47,6 +48,10 @@ class RecordingTelegram:
 
     async def set_reaction(self, chat_id: int, message_id: int, emoji: str) -> None:
         self.reactions.append((chat_id, message_id, emoji))
+
+    async def send_message(self, chat_id: int, topic_id: int, text: str) -> int:
+        self.sent.append((chat_id, topic_id, text))
+        return len(self.sent)
 
 
 class AlwaysJoClassifier:
@@ -72,6 +77,8 @@ async def notion_only_smoke(config_path: str | None) -> int:
         else Config(
             intake_chat_id=-1000000000000,
             intake_topic_id=1,
+            ops_chat_id=-1000000000001,
+            ops_topic_id=1,
             captured_reaction="✅",
             job_orders_data_source_id="3d8fb4d5-9e59-8073-a0d0-000b77632947",
         )
@@ -115,6 +122,7 @@ async def notion_only_smoke(config_path: str | None) -> int:
             "notion_page_id": msg["notion_page_id"],
             "readback_mismatch": msg["readback_mismatch"],
             "reaction_recorded": telegram.reactions,
+            "ops_posts_recorded": telegram.sent,
             "plan": json.loads(msg["plan_json"]),
         }, indent=2, ensure_ascii=False))
 

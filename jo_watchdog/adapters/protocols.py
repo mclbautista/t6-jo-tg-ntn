@@ -58,6 +58,10 @@ class TelegramClient(Protocol):
 
     async def set_reaction(self, chat_id: int, message_id: int, emoji: str) -> None: ...
 
+    async def send_message(self, chat_id: int, topic_id: int, text: str) -> int:
+        """Post Telegram-HTML ``text`` to a forum topic; return the new message id."""
+        ...
+
 
 @runtime_checkable
 class NotionClient(Protocol):

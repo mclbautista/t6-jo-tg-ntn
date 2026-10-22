@@ -18,8 +18,10 @@ import json
 import os
 import sqlite3
 import time
+from collections.abc import Sequence
 from contextlib import contextmanager
 from pathlib import Path
+from typing import NamedTuple
 
 from jo_watchdog.core.masker import outbound_text
 from jo_watchdog.core.plan import build_plan
@@ -27,6 +29,29 @@ from jo_watchdog.ledger.migrations import MIGRATIONS, REBUILDS_TABLES
 from jo_watchdog.ledger.states import State, can_transition
 
 CACHE_SNAPSHOTS_KEPT = 10
+
+# Ops-post retry delays: five attempts at 30s, 2m, 5m, 10m, 15m (#25).
+OUTBOX_RETRY_SECONDS = (30, 120, 300, 600, 900)
+
+OUTBOX_KINDS = frozenset(
+    {
+        "capture_report",
+        "edit_after_capture",
+        "stale_cache",
+        "outage_alert",
+        "heartbeat",
+        "dry_run_plan",
+    }
+)
+
+
+class OutboxMessage(NamedTuple):
+    """One rendered, masked ops post waiting to be inserted into ``outbox``."""
+
+    kind: str
+    chat_id: int
+    topic_id: int
+    text: str
 
 
 def _now() -> str:
@@ -429,15 +454,58 @@ class Ledger:
     def mark_writing(self, key: str) -> bool:
         return self.transition(key, State.PLANNED, State.WRITING)
 
-    def mark_written(self, key: str, notion_page_id: str) -> bool:
-        ok = self.transition(key, State.WRITING, State.WRITTEN)
-        if ok:
-            self._conn.execute(
-                "UPDATE messages SET notion_page_id = ?, updated_at = ?"
-                " WHERE telegram_key = ?",
-                (notion_page_id, _now(), key),
+    def mark_written(
+        self,
+        key: str,
+        notion_page_id: str,
+        *,
+        findings: list[dict] | None = None,
+        reports: Sequence[OutboxMessage] = (),
+    ) -> bool:
+        """Move ``writing`` → ``written`` with its findings and ops posts, atomically.
+
+        The state change, the final findings, a pending captured reaction and
+        every pending outbox row commit in one transaction (#23): a crash can
+        never leave a written row whose report was not queued.
+        """
+        if not can_transition(State.WRITING, State.WRITTEN):
+            return False
+        for report in reports:
+            if report.kind not in OUTBOX_KINDS:
+                raise ValueError(f"unknown outbox kind {report.kind!r}")
+        now = _now()
+        with self._transaction():
+            cur = self._conn.execute(
+                "UPDATE messages SET state = ?, notion_page_id = ?, findings_json = ?,"
+                " reaction_state = 'pending', updated_at = ?"
+                " WHERE telegram_key = ? AND state = ?",
+                (
+                    State.WRITTEN.value,
+                    notion_page_id,
+                    json.dumps(findings or [], ensure_ascii=False),
+                    now,
+                    key,
+                    State.WRITING.value,
+                ),
             )
-        return ok
+            if cur.rowcount != 1:
+                return False
+            row_id = self._conn.execute(
+                "SELECT id FROM messages WHERE telegram_key = ?", (key,)
+            ).fetchone()["id"]
+            for report in reports:
+                self._insert_outbox(report, message_row_id=row_id, now=now)
+        self._protect_files()
+        return True
+
+    def set_reaction_state(self, key: str, state: str) -> None:
+        """Record the captured reaction outcome; independent of the outbox."""
+        if state not in ("pending", "set", "failed"):
+            raise ValueError(f"unknown reaction state {state!r}")
+        self._conn.execute(
+            "UPDATE messages SET reaction_state = ?, updated_at = ? WHERE telegram_key = ?",
+            (state, _now(), key),
+        )
 
     def record_mismatch(self, key: str, detail: str) -> None:
         self._conn.execute(
@@ -448,6 +516,82 @@ class Ledger:
 
     def mark_done(self, key: str) -> bool:
         return self.transition(key, State.WRITTEN, State.DONE)
+
+    # -- ops outbox --------------------------------------------------------
+
+    def _insert_outbox(
+        self, report: OutboxMessage, *, message_row_id: int | None, now: str
+    ) -> int:
+        cur = self._conn.execute(
+            "INSERT INTO outbox (message_id, kind, chat_id, topic_id, text, state,"
+            " attempts, created_at) VALUES (?, ?, ?, ?, ?, 'pending', 0, ?)",
+            (message_row_id, report.kind, report.chat_id, report.topic_id, report.text, now),
+        )
+        return cur.lastrowid
+
+    def enqueue_system(self, report: OutboxMessage, *, key: str | None = None) -> int:
+        """Queue a system message (edit after capture, stale cache, alerts).
+
+        ``key`` links it to a ledger message when there is one.
+        """
+        if report.kind not in OUTBOX_KINDS:
+            raise ValueError(f"unknown outbox kind {report.kind!r}")
+        with self._transaction():
+            row_id = None
+            if key is not None:
+                row = self._conn.execute(
+                    "SELECT id FROM messages WHERE telegram_key = ?", (key,)
+                ).fetchone()
+                row_id = row["id"] if row else None
+            outbox_id = self._insert_outbox(report, message_row_id=row_id, now=_now())
+        self._protect_files()
+        return outbox_id
+
+    def due_outbox(self, *, now: str | None = None, limit: int = 20) -> list[dict]:
+        """Pending outbox rows whose next attempt is due, oldest first."""
+        rows = self._conn.execute(
+            "SELECT * FROM outbox WHERE state = 'pending'"
+            " AND (next_attempt_at IS NULL OR next_attempt_at <= ?)"
+            " ORDER BY id LIMIT ?",
+            (now or _now(), limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def outbox_sent(self, outbox_id: int, telegram_message_id: int | None) -> None:
+        self._conn.execute(
+            "UPDATE outbox SET state = 'sent', attempts = attempts + 1,"
+            " telegram_message_id = ?, sent_at = ?, last_error = NULL"
+            " WHERE id = ? AND state = 'pending'",
+            (telegram_message_id, _now(), outbox_id),
+        )
+
+    def outbox_failed_attempt(
+        self,
+        outbox_id: int,
+        error: str,
+        *,
+        retry_seconds: Sequence[int] = OUTBOX_RETRY_SECONDS,
+        now: float | None = None,
+    ) -> str:
+        """Count one failed post; schedule the next or give up. Returns the new state."""
+        row = self._conn.execute(
+            "SELECT attempts FROM outbox WHERE id = ?", (outbox_id,)
+        ).fetchone()
+        attempts = row["attempts"] + 1
+        clock = time.time() if now is None else now
+        if attempts >= len(retry_seconds):
+            state, next_at = "failed", None
+        else:
+            state = "pending"
+            next_at = time.strftime(
+                "%Y-%m-%dT%H:%M:%SZ", time.gmtime(clock + retry_seconds[attempts - 1])
+            )
+        self._conn.execute(
+            "UPDATE outbox SET state = ?, attempts = ?, next_attempt_at = ?, last_error = ?"
+            " WHERE id = ?",
+            (state, attempts, next_at, outbound_text(error).text, outbox_id),
+        )
+        return state
 
     # -- lifecycle ---------------------------------------------------------
 

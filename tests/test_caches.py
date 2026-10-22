@@ -31,6 +31,8 @@ def config(**overrides) -> Config:
     values = dict(
         intake_chat_id=-100123,
         intake_topic_id=5,
+        ops_chat_id=-100999,
+        ops_topic_id=7,
         job_orders_data_source_id=JOB_ORDERS,
         leizette_contact_page_id=LEIZETTE,
     )
