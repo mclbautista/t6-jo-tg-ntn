@@ -1,0 +1,106 @@
+{
+ "object": "data_source",
+ "id": "3d8fb4d5-9e59-8073-a0d0-000b77632947",
+ "title": [
+  {
+   "plain_text": "Job Orders"
+  }
+ ],
+ "properties": {
+  "Name": {
+   "id": "title",
+   "name": "Name",
+   "type": "title",
+   "title": {}
+  },
+  "Department": {
+   "id": "eEhQRg",
+   "name": "Department",
+   "type": "select",
+   "select": {
+    "options": [
+     {
+      "id": "o0",
+      "name": "TOC",
+      "color": "default",
+      "description": null
+     },
+     {
+      "id": "o1",
+      "name": "AE",
+      "color": "default",
+      "description": null
+     },
+     {
+      "id": "o2",
+      "name": "OE",
+      "color": "default",
+      "description": null
+     },
+     {
+      "id": "o3",
+      "name": "COOR",
+      "color": "default",
+      "description": null
+     },
+     {
+      "id": "o4",
+      "name": "COLOR",
+      "color": "default",
+      "description": null
+     },
+     {
+      "id": "o5",
+      "name": "VFX",
+      "color": "default",
+      "description": null
+     },
+     {
+      "id": "o6",
+      "name": "SOUND",
+      "color": "default",
+      "description": null
+     },
+     {
+      "id": "o7",
+      "name": "ADMIN",
+      "color": "default",
+      "description": null
+     }
+    ]
+   }
+  },
+  "Assigned": {
+   "id": "OnhdZw",
+   "name": "Assigned",
+   "type": "relation",
+   "relation": {
+    "data_source_id": "77b2a701-71db-4e88-a694-37f07303e77e"
+   }
+  },
+  "cc": {
+   "id": "cc",
+   "name": "cc",
+   "type": "relation",
+   "relation": {
+    "data_source_id": "77b2a701-71db-4e88-a694-37f07303e77e"
+   }
+  },
+  "Projects": {
+   "id": "proj",
+   "name": "Projects",
+   "type": "relation",
+   "relation": {
+    "data_source_id": "cc1dc02a-8f32-4c97-81e4-dc1e08d7f134"
+   }
+  },
+  "🗂️ Coordinator": {
+   "id": "bENVYw",
+   "name": "🗂️ Coordinator",
+   "type": "relation",
+   "relation": {
+    "data_source_id": "77b2a701-71db-4e88-a694-37f07303e77e"
+   }
+  }
+ }
+}

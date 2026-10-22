@@ -18,13 +18,41 @@ import json
 import os
 import sqlite3
 import time
+from collections.abc import Sequence
 from contextlib import contextmanager
 from pathlib import Path
+from typing import NamedTuple
 
+from jo_watchdog.core.duplicates import text_sha256
 from jo_watchdog.core.masker import outbound_text
 from jo_watchdog.core.plan import build_plan
-from jo_watchdog.ledger.migrations import MIGRATIONS
+from jo_watchdog.ledger.migrations import MIGRATIONS, REBUILDS_TABLES
 from jo_watchdog.ledger.states import State, can_transition
+
+CACHE_SNAPSHOTS_KEPT = 10
+
+# Ops-post retry delays: five attempts at 30s, 2m, 5m, 10m, 15m (#25).
+OUTBOX_RETRY_SECONDS = (30, 120, 300, 600, 900)
+
+OUTBOX_KINDS = frozenset(
+    {
+        "capture_report",
+        "edit_after_capture",
+        "stale_cache",
+        "outage_alert",
+        "heartbeat",
+        "dry_run_plan",
+    }
+)
+
+
+class OutboxMessage(NamedTuple):
+    """One rendered, masked ops post waiting to be inserted into ``outbox``."""
+
+    kind: str
+    chat_id: int
+    topic_id: int
+    text: str
 
 
 def _now() -> str:
@@ -33,6 +61,17 @@ def _now() -> str:
 
 def telegram_key(chat_id: int, message_id: int) -> str:
     return f"{chat_id}:{message_id}"
+
+
+def _forward_origin_type(raw_source: str) -> str | None:
+    """``forward_origin.type`` from a stored update, or None for a non-forward."""
+    try:
+        raw = json.loads(raw_source)
+    except (TypeError, ValueError):
+        return None
+    message = raw.get("message") if isinstance(raw, dict) else None
+    origin = message.get("forward_origin") if isinstance(message, dict) else None
+    return origin.get("type") if isinstance(origin, dict) else None
 
 
 class Ledger:
@@ -70,16 +109,32 @@ class Ledger:
             row["version"]
             for row in self._conn.execute("SELECT version FROM schema_version")
         } if self._table_exists("schema_version") else set()
-        for i, migration in enumerate(MIGRATIONS, start=1):
-            if i in applied:
+        for version in sorted(MIGRATIONS):
+            if version in applied:
                 continue
-            with self._transaction():
-                for statement in migration:
-                    self._conn.execute(statement)
-                self._conn.execute(
-                    "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
-                    (i, _now()),
-                )
+            migration = MIGRATIONS[version]
+            rebuild = version in REBUILDS_TABLES
+            if rebuild:
+                # Foreign-key enforcement can only change outside a transaction.
+                self._conn.execute("PRAGMA foreign_keys=OFF")
+            try:
+                with self._transaction():
+                    if callable(migration):
+                        migration(self._conn)
+                    else:
+                        for statement in migration:
+                            self._conn.execute(statement)
+                    if rebuild and self._conn.execute("PRAGMA foreign_key_check").fetchone():
+                        raise sqlite3.IntegrityError(
+                            f"migration {version} left dangling foreign keys"
+                        )
+                    self._conn.execute(
+                        "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
+                        (version, _now()),
+                    )
+            finally:
+                if rebuild:
+                    self._conn.execute("PRAGMA foreign_keys=ON")
 
     def _table_exists(self, name: str) -> bool:
         row = self._conn.execute(
@@ -179,6 +234,7 @@ class Ledger:
         raw_source: str,
         text: str,
         first_line: str,
+        posted_at: str | None = None,
     ) -> str:
         """Durably queue an in-scope update and advance the offset atomically.
 
@@ -193,8 +249,8 @@ class Ledger:
                 "INSERT INTO messages"
                 " (chat_id, message_id, telegram_key, update_id, raw_source, text,"
                 "  first_line, masked_text, masker_version, masked_count, state,"
-                "  created_at, updated_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "  posted_at, text_sha256, forward_origin_type, created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     chat_id,
                     message_id,
@@ -207,6 +263,9 @@ class Ledger:
                     masked.masker_version,
                     masked.withheld_count,
                     State.RECEIVED.value,
+                    posted_at,
+                    text_sha256(text),
+                    _forward_origin_type(raw_source),
                     now,
                     now,
                 ),
@@ -219,9 +278,7 @@ class Ledger:
         return self.get_message(key) is not None
 
     def get_message(self, key: str) -> dict | None:
-        row = self._conn.execute(
-            "SELECT * FROM messages WHERE telegram_key = ?", (key,)
-        ).fetchone()
+        row = self._conn.execute("SELECT * FROM messages WHERE telegram_key = ?", (key,)).fetchone()
         return dict(row) if row else None
 
     def pending(self, state: State | str) -> list[str]:
@@ -230,6 +287,136 @@ class Ledger:
             (State(state).value,),
         ).fetchall()
         return [r["telegram_key"] for r in rows]
+
+    def due(self, state: State | str, now: str | None = None) -> list[str]:
+        """Keys in ``state`` whose retry time, if any, has come."""
+        rows = self._conn.execute(
+            "SELECT telegram_key FROM messages WHERE state = ?"
+            " AND (next_attempt_at IS NULL OR next_attempt_at <= ?) ORDER BY id",
+            (State(state).value, now or _now()),
+        ).fetchall()
+        return [r["telegram_key"] for r in rows]
+
+    def stage_result(self, key: str, stage: str) -> dict | None:
+        row = self._conn.execute(
+            "SELECT s.result_json FROM stage_results s JOIN messages m ON m.id = s.message_id"
+            " WHERE m.telegram_key = ? AND s.stage = ?",
+            (key, stage),
+        ).fetchone()
+        return json.loads(row["result_json"]) if row else None
+
+    # -- classification ----------------------------------------------------
+
+    def _insert_llm_call(self, message_row_id: int, call: dict, now: str) -> None:
+        self._conn.execute(
+            "INSERT INTO llm_calls"
+            " (message_id, provider, purpose, requested_model, returned_model, prompt_tag,"
+            "  masker_version, input_tokens, output_tokens, latency_ms, outcome, error,"
+            "  detail_json, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                message_row_id,
+                call["provider"],
+                call["purpose"],
+                call["requested_model"],
+                call.get("returned_model"),
+                call["prompt_tag"],
+                call["masker_version"],
+                call.get("input_tokens"),
+                call.get("output_tokens"),
+                call.get("latency_ms"),
+                call["outcome"],
+                outbound_text(call["error"]).text if call.get("error") else None,
+                call.get("detail_json"),
+                now,
+            ),
+        )
+
+    def _move(self, key: str, from_state: State, to_state: State, now: str) -> dict:
+        if not can_transition(from_state, to_state):
+            raise ValueError(f"illegal transition {from_state.value} -> {to_state.value}")
+        row = self._conn.execute(
+            "SELECT * FROM messages WHERE telegram_key = ? AND state = ?",
+            (key, from_state.value),
+        ).fetchone()
+        if row is None:
+            raise LookupError(f"{key} is not in state {from_state.value}")
+        self._conn.execute(
+            "UPDATE messages SET state = ?, attempts = 0, next_attempt_at = NULL,"
+            " last_error = NULL, updated_at = ? WHERE id = ?",
+            (to_state.value, now, row["id"]),
+        )
+        return dict(row)
+
+    def _insert_stage_result(self, message_row_id: int, stage: str, result: dict, now: str):
+        self._conn.execute(
+            "INSERT INTO stage_results (message_id, stage, result_json, created_at)"
+            " VALUES (?, ?, ?, ?)",
+            (message_row_id, stage, json.dumps(result, ensure_ascii=False), now),
+        )
+
+    def _log_ignored(self, row: dict, reason: str, now: str) -> None:
+        self._conn.execute(
+            "UPDATE messages SET ignore_reason = ? WHERE id = ?", (reason, row["id"])
+        )
+        self._conn.execute(
+            "INSERT INTO ignore_log"
+            " (chat_id, message_id, update_id, reason, first_line, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                row["chat_id"],
+                row["message_id"],
+                row["update_id"],
+                reason,
+                outbound_text(row["first_line"]).text,
+                now,
+            ),
+        )
+
+    def record_extraction(self, key: str, *, call: dict, result: dict) -> State:
+        """Store a validated extraction, its trace, and the verdict's next state atomically.
+
+        ``jo`` and ``unsure`` move to ``extracted``; ``not_jo`` moves to ``ignored``
+        and gets an ``ignore_log`` row with the masked first line.
+        """
+        verdict = result["extraction"]["verdict"]
+        to_state = State.IGNORED if verdict == "not_jo" else State.EXTRACTED
+        now = _now()
+        with self._transaction():
+            row = self._move(key, State.RECEIVED, to_state, now)
+            self._conn.execute(
+                "UPDATE messages SET verdict = ? WHERE id = ?", (verdict, row["id"])
+            )
+            self._insert_llm_call(row["id"], call, now)
+            self._insert_stage_result(row["id"], "extract", result, now)
+            if to_state is State.IGNORED:
+                self._log_ignored(row, "not_jo", now)
+        return to_state
+
+    def record_no_text(self, key: str) -> None:
+        """A message with no text or caption skips the model and is ignored as ``no_text``."""
+        now = _now()
+        with self._transaction():
+            row = self._move(key, State.RECEIVED, State.IGNORED, now)
+            self._log_ignored(row, "no_text", now)
+
+    def record_classifier_failure(self, key: str, *, call: dict, retry_at: str) -> None:
+        """Count one failed classify attempt and schedule the next; the row stays queued."""
+        now = _now()
+        error = outbound_text(f"{call['outcome']}: {call.get('error') or ''}".strip()).text
+        with self._transaction():
+            row = self._conn.execute(
+                "SELECT id FROM messages WHERE telegram_key = ? AND state = ?",
+                (key, State.RECEIVED.value),
+            ).fetchone()
+            if row is None:
+                raise LookupError(f"{key} is not in state received")
+            self._insert_llm_call(row["id"], call, now)
+            self._conn.execute(
+                "UPDATE messages SET attempts = attempts + 1, next_attempt_at = ?,"
+                " last_error = ?, updated_at = ? WHERE id = ?",
+                (retry_at, error, now, row["id"]),
+            )
 
     # -- ignore log --------------------------------------------------------
 
@@ -270,24 +457,84 @@ class Ledger:
         )
         return cur.rowcount == 1
 
-    def store_plan(self, key: str, plan: dict) -> None:
+    def store_plan(self, key: str, plan: dict, *, jo_key: str | None = None) -> None:
+        """Store the exact plan, and the content-duplicate key it was planned with."""
         self._conn.execute(
-            "UPDATE messages SET plan_json = ?, updated_at = ? WHERE telegram_key = ?",
-            (json.dumps(plan, ensure_ascii=False), _now(), key),
+            "UPDATE messages SET plan_json = ?, jo_key = ?, updated_at = ? WHERE telegram_key = ?",
+            (json.dumps(plan, ensure_ascii=False), jo_key, _now(), key),
         )
+
+    def earlier_captures(self, key: str, *, text_sha: str, jo_key: str | None) -> list[dict]:
+        """Other rows with a Notion page that share this text or JO key, oldest first."""
+        rows = self._conn.execute(
+            "SELECT telegram_key, text_sha256, jo_key, notion_page_id, posted_at, created_at"
+            " FROM messages WHERE notion_page_id IS NOT NULL AND telegram_key != ?"
+            " AND (text_sha256 = ? OR (? IS NOT NULL AND jo_key = ?)) ORDER BY id",
+            (key, text_sha, jo_key, jo_key),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     def mark_writing(self, key: str) -> bool:
         return self.transition(key, State.PLANNED, State.WRITING)
 
-    def mark_written(self, key: str, notion_page_id: str) -> bool:
-        ok = self.transition(key, State.WRITING, State.WRITTEN)
-        if ok:
-            self._conn.execute(
-                "UPDATE messages SET notion_page_id = ?, updated_at = ?"
-                " WHERE telegram_key = ?",
-                (notion_page_id, _now(), key),
+    def mark_written(
+        self,
+        key: str,
+        notion_page_id: str,
+        *,
+        findings: list[dict] | None = None,
+        reports: Sequence[OutboxMessage] = (),
+    ) -> bool:
+        """Move ``writing`` → ``written`` with its findings and ops posts, atomically.
+
+        The state change, the final findings, a pending captured reaction and
+        every pending outbox row commit in one transaction (#23): a crash can
+        never leave a written row whose report was not queued.
+        """
+        if not can_transition(State.WRITING, State.WRITTEN):
+            return False
+        for report in reports:
+            if report.kind not in OUTBOX_KINDS:
+                raise ValueError(f"unknown outbox kind {report.kind!r}")
+        now = _now()
+        with self._transaction():
+            cur = self._conn.execute(
+                "UPDATE messages SET state = ?, notion_page_id = ?, findings_json = ?,"
+                " reaction_state = 'pending', updated_at = ?"
+                " WHERE telegram_key = ? AND state = ?",
+                (
+                    State.WRITTEN.value,
+                    notion_page_id,
+                    json.dumps(findings or [], ensure_ascii=False),
+                    now,
+                    key,
+                    State.WRITING.value,
+                ),
             )
-        return ok
+            if cur.rowcount != 1:
+                return False
+            row_id = self._conn.execute(
+                "SELECT id FROM messages WHERE telegram_key = ?", (key,)
+            ).fetchone()["id"]
+            for report in reports:
+                self._insert_outbox(report, message_row_id=row_id, now=now)
+            # Edits that arrived mid-pipeline are reported with this capture.
+            self._conn.execute(
+                "UPDATE edits SET outcome = 'reported'"
+                " WHERE telegram_key = ? AND outcome = 'pending_capture'",
+                (key,),
+            )
+        self._protect_files()
+        return True
+
+    def set_reaction_state(self, key: str, state: str) -> None:
+        """Record the captured reaction outcome; independent of the outbox."""
+        if state not in ("pending", "set", "failed"):
+            raise ValueError(f"unknown reaction state {state!r}")
+        self._conn.execute(
+            "UPDATE messages SET reaction_state = ?, updated_at = ? WHERE telegram_key = ?",
+            (state, _now(), key),
+        )
 
     def record_mismatch(self, key: str, detail: str) -> None:
         self._conn.execute(
@@ -299,7 +546,177 @@ class Ledger:
     def mark_done(self, key: str) -> bool:
         return self.transition(key, State.WRITTEN, State.DONE)
 
+    # -- edits (#24) -------------------------------------------------------
+
+    def edit_seen(self, update_id: int) -> bool:
+        """True when this edit update was already recorded (offset N+1 redelivery)."""
+        row = self._conn.execute("SELECT 1 FROM edits WHERE update_id = ?", (update_id,)).fetchone()
+        return row is not None
+
+    def has_pending_edits(self, key: str) -> bool:
+        row = self._conn.execute(
+            "SELECT 1 FROM edits WHERE telegram_key = ? AND outcome = 'pending_capture'",
+            (key,),
+        ).fetchone()
+        return row is not None
+
+    def edits_for(self, key: str) -> list[dict]:
+        rows = self._conn.execute(
+            "SELECT * FROM edits WHERE telegram_key = ? ORDER BY id", (key,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def record_edit(
+        self,
+        key: str,
+        update_id: int,
+        *,
+        edited_at: str,
+        outcome: str,
+        report: OutboxMessage | None = None,
+    ) -> None:
+        """Record an edit, its ops post if any, and advance the offset atomically.
+
+        The Notion row and the stored plan are never touched.
+        """
+        if outcome not in ("reported", "pending_capture", "ignored_message"):
+            raise ValueError(f"unknown edit outcome {outcome!r}")
+        if report is not None and report.kind not in OUTBOX_KINDS:
+            raise ValueError(f"unknown outbox kind {report.kind!r}")
+        now = _now()
+        with self._transaction():
+            self._conn.execute(
+                "INSERT INTO edits (telegram_key, update_id, edited_at, outcome, created_at)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (key, update_id, edited_at, outcome, now),
+            )
+            if report is not None:
+                row = self._conn.execute(
+                    "SELECT id FROM messages WHERE telegram_key = ?", (key,)
+                ).fetchone()
+                self._insert_outbox(report, message_row_id=row["id"] if row else None, now=now)
+            self._advance_offset(update_id)
+        self._protect_files()
+
+    # -- ops outbox --------------------------------------------------------
+
+    def _insert_outbox(self, report: OutboxMessage, *, message_row_id: int | None, now: str) -> int:
+        cur = self._conn.execute(
+            "INSERT INTO outbox (message_id, kind, chat_id, topic_id, text, state,"
+            " attempts, created_at) VALUES (?, ?, ?, ?, ?, 'pending', 0, ?)",
+            (message_row_id, report.kind, report.chat_id, report.topic_id, report.text, now),
+        )
+        return cur.lastrowid
+
+    def enqueue_system(self, report: OutboxMessage, *, key: str | None = None) -> int:
+        """Queue a system message (edit after capture, stale cache, alerts).
+
+        ``key`` links it to a ledger message when there is one.
+        """
+        if report.kind not in OUTBOX_KINDS:
+            raise ValueError(f"unknown outbox kind {report.kind!r}")
+        with self._transaction():
+            row_id = None
+            if key is not None:
+                row = self._conn.execute(
+                    "SELECT id FROM messages WHERE telegram_key = ?", (key,)
+                ).fetchone()
+                row_id = row["id"] if row else None
+            outbox_id = self._insert_outbox(report, message_row_id=row_id, now=_now())
+        self._protect_files()
+        return outbox_id
+
+    def due_outbox(self, *, now: str | None = None, limit: int = 20) -> list[dict]:
+        """Pending outbox rows whose next attempt is due, oldest first."""
+        rows = self._conn.execute(
+            "SELECT * FROM outbox WHERE state = 'pending'"
+            " AND (next_attempt_at IS NULL OR next_attempt_at <= ?)"
+            " ORDER BY id LIMIT ?",
+            (now or _now(), limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def outbox_sent(self, outbox_id: int, telegram_message_id: int | None) -> None:
+        self._conn.execute(
+            "UPDATE outbox SET state = 'sent', attempts = attempts + 1,"
+            " telegram_message_id = ?, sent_at = ?, last_error = NULL"
+            " WHERE id = ? AND state = 'pending'",
+            (telegram_message_id, _now(), outbox_id),
+        )
+
+    def outbox_failed_attempt(
+        self,
+        outbox_id: int,
+        error: str,
+        *,
+        retry_seconds: Sequence[int] = OUTBOX_RETRY_SECONDS,
+        now: float | None = None,
+    ) -> str:
+        """Count one failed post; schedule the next or give up. Returns the new state."""
+        row = self._conn.execute(
+            "SELECT attempts FROM outbox WHERE id = ?", (outbox_id,)
+        ).fetchone()
+        attempts = row["attempts"] + 1
+        clock = time.time() if now is None else now
+        if attempts >= len(retry_seconds):
+            state, next_at = "failed", None
+        else:
+            state = "pending"
+            next_at = time.strftime(
+                "%Y-%m-%dT%H:%M:%SZ", time.gmtime(clock + retry_seconds[attempts - 1])
+            )
+        self._conn.execute(
+            "UPDATE outbox SET state = ?, attempts = ?, next_attempt_at = ?, last_error = ?"
+            " WHERE id = ?",
+            (state, attempts, next_at, outbound_text(error).text, outbox_id),
+        )
+        return state
+
     # -- lifecycle ---------------------------------------------------------
+
+    # -- cache snapshots -----------------------------------------------------
+
+    def save_cache_snapshot(
+        self,
+        kind: str,
+        format_version: int,
+        payload: list | dict,
+        item_count: int,
+        fetched_at: str,
+        *,
+        keep: int = CACHE_SNAPSHOTS_KEPT,
+    ) -> None:
+        """Insert a successful refresh, then prune that kind to the last ``keep`` rows."""
+        with self._transaction():
+            self._conn.execute(
+                "INSERT INTO cache_snapshot"
+                " (kind, format_version, payload_json, item_count, fetched_at)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (kind, format_version, json.dumps(payload), item_count, fetched_at),
+            )
+            self._conn.execute(
+                "DELETE FROM cache_snapshot WHERE kind = ? AND id NOT IN ("
+                " SELECT id FROM cache_snapshot WHERE kind = ?"
+                " ORDER BY fetched_at DESC, id DESC LIMIT ?)",
+                (kind, kind, keep),
+            )
+
+    def latest_cache_snapshot(self, kind: str) -> dict | None:
+        """The live snapshot for ``kind``: its newest row, payload decoded."""
+        row = self._conn.execute(
+            "SELECT * FROM cache_snapshot WHERE kind = ? ORDER BY fetched_at DESC, id DESC LIMIT 1",
+            (kind,),
+        ).fetchone()
+        if row is None:
+            return None
+        snapshot = dict(row)
+        snapshot["payload"] = json.loads(snapshot.pop("payload_json"))
+        return snapshot
+
+    def cache_snapshot_count(self, kind: str) -> int:
+        return self._conn.execute(
+            "SELECT COUNT(*) FROM cache_snapshot WHERE kind = ?", (kind,)
+        ).fetchone()[0]
 
     def close(self) -> None:
         self._conn.close()

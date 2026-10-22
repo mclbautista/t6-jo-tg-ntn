@@ -112,6 +112,25 @@ class NotionAdapter:
             next_cursor=data.get("next_cursor"),
         )
 
+    async def retrieve_data_source(self, data_source_id: str) -> dict:
+        """Retrieve a data source's schema (property names, types, select options)."""
+        return await self._request("GET", f"/data_sources/{data_source_id}")
+
+    async def query_all(
+        self, data_source_id: str, *, filter: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
+        """Query every page of a data source, following ``next_cursor`` to the end."""
+        results: list[dict[str, Any]] = []
+        cursor: str | None = None
+        while True:
+            page = await self.query_data_source(
+                data_source_id, QueryRequest(start_cursor=cursor, filter=filter)
+            )
+            results.extend(page.results)
+            if not page.has_more or not page.next_cursor:
+                return results
+            cursor = page.next_cursor
+
     async def query_project_deliverables(
         self, data_source_id: str, project_page_id: str
     ) -> list[Candidate]:
@@ -119,19 +138,14 @@ class NotionAdapter:
 
         A live, fully paginated query with no Status or Class filter (#26).
         """
-        candidates: list[Candidate] = []
-        request = QueryRequest(
+        rows = await self.query_all(
+            data_source_id,
             filter={
                 "property": DELIVERABLE_PROJECTS_PROPERTY,
                 "relation": {"contains": project_page_id},
-            }
+            },
         )
-        while True:
-            page = await self.query_data_source(data_source_id, request)
-            candidates.extend(_deliverable_candidate(row) for row in page.results)
-            if not page.has_more or not page.next_cursor:
-                return candidates
-            request = request.model_copy(update={"start_cursor": page.next_cursor})
+        return [_deliverable_candidate(row) for row in rows]
 
 
 def _deliverable_candidate(row: dict) -> Candidate:
