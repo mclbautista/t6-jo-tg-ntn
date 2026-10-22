@@ -74,6 +74,16 @@ class NotionClient(Protocol):
 
     async def retrieve_page(self, page_id: str) -> dict: ...
 
+    async def find_pages_by_telegram_key(
+        self, data_source_id: str, telegram_key: str
+    ) -> list[PageRef]:
+        """Pages whose ``Telegram Key`` equals ``telegram_key``, oldest first.
+
+        Reserved for recovering from an uncertain write; normal success reads
+        back by id.
+        """
+        ...
+
 
 @runtime_checkable
 class NotionReader(Protocol):

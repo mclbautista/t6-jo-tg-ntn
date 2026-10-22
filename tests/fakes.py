@@ -113,16 +113,30 @@ class FakeTelegram:
 class FakeNotion:
     """Echoes written properties back so read-back comparison can run."""
 
-    def __init__(self, *, fail_create: bool = False, wrong_name: bool = False):
+    def __init__(
+        self,
+        *,
+        fail_create: bool = False,
+        wrong_name: bool = False,
+        fail_retrieve: int = 0,
+        fail_find: int = 0,
+        create_error: Exception | None = None,
+    ):
         self.fail_create = fail_create
         self.wrong_name = wrong_name
+        self.fail_retrieve = fail_retrieve  # fail this many retrieve calls first
+        self.fail_find = fail_find  # fail this many Telegram-Key queries first
+        self.find_calls = 0
+        self.create_calls = 0
+        self.create_error = create_error  # raised instead of the default failure
         self.created: list[dict] = []
         self.pages: dict[str, dict] = {}
         self._counter = 0
 
     async def create_page(self, payload: dict):
+        self.create_calls += 1
         if self.fail_create:
-            raise RuntimeError("notion create failed")
+            raise self.create_error or RuntimeError("notion create failed")
         self._counter += 1
         page_id = f"page-{self._counter}"
         name = payload["properties"]["Name"]["title"][0]["text"]["content"]
@@ -141,4 +155,18 @@ class FakeNotion:
         return PageRef(id=page_id, url=f"https://notion.example/{page_id}")
 
     async def retrieve_page(self, page_id: str) -> dict:
+        if self.fail_retrieve:
+            self.fail_retrieve -= 1
+            raise RuntimeError("notion retrieve failed")
         return self.pages[page_id]
+
+    async def find_pages_by_telegram_key(self, data_source_id: str, telegram_key: str):
+        self.find_calls += 1
+        if self.fail_find:
+            self.fail_find -= 1
+            raise RuntimeError("notion query failed")
+        return [
+            PageRef(id=page["id"], url=page["url"])
+            for page in self.pages.values()
+            if page["properties"]["Telegram Key"]["rich_text"][0]["plain_text"] == telegram_key
+        ]

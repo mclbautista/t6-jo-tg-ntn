@@ -18,8 +18,9 @@ import json
 import os
 import sqlite3
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from contextlib import contextmanager
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import NamedTuple
 
@@ -57,6 +58,19 @@ class OutboxMessage(NamedTuple):
 
 def _now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def fmt_utc(when: datetime) -> str:
+    """A timezone-aware datetime as the ledger's UTC timestamp string."""
+    return when.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+class FailureResult(NamedTuple):
+    """What one failed attempt did to a message."""
+
+    attempts: int
+    exhausted: bool
+    next_attempt_at: str | None
 
 
 def telegram_key(chat_id: int, message_id: int) -> str:
@@ -288,12 +302,23 @@ class Ledger:
         ).fetchall()
         return [r["telegram_key"] for r in rows]
 
-    def due(self, state: State | str, now: str | None = None) -> list[str]:
-        """Keys in ``state`` whose retry time, if any, has come."""
+    def due(
+        self, state: State | str, now: str | None = None, *, settle_before: str | None = None
+    ) -> list[str]:
+        """Keys in ``state`` whose retry time, if any, has come, oldest first.
+
+        Exhausted messages are never due until ``retry`` clears them. With
+        ``settle_before``, a message that has no scheduled retry (it was left
+        mid-flight by a crash) is due only once it was last touched at or
+        before that time.
+        """
+        now = now or _now()
+        settle = settle_before or now
         rows = self._conn.execute(
-            "SELECT telegram_key FROM messages WHERE state = ?"
-            " AND (next_attempt_at IS NULL OR next_attempt_at <= ?) ORDER BY id",
-            (State(state).value, now or _now()),
+            "SELECT telegram_key FROM messages WHERE state = ? AND exhausted_at IS NULL"
+            " AND ((next_attempt_at IS NOT NULL AND next_attempt_at <= ?)"
+            "      OR (next_attempt_at IS NULL AND updated_at <= ?)) ORDER BY id",
+            (State(state).value, now, settle),
         ).fetchall()
         return [r["telegram_key"] for r in rows]
 
@@ -400,23 +425,260 @@ class Ledger:
             row = self._move(key, State.RECEIVED, State.IGNORED, now)
             self._log_ignored(row, "no_text", now)
 
-    def record_classifier_failure(self, key: str, *, call: dict, retry_at: str) -> None:
+    def record_classifier_failure(
+        self,
+        key: str,
+        *,
+        call: dict,
+        schedule: Sequence[int],
+        now: datetime,
+        on_exhausted: Callable[[str, int], OutboxMessage] | None = None,
+    ) -> FailureResult:
         """Count one failed classify attempt and schedule the next; the row stays queued."""
-        now = _now()
-        error = outbound_text(f"{call['outcome']}: {call.get('error') or ''}".strip()).text
+        error = f"{call['outcome']}: {call.get('error') or ''}".strip()
+        return self.record_failure(
+            key,
+            error=error,
+            schedule=schedule,
+            now=now,
+            state=State.RECEIVED,
+            call=call,
+            on_exhausted=on_exhausted,
+        )
+
+    # -- retries and exhaustion (#25) ---------------------------------------
+
+    def record_failure(
+        self,
+        key: str,
+        *,
+        error: str,
+        schedule: Sequence[int],
+        now: datetime,
+        retry_after: float | None = None,
+        state: State | None = None,
+        call: dict | None = None,
+        on_exhausted: Callable[[str, int], OutboxMessage] | None = None,
+    ) -> FailureResult:
+        """Count one failed attempt, then schedule the next or give up.
+
+        The delay after the Nth failure is ``schedule[N-1]``, stretched to a
+        provider's ``Retry-After`` when that is longer. The failure that uses up the
+        schedule sets ``exhausted_at`` and queues the one outage alert
+        (``on_exhausted(masked_error, attempts)``) in the same transaction. The
+        row keeps its state and stored plan; nothing is deleted.
+        """
+        masked = outbound_text(error).text
+        stamp = fmt_utc(now)
         with self._transaction():
             row = self._conn.execute(
-                "SELECT id FROM messages WHERE telegram_key = ? AND state = ?",
-                (key, State.RECEIVED.value),
+                "SELECT id, attempts, state FROM messages WHERE telegram_key = ?", (key,)
             ).fetchone()
-            if row is None:
-                raise LookupError(f"{key} is not in state received")
-            self._insert_llm_call(row["id"], call, now)
+            if row is None or (state is not None and row["state"] != state.value):
+                raise LookupError(f"{key} is not in state {state.value if state else 'any'}")
+            if call is not None:
+                self._insert_llm_call(row["id"], call, stamp)
+            attempts = row["attempts"] + 1
+            # Five attempts: the fifth failure gives up, so the last delay only
+            # ever applies as a floor (nothing waits 15 minutes for a sixth try).
+            exhausted = attempts >= len(schedule)
+            if exhausted:
+                next_at = None
+            else:
+                delay = max(schedule[attempts - 1], retry_after or 0)
+                next_at = fmt_utc(now + timedelta(seconds=delay))
             self._conn.execute(
-                "UPDATE messages SET attempts = attempts + 1, next_attempt_at = ?,"
-                " last_error = ?, updated_at = ? WHERE id = ?",
-                (retry_at, error, now, row["id"]),
+                "UPDATE messages SET attempts = ?, next_attempt_at = ?, last_error = ?,"
+                " exhausted_at = ?, updated_at = ? WHERE id = ?",
+                (attempts, next_at, masked, stamp if exhausted else None, _now(), row["id"]),
             )
+            if exhausted and on_exhausted is not None:
+                alert = on_exhausted(masked, attempts)
+                if alert.kind not in OUTBOX_KINDS:
+                    raise ValueError(f"unknown outbox kind {alert.kind!r}")
+                self._insert_outbox(alert, message_row_id=row["id"], now=stamp)
+        self._protect_files()
+        return FailureResult(attempts, exhausted, next_at)
+
+    def retry(self, key: str, *, now: datetime) -> bool:
+        """Make one exhausted message eligible again; the stored plan is untouched."""
+        return self._retry("telegram_key = ?", (key,), now) == 1
+
+    def retry_all_exhausted(self, *, now: datetime) -> int:
+        """Make every exhausted message eligible again; returns how many."""
+        return self._retry("1 = 1", (), now)
+
+    def _retry(self, where: str, params: tuple, now: datetime) -> int:
+        cur = self._conn.execute(
+            "UPDATE messages SET attempts = 0, exhausted_at = NULL, next_attempt_at = ?,"
+            f" updated_at = ? WHERE exhausted_at IS NOT NULL AND {where}",
+            (fmt_utc(now), _now(), *params),
+        )
+        return cur.rowcount
+
+    def exhausted_keys(self) -> list[str]:
+        rows = self._conn.execute(
+            "SELECT telegram_key FROM messages WHERE exhausted_at IS NOT NULL ORDER BY id"
+        ).fetchall()
+        return [r["telegram_key"] for r in rows]
+
+    def store_page_id(self, key: str, notion_page_id: str) -> bool:
+        """Remember the created page while the row is still ``writing``.
+
+        A later read-back failure then retries only the retrieve. Progress, so
+        the attempt counter restarts.
+        """
+        cur = self._conn.execute(
+            "UPDATE messages SET notion_page_id = ?, attempts = 0, next_attempt_at = NULL,"
+            " last_error = NULL, updated_at = ? WHERE telegram_key = ? AND state = ?",
+            (notion_page_id, _now(), key, State.WRITING.value),
+        )
+        return cur.rowcount == 1
+
+    def record_stage_result(self, key: str, stage: str, result: dict) -> None:
+        """Store (or replace) one stage's result for a message."""
+        now = _now()
+        self._conn.execute(
+            "INSERT INTO stage_results (message_id, stage, result_json, created_at)"
+            " SELECT id, ?, ?, ? FROM messages WHERE telegram_key = ?"
+            " ON CONFLICT(message_id, stage) DO UPDATE SET result_json = excluded.result_json",
+            (stage, json.dumps(result, ensure_ascii=False), now, key),
+        )
+
+    # -- liveness and heartbeat (#25) ---------------------------------------
+
+    def stamp_alive(self, now: datetime) -> None:
+        """Record that the poller is making progress (read by the deadman and health check)."""
+        stamp = fmt_utc(now)
+        self._conn.execute(
+            "INSERT INTO runtime_state (key, value, updated_at) VALUES ('poller_alive_at', ?, ?)"
+            " ON CONFLICT(key) DO UPDATE SET value = excluded.value,"
+            " updated_at = excluded.updated_at",
+            (stamp, stamp),
+        )
+
+    def poller_alive_at(self) -> datetime | None:
+        row = self._conn.execute(
+            "SELECT value FROM runtime_state WHERE key = 'poller_alive_at'"
+        ).fetchone()
+        return datetime.fromisoformat(row["value"]) if row else None
+
+    def heartbeat_exists(self, window_start: datetime) -> bool:
+        row = self._conn.execute(
+            "SELECT 1 FROM heartbeats WHERE window_start = ?", (fmt_utc(window_start),)
+        ).fetchone()
+        return row is not None
+
+    def has_heartbeats(self) -> bool:
+        return self._conn.execute("SELECT 1 FROM heartbeats LIMIT 1").fetchone() is not None
+
+    def skip_heartbeat(self, window_start: datetime, window_end: datetime) -> None:
+        """Mark a window as handled without a post (a brand-new ledger's first window)."""
+        self._conn.execute(
+            "INSERT OR IGNORE INTO heartbeats (window_start, window_end, outbox_id, created_at)"
+            " VALUES (?, ?, NULL, ?)",
+            (fmt_utc(window_start), fmt_utc(window_end), _now()),
+        )
+
+    def enqueue_heartbeat(
+        self, window_start: datetime, window_end: datetime, report: OutboxMessage
+    ) -> bool:
+        """Queue the heartbeat for a window exactly once, even across restarts."""
+        if report.kind != "heartbeat":
+            raise ValueError("not a heartbeat message")
+        start = fmt_utc(window_start)
+        now = _now()
+        with self._transaction():
+            if self._conn.execute(
+                "SELECT 1 FROM heartbeats WHERE window_start = ?", (start,)
+            ).fetchone():
+                return False
+            outbox_id = self._insert_outbox(report, message_row_id=None, now=now)
+            self._conn.execute(
+                "INSERT INTO heartbeats (window_start, window_end, outbox_id, created_at)"
+                " VALUES (?, ?, ?, ?)",
+                (start, fmt_utc(window_end), outbox_id, now),
+            )
+        self._protect_files()
+        return True
+
+    def _latest_model(self, provider: str, *, before: str, since: str = "") -> str | None:
+        """The newest ``returned_model`` a provider sent in ``[since, before)``."""
+        row = self._conn.execute(
+            "SELECT returned_model FROM llm_calls WHERE provider = ?"
+            " AND returned_model IS NOT NULL AND created_at < ? AND created_at >= ?"
+            " ORDER BY created_at DESC, id DESC LIMIT 1",
+            (provider, before, since),
+        ).fetchone()
+        return row[0] if row else None
+
+    def heartbeat_stats(self, window_start: datetime, window_end: datetime) -> dict:
+        """Everything the heartbeat reports, straight from ledger rows (no counters).
+
+        A message's last ``updated_at`` after it reaches ``written`` is the
+        write time: the reaction and ``done`` follow within the same cycle.
+        """
+        start, end = fmt_utc(window_start), fmt_utc(window_end)
+        one = lambda sql, *args: self._conn.execute(sql, args).fetchone()[0]  # noqa: E731
+        captured = "state IN ('written', 'done') AND updated_at >= ? AND updated_at < ?"
+        ignored = "FROM ignore_log WHERE reason = ? AND created_at >= ? AND created_at < ?"
+        deliverables = {
+            outcome: one(
+                "SELECT COUNT(*) FROM stage_results WHERE stage = 'match'"
+                " AND created_at >= ? AND created_at < ?"
+                " AND json_extract(result_json, '$.outcome') = ?",
+                start,
+                end,
+                outcome,
+            )
+            for outcome in ("linked", "hinted", "none", "skipped")
+        }
+        models = {}
+        for (provider,) in self._conn.execute(
+            "SELECT DISTINCT provider FROM llm_calls WHERE returned_model IS NOT NULL"
+            " AND created_at >= ? AND created_at < ?",
+            (start, end),
+        ).fetchall():
+            current = self._latest_model(provider, before=end, since=start)
+            previous = self._latest_model(provider, before=start)
+            if current and previous and current != previous:
+                models[provider] = (previous, current)
+        return {
+            "captured": one(f"SELECT COUNT(*) FROM messages WHERE {captured}", start, end),
+            "flagged": one(
+                f"SELECT COUNT(*) FROM messages WHERE {captured}"
+                " AND findings_json IS NOT NULL AND findings_json != '[]'",
+                start,
+                end,
+            ),
+            "ignored": one(f"SELECT COUNT(*) {ignored}", "not_jo", start, end),
+            "no_text": one(f"SELECT COUNT(*) {ignored}", "no_text", start, end),
+            "ignored_first_lines": [
+                r[0]
+                for r in self._conn.execute(
+                    f"SELECT first_line {ignored} ORDER BY id DESC LIMIT 5", ("not_jo", start, end)
+                )
+            ],
+            "passwords_withheld": one(
+                "SELECT COUNT(*) FROM messages WHERE masked_count > 0"
+                " AND created_at >= ? AND created_at < ?",
+                start,
+                end,
+            ),
+            "reaction_failed": one(
+                "SELECT COUNT(*) FROM messages WHERE reaction_state = 'failed'"
+                " AND updated_at >= ? AND updated_at < ?",
+                start,
+                end,
+            ),
+            "deliverables": deliverables,
+            "stuck": one("SELECT COUNT(*) FROM messages WHERE exhausted_at IS NOT NULL"),
+            "pending_retry": one(
+                "SELECT COUNT(*) FROM messages WHERE attempts > 0 AND exhausted_at IS NULL"
+            ),
+            "ops_failed": one("SELECT COUNT(*) FROM outbox WHERE state = 'failed'"),
+            "models": models,
+        }
 
     # -- ignore log --------------------------------------------------------
 
@@ -451,10 +713,33 @@ class Ledger:
         if not can_transition(from_state, to_state):
             return False
         cur = self._conn.execute(
-            "UPDATE messages SET state = ?, updated_at = ?"
-            " WHERE telegram_key = ? AND state = ?",
+            "UPDATE messages SET state = ?, attempts = 0, next_attempt_at = NULL,"
+            " last_error = NULL, updated_at = ? WHERE telegram_key = ? AND state = ?",
             (State(to_state).value, _now(), key, State(from_state).value),
         )
+        return cur.rowcount == 1
+
+    def plan_message(self, key: str, plan: dict, *, jo_key: str | None = None) -> bool:
+        """Move ``extracted`` → ``planned`` and store the plan in one transaction.
+
+        A crash can therefore never leave a `planned` row without its plan.
+        """
+        if not can_transition(State.EXTRACTED, State.PLANNED):
+            return False
+        with self._transaction():
+            cur = self._conn.execute(
+                "UPDATE messages SET state = ?, plan_json = ?, jo_key = ?, attempts = 0,"
+                " next_attempt_at = NULL, last_error = NULL, updated_at = ?"
+                " WHERE telegram_key = ? AND state = ?",
+                (
+                    State.PLANNED.value,
+                    json.dumps(plan, ensure_ascii=False),
+                    jo_key,
+                    _now(),
+                    key,
+                    State.EXTRACTED.value,
+                ),
+            )
         return cur.rowcount == 1
 
     def store_plan(self, key: str, plan: dict, *, jo_key: str | None = None) -> None:
@@ -500,7 +785,8 @@ class Ledger:
         with self._transaction():
             cur = self._conn.execute(
                 "UPDATE messages SET state = ?, notion_page_id = ?, findings_json = ?,"
-                " reaction_state = 'pending', updated_at = ?"
+                " reaction_state = 'pending', attempts = 0, next_attempt_at = NULL,"
+                " last_error = NULL, updated_at = ?"
                 " WHERE telegram_key = ? AND state = ?",
                 (
                     State.WRITTEN.value,

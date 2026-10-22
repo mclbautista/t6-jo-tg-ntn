@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from jo_watchdog.adapters.protocols import PageRef
 from jo_watchdog.core.matching import Candidate
+from jo_watchdog.core.payload import page_url_for
 
 NOTION_VERSION = "2026-03-11"
 BASE_URL = "https://api.notion.com/v1"
@@ -26,11 +27,12 @@ DELIVERABLE_TITLE_PROPERTY = "Name"
 class NotionError(Exception):
     """A Notion API error (status + code + message)."""
 
-    def __init__(self, status: int, code: str, message: str):
+    def __init__(self, status: int, code: str, message: str, retry_after: float | None = None):
         super().__init__(f"Notion {status} {code}: {message}")
         self.status = status
         self.code = code
         self.message = message
+        self.retry_after = retry_after  # seconds, from a Retry-After header
 
 
 class QueryRequest(BaseModel):
@@ -77,11 +79,15 @@ class NotionAdapter:
     async def _request(self, method: str, path: str, body: dict | None = None) -> dict:
         resp = await self._client.request(method, path, json=body)
         if resp.status_code >= 400:
-            data = resp.json()
+            try:
+                data = resp.json()
+            except ValueError:
+                data = {}
             raise NotionError(
                 resp.status_code,
                 data.get("code", "unknown"),
                 data.get("message", resp.text),
+                retry_after=_retry_after(resp.headers.get("Retry-After")),
             )
         return resp.json()
 
@@ -93,6 +99,19 @@ class NotionAdapter:
     async def retrieve_page(self, page_id: str) -> dict:
         """Retrieve a page by id (the normal read-back path)."""
         return await self._request("GET", f"/pages/{page_id}")
+
+    async def find_pages_by_telegram_key(
+        self, data_source_id: str, telegram_key: str
+    ) -> list[PageRef]:
+        """Pages whose ``Telegram Key`` equals the key, oldest first (write recovery only)."""
+        rows = await self.query_all(
+            data_source_id,
+            filter={"property": "Telegram Key", "rich_text": {"equals": telegram_key}},
+        )
+        rows.sort(key=lambda row: row.get("created_time", ""))
+        return [
+            PageRef(id=row["id"], url=row.get("url") or page_url_for(row["id"])) for row in rows
+        ]
 
     async def query_data_source(
         self,
@@ -146,6 +165,13 @@ class NotionAdapter:
             },
         )
         return [_deliverable_candidate(row) for row in rows]
+
+
+def _retry_after(value: str | None) -> float | None:
+    try:
+        return float(value) if value is not None else None
+    except ValueError:
+        return None
 
 
 def _deliverable_candidate(row: dict) -> Candidate:
