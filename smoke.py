@@ -11,7 +11,7 @@ Two modes:
 
 - ``--full``: poll one REAL Telegram intake message and run the pipeline against
   the real accounts. Requires ``TELEGRAM_BOT_TOKEN`` + a filled-in config.yaml
-  (real intake chat/topic ids).
+  (real intake chat/topic ids) and ``DEEPSEEK_API_KEY``.
 
 This file is the manual real-account seam (test strategy #4) — never run in CI.
 """
@@ -26,8 +26,9 @@ import time
 from pathlib import Path
 
 from jo_watchdog.adapters.notion import NotionAdapter
-from jo_watchdog.adapters.protocols import IncomingUpdate
+from jo_watchdog.adapters.protocols import ClassifyResult, IncomingUpdate
 from jo_watchdog.app.config import Config, load_config, notion_token
+from jo_watchdog.core.extraction import EXTRACTED_FIELDS, PROMPT_TAG, Extraction
 from jo_watchdog.app.worker import Worker
 from jo_watchdog.ledger.db import Ledger
 
@@ -46,6 +47,22 @@ class RecordingTelegram:
 
     async def set_reaction(self, chat_id: int, message_id: int, emoji: str) -> None:
         self.reactions.append((chat_id, message_id, emoji))
+
+
+class AlwaysJoClassifier:
+    """Stands in for DeepSeek in Notion-only mode (no DeepSeek key needed)."""
+
+    async def classify(self, masked_text: str, origin_lines) -> ClassifyResult:
+        extraction = Extraction(
+            verdict="jo",
+            confidence="high",
+            reasons="Smoke test stub.",
+            multiple_jo_suspected=False,
+            **{field: None for field in EXTRACTED_FIELDS},
+        )
+        return ClassifyResult(
+            outcome="ok", extraction=extraction, requested_model="stub", prompt_tag=PROMPT_TAG
+        )
 
 
 async def notion_only_smoke(config_path: str | None) -> int:
@@ -82,7 +99,13 @@ async def notion_only_smoke(config_path: str | None) -> int:
         telegram = RecordingTelegram()
         telegram.updates.append(synthetic)
         notion = NotionAdapter(notion_token())
-        worker = Worker(ledger=ledger, telegram=telegram, notion=notion, config=config)
+        worker = Worker(
+            ledger=ledger,
+            telegram=telegram,
+            notion=notion,
+            classifier=AlwaysJoClassifier(),
+            config=config,
+        )
 
         await worker.run_once()
         key = f"{synthetic.chat_id}:{synthetic.message_id}"
@@ -104,18 +127,28 @@ async def notion_only_smoke(config_path: str | None) -> int:
 async def full_smoke(config_path: str) -> int:
     from aiogram import Bot
 
+    from jo_watchdog.adapters.deepseek import DeepSeekClassifier
     from jo_watchdog.adapters.telegram import AiogramTelegramClient
-    from jo_watchdog.app.config import telegram_token
+    from jo_watchdog.app.config import deepseek_token, telegram_token
 
     config = load_config(config_path)
     ledger = Ledger(config.ledger_path)
     bot = Bot(token=telegram_token())
     telegram = AiogramTelegramClient(bot)
     notion = NotionAdapter(notion_token())
-    worker = Worker(ledger=ledger, telegram=telegram, notion=notion, config=config)
+    classifier = DeepSeekClassifier(
+        deepseek_token(),
+        base_url=config.deepseek_base_url,
+        model=config.deepseek_model,
+        timeout_seconds=config.deepseek_timeout_seconds,
+    )
+    worker = Worker(
+        ledger=ledger, telegram=telegram, notion=notion, classifier=classifier, config=config
+    )
     try:
         await worker.run_once()  # one poll + drain cycle
     finally:
+        await classifier.close()
         await notion.close()
         await bot.session.close()
         ledger.close()

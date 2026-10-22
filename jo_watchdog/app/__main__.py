@@ -2,7 +2,7 @@
 
 Builds the real adapters (aiogram Telegram, httpx Notion) and the ledger, then
 runs the worker loop. Secrets come from the environment (``TELEGRAM_BOT_TOKEN``,
-``NOTION_API_KEY``); non-secrets come from the YAML config.
+``NOTION_API_KEY``, ``DEEPSEEK_API_KEY``); non-secrets come from the YAML config.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import asyncio
 import sys
 from pathlib import Path
 
-from jo_watchdog.app.config import load_config, notion_token, telegram_token
+from jo_watchdog.app.config import deepseek_token, load_config, notion_token, telegram_token
 from jo_watchdog.app.logging_config import configure_logging
 from jo_watchdog.app.worker import Worker
 from jo_watchdog.ledger.db import Ledger
@@ -25,19 +25,29 @@ async def run(config_path: str) -> None:
 
     from aiogram import Bot
 
+    from jo_watchdog.adapters.deepseek import DeepSeekClassifier
     from jo_watchdog.adapters.notion import NotionAdapter
     from jo_watchdog.adapters.telegram import AiogramTelegramClient
 
     bot = Bot(token=telegram_token())
     telegram = AiogramTelegramClient(bot)
     notion = NotionAdapter(notion_token())
+    classifier = DeepSeekClassifier(
+        deepseek_token(),
+        base_url=config.deepseek_base_url,
+        model=config.deepseek_model,
+        timeout_seconds=config.deepseek_timeout_seconds,
+    )
 
-    worker = Worker(ledger=ledger, telegram=telegram, notion=notion, config=config)
+    worker = Worker(
+        ledger=ledger, telegram=telegram, notion=notion, classifier=classifier, config=config
+    )
 
     try:
         await worker.run()
     finally:
         await notion.close()
+        await classifier.close()
         await bot.session.close()
         ledger.close()
 

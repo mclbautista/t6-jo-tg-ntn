@@ -12,6 +12,7 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, Field, model_validator
 
+from jo_watchdog.adapters.deepseek import DEFAULT_BASE_URL, DEFAULT_MODEL
 from jo_watchdog.adapters.notion import NOTION_VERSION
 
 
@@ -30,6 +31,11 @@ class Config(BaseModel):
     # Notion
     job_orders_data_source_id: str
     notion_version: str = NOTION_VERSION
+
+    # DeepSeek classify/extract
+    deepseek_base_url: str = DEFAULT_BASE_URL
+    deepseek_model: str = DEFAULT_MODEL  # the "latest" alias, no pin
+    deepseek_timeout_seconds: float = Field(default=60, gt=0)
 
     # Ledger
     ledger_path: str = "./data/ledger.db"
@@ -59,4 +65,11 @@ def notion_token() -> str:
     token = os.environ.get("NOTION_API_KEY", "")
     if not token:
         raise RuntimeError("NOTION_API_KEY is not set")
+    return token
+
+
+def deepseek_token() -> str:
+    token = os.environ.get("DEEPSEEK_API_KEY", "")
+    if not token:
+        raise RuntimeError("DEEPSEEK_API_KEY is not set")
     return token
