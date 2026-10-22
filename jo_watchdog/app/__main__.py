@@ -30,6 +30,7 @@ from jo_watchdog.app.config import (
     load_config,
     missing_secrets,
     notion_token,
+    openrouter_token,
     require_live_keys,
     telegram_token,
 )
@@ -52,6 +53,7 @@ async def run(config_path: str) -> None:
     from aiogram import Bot
 
     from jo_watchdog.adapters.deepseek import DeepSeekClassifier
+    from jo_watchdog.adapters.jev import JevMatcher
     from jo_watchdog.adapters.notion import NotionAdapter
     from jo_watchdog.adapters.telegram import AiogramTelegramClient
 
@@ -65,6 +67,13 @@ async def run(config_path: str) -> None:
         timeout_seconds=config.deepseek_timeout_seconds,
     )
 
+    matcher = JevMatcher(
+        openrouter_token(),
+        url=config.jev_url,
+        model=config.jev_model,
+        timeout=config.jev_timeout_seconds,
+    )
+
     caches = CacheManager(ledger=ledger, notion=notion, config=config)
     caches.load_persisted()  # last good snapshots first, then the live refresh
     worker = Worker(
@@ -74,6 +83,8 @@ async def run(config_path: str) -> None:
         classifier=classifier,
         config=config,
         caches=caches,
+        matcher=matcher,
+        deliverables=notion,
     )
 
     try:
@@ -81,6 +92,7 @@ async def run(config_path: str) -> None:
     finally:
         await notion.close()
         await classifier.close()
+        await matcher.close()
         await bot.session.close()
         ledger.close()
 

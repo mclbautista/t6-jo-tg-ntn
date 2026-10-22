@@ -109,6 +109,9 @@ class JobOrderPlan(BaseModel):
     # The duplicate decision made at plan time (#24), replayed unchanged:
     # ``{"code": "exact_repost" | "number_reuse", "url", "days", "jo_number"}``.
     duplicate: dict | None = None
+    # The Deliverable match stage result (#26): candidate snapshot, per-candidate
+    # probabilities and outcome. None when no matcher is wired.
+    match: dict | None = None
 
 
 def load_plan(stored: str | dict) -> JobOrderPlan:

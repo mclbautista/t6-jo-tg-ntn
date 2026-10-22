@@ -264,6 +264,13 @@ class CacheManager:
             raise RuntimeError("Projects cache has not loaded; hold planning")
         return resolve_project(project_raw, self.projects)
 
+    def project_name(self, page_id: str | None) -> str | None:
+        """The cached name of a resolved Project page, for the matcher's ``state``."""
+        for project in self.projects or []:
+            if project.page_id == page_id:
+                return project.name
+        return None
+
     def resolve_department(self, token: str | None) -> DepartmentResolution:
         if self.departments is None:
             raise RuntimeError("Department options have not loaded; hold planning")

@@ -719,10 +719,20 @@ class Ledger:
         )
         return cur.rowcount == 1
 
-    def plan_message(self, key: str, plan: dict, *, jo_key: str | None = None) -> bool:
+    def plan_message(
+        self,
+        key: str,
+        plan: dict,
+        *,
+        jo_key: str | None = None,
+        stage_results: dict[str, dict] | None = None,
+        llm_calls: list[dict] | None = None,
+    ) -> bool:
         """Move ``extracted`` → ``planned`` and store the plan in one transaction.
 
-        A crash can therefore never leave a `planned` row without its plan.
+        A crash can therefore never leave a `planned` row without its plan. The
+        planning-time stage results (the #26 match) and their LLM calls commit
+        with it, so a replayed plan never repeats the call.
         """
         if not can_transition(State.EXTRACTED, State.PLANNED):
             return False
@@ -740,6 +750,20 @@ class Ledger:
                     State.EXTRACTED.value,
                 ),
             )
+            if cur.rowcount == 1 and (stage_results or llm_calls):
+                now = _now()
+                row_id = self._conn.execute(
+                    "SELECT id FROM messages WHERE telegram_key = ?", (key,)
+                ).fetchone()["id"]
+                for stage, result in (stage_results or {}).items():
+                    self._conn.execute(
+                        "INSERT INTO stage_results (message_id, stage, result_json, created_at)"
+                        " VALUES (?, ?, ?, ?) ON CONFLICT(message_id, stage)"
+                        " DO UPDATE SET result_json = excluded.result_json",
+                        (row_id, stage, json.dumps(result, ensure_ascii=False), now),
+                    )
+                for call in llm_calls or []:
+                    self._insert_llm_call(row_id, call, now)
         return cur.rowcount == 1
 
     def store_plan(self, key: str, plan: dict, *, jo_key: str | None = None) -> None:
