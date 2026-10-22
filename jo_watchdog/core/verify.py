@@ -56,6 +56,29 @@ TAGS_LEIZETTE = frozenset(
     }
 )
 
+# Codes that appear at most once per capture. When a stage already recorded
+# one (e.g. the planner's `deadline_past`), its copy wins over a recomputed one.
+SINGLE_CODES = frozenset(
+    {
+        "unsure",
+        "multiple_jo",
+        "unknown_department",
+        "exact_repost",
+        "number_reuse",
+        "forward_origin",
+        "title_blank",
+        "task_blank",
+        "deadline_past",
+        "deadline_unparsed",
+        "asap",
+        "shift_fallback",
+        "header_date_mismatch",
+        "matcher_skipped",
+        "readback_mismatch",
+        "duplicate_key",
+    }
+)
+
 # A poster's own "nothing here" placeholder is not deadline-shaped text.
 DEADLINE_PLACEHOLDERS = frozenset({"", "-", "n/a", "na", "none"})
 
@@ -208,13 +231,14 @@ def readback_properties(mismatches: list[str]) -> list[str]:
 
 
 def order_findings(findings: list[Finding]) -> list[Finding]:
-    """Drop exact duplicates and sort by the report table order (stable)."""
+    """Drop duplicates (first wins) and sort by the report table order (stable)."""
     seen: set[str] = set()
     unique: list[Finding] = []
     for f in findings:
-        if f.key() in seen:
+        key = f.code if f.code in SINGLE_CODES else f.key()
+        if key in seen:
             continue
-        seen.add(f.key())
+        seen.add(key)
         unique.append(f)
     rank = {code: i for i, code in enumerate(FINDING_ORDER)}
     return sorted(unique, key=lambda f: rank.get(f.code, len(FINDING_ORDER)))

@@ -89,7 +89,8 @@ def finding_line(f: Finding) -> str:
         case "asap":
             return "ASAP — high priority"
         case "shift_fallback":
-            names = p.get("names") or []
+            # #21 records `defaulted` names, or a `reason` when none resolved.
+            names = p.get("names") or p.get("defaulted") or []
             if names:
                 who = ", ".join(_field(n) for n in names)
                 return f"Deadline defaulted to 23:59: {who} have no fixed End of Shift"

@@ -79,6 +79,19 @@ class FindingLineTests(unittest.TestCase):
     def test_table_covers_every_code(self):
         self.assertEqual({f.code for f, _ in TABLE}, set(FINDING_ORDER))
 
+    def test_planner_shift_fallback_params(self):
+        # #21 records `defaulted` names, or a `reason` when no assignee resolved.
+        self.assertEqual(
+            finding_line(Finding(code="shift_fallback", params={"defaulted": ["Bea"]})),
+            "Deadline defaulted to 23:59: Bea have no fixed End of Shift",
+        )
+        self.assertEqual(
+            finding_line(
+                Finding(code="shift_fallback", params={"reason": "no assignee resolved"})
+            ),
+            "Deadline defaulted to 23:59: no assignee resolved",
+        )
+
     def test_one_day_is_singular(self):
         line = finding_line(Finding(code="exact_repost", params={"url": ROW, "days": 1}))
         self.assertTrue(line.endswith(", 1 day ago"))

@@ -13,12 +13,13 @@ from unittest import mock
 
 from pydantic import Field
 
+from jo_watchdog.app.caches import StaleCache
 from jo_watchdog.app.config import Config
 from jo_watchdog.app.worker import Worker
 from jo_watchdog.core.plan import Plan, build_plan
 from jo_watchdog.ledger.db import OUTBOX_RETRY_SECONDS, Ledger, OutboxMessage
 from jo_watchdog.ledger.states import State
-from tests.fakes import FakeNotion, FakeTelegram, update
+from tests.fakes import FakeClassifier, FakeNotion, FakeTelegram, ok_result, update
 
 KEY = "-100123:42"
 WITHHELD = "[password withheld – see Telegram message]"
@@ -50,12 +51,18 @@ def channel_forward(update_id=1, message_id=42, text="MG - TOC - JO #41\nTask: e
 
 
 class Harness:
-    def __init__(self, test, updates=(), *, telegram=None, notion=None, **config):
+    def __init__(
+        self, test, updates=(), *, telegram=None, notion=None, classifier=None, **config
+    ):
         self.tmp = tempfile.TemporaryDirectory()
         test.addCleanup(self.tmp.cleanup)
         self.path = Path(self.tmp.name) / "ledger.db"
         self.telegram = telegram or FakeTelegram(list(updates))
         self.notion = notion or FakeNotion()
+        # A clean `jo` extraction, so only what a test sets up is flagged.
+        self.classifier = classifier or FakeClassifier(
+            ok_result(title="Teaser", task="Edit the teaser")
+        )
         self.config = make_config(**config)
         self.open()
         test.addCleanup(lambda: self.ledger.close())
@@ -63,7 +70,11 @@ class Harness:
     def open(self):
         self.ledger = Ledger(self.path)
         self.worker = Worker(
-            ledger=self.ledger, telegram=self.telegram, notion=self.notion, config=self.config
+            ledger=self.ledger,
+            telegram=self.telegram,
+            notion=self.notion,
+            classifier=self.classifier,
+            config=self.config,
         )
 
     def reopen(self):
@@ -198,6 +209,67 @@ class CaptureReportTests(unittest.IsolatedAsyncioTestCase):
         [(_, _, text)] = h.telegram.sent
         self.assertIn('Department "XYZ" isn\'t a Notion option', text)
         self.assertTrue(text.endswith("\n\n@leizette"))
+
+
+class ExtractionFactsTests(unittest.IsolatedAsyncioTestCase):
+    async def test_unsure_blank_task_and_header_date_reach_the_report(self):
+        classifier = FakeClassifier(
+            ok_result(
+                "unsure",
+                reasons="No JO header.",
+                title="Teaser",
+                task=None,
+                header_date_raw="Sept 25 / FRIDAY",  # posted Sep 28 in Manila
+            )
+        )
+        h = Harness(self, [update(1, message_id=42)], classifier=classifier)
+        await h.worker.run_once()
+        [(_, _, text)] = h.telegram.sent
+        self.assertIn("Classifier unsure: No JO header.\nTask is blank\n", text)
+        self.assertIn(
+            'Header date ("Sept 25 / FRIDAY") doesn\'t match the actual post date (Mon, Sep 28)',
+            text,
+        )
+        self.assertNotIn("@", text)
+
+    async def test_multiple_jo_tags_leizette(self):
+        classifier = FakeClassifier(
+            ok_result(title="T", task="X", multiple_jo_suspected=True, reasons="Two headers.")
+        )
+        h = Harness(self, [update(1, message_id=42)], classifier=classifier)
+        await h.worker.run_once()
+        [(_, _, text)] = h.telegram.sent
+        self.assertIn(
+            "Looks like more than one JO in this message, split by hand: Two headers.", text
+        )
+        self.assertTrue(text.endswith("\n\n@leizette"))
+
+
+class StaleCacheTests(unittest.IsolatedAsyncioTestCase):
+    async def test_stale_cache_event_is_queued_and_posted(self):
+        class StaleCaches:
+            ready = True
+
+            async def refresh_if_due(self):
+                return [
+                    StaleCache(
+                        kind="people",
+                        fetched_at="2026-10-20T23:00:00Z",
+                        hours_stale=30.0,
+                        error="Notion 503",
+                    )
+                ]
+
+        h = Harness(self)
+        h.worker.caches = StaleCaches()
+        await h.worker.run_once()
+        [(chat, topic, text)] = h.telegram.sent
+        self.assertEqual((chat, topic), (-100999, 7))
+        self.assertTrue(
+            text.startswith("⚠️ Notion cache is stale\nPeople: last refreshed Oct 21 07:00 (")
+        )
+        self.assertTrue(text.endswith("Last error: Notion 503"))
+        self.assertEqual(h.outbox()[0]["kind"], "stale_cache")
 
 
 class AtomicityTests(unittest.IsolatedAsyncioTestCase):

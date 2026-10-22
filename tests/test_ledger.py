@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 from jo_watchdog.ledger.db import Ledger
-from jo_watchdog.ledger.migrations import MIGRATION_1
+from jo_watchdog.ledger.migrations import MIGRATION_1, MIGRATION_2, MIGRATIONS
 from jo_watchdog.ledger.states import State
 
 
@@ -183,7 +183,8 @@ class StateMachineTests(unittest.TestCase):
 
     def test_valid_transition_chain(self):
         key = "-100123:42"
-        self.assertTrue(self.ledger.transition(key, State.RECEIVED, State.PLANNED))
+        self.assertTrue(self.ledger.transition(key, State.RECEIVED, State.EXTRACTED))
+        self.assertTrue(self.ledger.transition(key, State.EXTRACTED, State.PLANNED))
         self.assertTrue(self.ledger.transition(key, State.PLANNED, State.WRITING))
         self.assertTrue(self.ledger.transition(key, State.WRITING, State.WRITTEN))
         self.assertTrue(self.ledger.transition(key, State.WRITTEN, State.DONE))
@@ -197,14 +198,16 @@ class StateMachineTests(unittest.TestCase):
 
     def test_store_plan_and_page_id(self):
         key = "-100123:42"
-        self.ledger.transition(key, State.RECEIVED, State.PLANNED)
+        self.ledger.transition(key, State.RECEIVED, State.EXTRACTED)
+        self.ledger.transition(key, State.EXTRACTED, State.PLANNED)
         self.ledger.store_plan(key, {"name": "N", "telegram_key": key, "body_blocks": ["b"]})
         msg = self.ledger.get_message(key)
         self.assertEqual(json.loads(msg["plan_json"])["name"], "N")
 
     def test_record_mismatch(self):
         key = "-100123:42"
-        self.ledger.transition(key, State.RECEIVED, State.PLANNED)
+        self.ledger.transition(key, State.RECEIVED, State.EXTRACTED)
+        self.ledger.transition(key, State.EXTRACTED, State.PLANNED)
         self.ledger.transition(key, State.PLANNED, State.WRITING)
         self.ledger.mark_written(key, "page-1")
         self.ledger.record_mismatch(key, "Name differs")
@@ -220,3 +223,92 @@ class StateMachineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Migration3Tests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.path = Path(self.tmp.name) / "v2.db"
+        conn = sqlite3.connect(self.path)
+        for statement in MIGRATION_1 + MIGRATION_2:
+            conn.execute(statement)
+        conn.execute("INSERT INTO schema_version VALUES (1, 't'), (2, 't')")
+        conn.execute(
+            "INSERT INTO messages (chat_id, message_id, telegram_key, update_id, raw_source,"
+            " text, first_line, state, created_at, updated_at, masked_text, masker_version,"
+            " masked_count) VALUES (-100, 1, '-100:1', 1, ?, 'x', 'x', 'done', 't', 't',"
+            " 'x', '1.0.0', 0)",
+            (json.dumps({"message": {"date": 1790564400}}),),
+        )
+        conn.commit()
+        self.conn = conn
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def open(self):
+        self.conn.close()
+        ledger = Ledger(self.path)
+        self.addCleanup(ledger.close)
+        return ledger
+
+    def test_v2_rows_survive_and_posted_at_is_backfilled_in_manila_time(self):
+        ledger = self.open()
+        msg = ledger.get_message("-100:1")
+        self.assertEqual(msg["state"], "done")
+        self.assertEqual(msg["posted_at"], "2026-09-28T11:00:00+08:00")
+        self.assertEqual(msg["attempts"], 0)
+        versions = [r[0] for r in ledger._conn.execute("SELECT version FROM schema_version")]
+        self.assertEqual(versions, sorted(MIGRATIONS))  # every migration, 3 included
+
+    def test_new_states_and_tables(self):
+        ledger = self.open()
+        for state in ("extracted", "ignored"):
+            ledger._conn.execute(
+                "INSERT INTO messages (chat_id, message_id, telegram_key, update_id,"
+                " raw_source, text, first_line, state, created_at, updated_at)"
+                " VALUES (-100, ?, ?, 1, '{}', 'x', 'x', ?, 't', 't')",
+                (len(state), f"-100:{state}", state),
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            ledger._conn.execute(
+                "INSERT INTO stage_results (message_id, stage, result_json, created_at)"
+                " VALUES (999, 'extract', '{}', 't')"
+            )
+        ledger._conn.execute(
+            "INSERT INTO stage_results (message_id, stage, result_json, created_at)"
+            " VALUES (1, 'extract', '{}', 't')"
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            ledger._conn.execute(
+                "INSERT INTO stage_results (message_id, stage, result_json, created_at)"
+                " VALUES (1, 'extract', '{}', 't')"
+            )
+        index = ledger._conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='index' AND tbl_name='llm_calls'"
+        ).fetchone()
+        self.assertIsNotNone(index)
+
+    def test_rebuild_keeps_later_columns_indexes_and_references(self):
+        # A development ledger where a later migration (e.g. #23's 5) ran first.
+        self.conn.execute("ALTER TABLE messages ADD COLUMN findings_json TEXT")
+        self.conn.execute("ALTER TABLE messages ADD COLUMN reaction_state TEXT DEFAULT 'pending'")
+        self.conn.execute("CREATE INDEX messages_state ON messages (state)")
+        self.conn.execute(
+            "CREATE TABLE outbox (id INTEGER PRIMARY KEY,"
+            " message_id INTEGER REFERENCES messages(id), text TEXT)"
+        )
+        self.conn.execute("UPDATE messages SET findings_json = '[]'")
+        self.conn.execute("INSERT INTO outbox (message_id, text) VALUES (1, 'hi')")
+        self.conn.execute("INSERT INTO schema_version VALUES (5, 't')")
+        self.conn.commit()
+
+        ledger = self.open()
+        msg = ledger.get_message("-100:1")
+        self.assertEqual(msg["findings_json"], "[]")
+        self.assertEqual(msg["reaction_state"], "pending")
+        self.assertEqual(ledger._conn.execute("PRAGMA foreign_key_check").fetchall(), [])
+        self.assertEqual(ledger._conn.execute("PRAGMA foreign_keys").fetchone()[0], 1)
+        names = {r[0] for r in ledger._conn.execute("SELECT name FROM sqlite_master")}
+        self.assertIn("messages_state", names)
+        self.assertNotIn("messages_new", names)

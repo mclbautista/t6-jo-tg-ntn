@@ -184,6 +184,14 @@ class AdditionalFindingTests(unittest.TestCase):
         )
         self.assertEqual(codes(facts), ["unknown_department", "deadline_unparsed", "asap"])
 
+    def test_planner_copy_of_a_single_code_wins(self):
+        # #21 records deadline_past with the deadline as a parameter.
+        planned = Finding(code="deadline_past", params={"deadline": "2026-09-22T09:00:00+08:00"})
+        facts = extracted(
+            deadline=datetime(2026, 9, 22, 9, 0, tzinfo=MANILA), plan_findings=[planned]
+        )
+        self.assertEqual(verify(facts), [planned])
+
     def test_verification_is_deterministic(self):
         facts = extracted(verdict="unsure", unknown_department="X", title="")
         self.assertEqual(verify(facts), verify(facts))

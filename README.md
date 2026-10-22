@@ -8,7 +8,7 @@ payload, writes it once, reads it back, and acknowledges with a fixed-meaning
 
 This repository is being built ticket-by-ticket. The walking skeleton (this
 slice) proves the ledger, the commit-before-offset ordering, and the Notion
-adapter's shape. Classification (DeepSeek), credential masking, resolution,
+adapter's shape; DeepSeek classification and credential masking are in. Resolution,
 verification, reliability, and Deliverable matching arrive in later tickets.
 
 ## Layout
@@ -18,7 +18,8 @@ jo_watchdog/
   core/       pure: plan builder, payload builder, read-back compare, masker seam,
               verification findings, ops-report rendering
   ledger/     SQLite (WAL, versioned schema), offsets, state machine
-  adapters/   Telegram (aiogram-as-client), Notion (httpx, pinned version)
+  adapters/   Telegram (aiogram-as-client), Notion (httpx, pinned version), DeepSeek
+  prompts/    versioned few-shot turns for the classify/extract prompt
   app/        config, worker loop, entry point
 tests/        unittest (runs under pytest too); real SQLite + fake adapters
 smoke.py      manual real-account smoke test (never in CI)
@@ -39,6 +40,16 @@ python -m jo_watchdog.app --config config.yaml
 ```sh
 python -m unittest discover -s tests -t .    # or: pytest
 ```
+
+## Extraction report (DeepSeek, not a CI gate)
+
+```sh
+DEEPSEEK_API_KEY=... python -m jo_watchdog.app.extraction_report --config config.yaml --save run.json
+python -m jo_watchdog.app.extraction_report --from run.json   # re-score offline
+```
+
+Scores the held-out corpus Job Orders (every one not used as a few-shot
+example) field by field against `tests/fixtures/extraction_golden.json`.
 
 ## Smoke test (real accounts)
 
