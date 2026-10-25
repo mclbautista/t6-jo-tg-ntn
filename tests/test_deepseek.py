@@ -108,5 +108,84 @@ class OutcomeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.outcome, "api_error")
 
 
+OK_CONTENT = RECORDED["not_jo"]["body"]["choices"][0]["message"]["content"]
+
+
+def envelope(**overrides) -> dict:
+    body = {
+        "model": "deepseek-chat-v9",
+        "choices": [{"message": {"content": OK_CONTENT}}],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 3},
+    }
+    body.update(overrides)
+    return body
+
+
+MALFORMED_ENVELOPES = {
+    "list envelope": [envelope()],
+    "string envelope": "oops",
+    "null envelope": None,
+    "choices not a list": envelope(choices={"message": {}}),
+    "empty choices": envelope(choices=[]),
+    "choice not a mapping": envelope(choices=["x"]),
+    "message not a mapping": envelope(choices=[{"message": "x"}]),
+    "message missing": envelope(choices=[{}]),
+    "content is a number": envelope(choices=[{"message": {"content": 5}}]),
+    "content is a list": envelope(choices=[{"message": {"content": ["a"]}}]),
+    "usage is a string": envelope(usage="many"),
+    "usage is a list": envelope(usage=[1, 2]),
+}
+
+
+class MalformedEnvelopeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_structure_failures_are_returned_not_raised(self):
+        for name, body in MALFORMED_ENVELOPES.items():
+            if name.startswith("usage"):
+                continue
+            with self.subTest(name):
+                classifier, seen = classifier_for(lambda r, b=body: httpx.Response(200, json=b))
+                result = await classifier.classify("x", None)
+                self.assertEqual(result.outcome, "api_error")
+                self.assertIn("malformed envelope", result.error)
+                self.assertIsNone(result.extraction)
+                self.assertEqual(len(seen), 1)  # no repair call
+
+    async def test_malformed_usage_is_dropped_but_the_call_still_succeeds(self):
+        for name in ("usage is a string", "usage is a list"):
+            with self.subTest(name):
+                body = MALFORMED_ENVELOPES[name]
+                classifier, _ = classifier_for(lambda r, b=body: httpx.Response(200, json=b))
+                result = await classifier.classify("x", None)
+                self.assertEqual(result.outcome, "ok")
+                self.assertEqual(result.returned_model, "deepseek-chat-v9")
+                self.assertIsNone(result.input_tokens)
+                self.assertIsNone(result.output_tokens)
+
+    async def test_safe_trace_is_kept_on_a_malformed_choice(self):
+        body = envelope(choices=[{"message": {"content": 5}}])
+        classifier, _ = classifier_for(lambda r: httpx.Response(200, json=body))
+        result = await classifier.classify("x", None)
+        self.assertEqual(result.outcome, "api_error")
+        self.assertEqual(result.returned_model, "deepseek-chat-v9")
+        self.assertEqual(result.input_tokens, 10)
+        self.assertEqual(result.output_tokens, 3)
+
+    async def test_unsafe_trace_values_are_dropped(self):
+        body = envelope(
+            model=["x"], usage={"prompt_tokens": "10", "completion_tokens": True}, choices=[]
+        )
+        classifier, _ = classifier_for(lambda r: httpx.Response(200, json=body))
+        result = await classifier.classify("x", None)
+        self.assertEqual(result.outcome, "api_error")
+        self.assertIsNone(result.returned_model)
+        self.assertIsNone(result.input_tokens)
+        self.assertIsNone(result.output_tokens)
+
+    async def test_non_json_body_is_api_error(self):
+        classifier, _ = classifier_for(lambda r: httpx.Response(200, content=b"<html>"))
+        result = await classifier.classify("x", None)
+        self.assertEqual(result.outcome, "api_error")
+
+
 if __name__ == "__main__":
     unittest.main()

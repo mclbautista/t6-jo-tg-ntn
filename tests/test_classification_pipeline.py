@@ -141,6 +141,41 @@ class FailureTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(call["outcome"], outcome)
                 cleanup()
 
+    async def test_malformed_deepseek_response_is_one_retryable_failed_attempt(self):
+        import httpx
+
+        from jo_watchdog.adapters.deepseek import DeepSeekClassifier
+        from tests.test_deepseek import MALFORMED_ENVELOPES
+
+        for name, body in MALFORMED_ENVELOPES.items():
+            if name.startswith("usage"):
+                continue  # still a successful call
+            with self.subTest(name):
+                calls = []
+
+                def handler(request, body=body):
+                    calls.append(request)
+                    return httpx.Response(200, json=body)
+
+                client = httpx.AsyncClient(
+                    base_url="https://api.deepseek.test", transport=httpx.MockTransport(handler)
+                )
+                worker, ledger, telegram, notion, cleanup = make_worker(
+                    [update(7, message_id=42)],
+                    classifier=DeepSeekClassifier("sk-test", client=client),
+                )
+                await worker.run_once()  # no uncaught error
+                msg = ledger.get_message(KEY)
+                self.assertEqual(msg["state"], "received")
+                self.assertEqual(msg["attempts"], 1)
+                self.assertIsNotNone(msg["next_attempt_at"])
+                self.assertIn("malformed envelope", msg["last_error"])
+                self.assertEqual(len(calls), 1)  # no repair call
+                self.assertEqual(notion.created, [])
+                (call,) = rows(ledger, "SELECT outcome FROM llm_calls")
+                self.assertEqual(call["outcome"], "api_error")
+                cleanup()
+
     async def test_retry_waits_then_succeeds_and_resets_attempts(self):
         classifier = FakeClassifier(failed_result("timeout"), ok_result("jo"))
         worker, ledger, telegram, notion, cleanup = make_worker(
