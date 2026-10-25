@@ -9,7 +9,7 @@ only the stored plan, never the extraction or the clock.
 from __future__ import annotations
 
 import json
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime, time
 from typing import Any, Protocol
 

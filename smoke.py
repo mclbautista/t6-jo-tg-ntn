@@ -30,6 +30,15 @@ Side effects, by step:
   delivered capture report and ``reaction_state = set``, not the last ledger row.
   ``pipeline`` creates one clearly marked Job Order (the integration cannot
   archive it; the URL is printed so you can delete it by hand).
+- ``deepseek`` makes two live calls (a masked-credential text and a no-mask text) through
+  the production classifier; ``jev`` makes exactly one live Decisions request that holds
+  all three regression pairs (``tests/fixtures/jev/regression_pairs.json``), validated by
+  the production matcher. Both need explicit authorization and cost tokens. They print the
+  returned snapshot, token counts, probabilities and any ``Retry-After``/``X-RateLimit-*``
+  headers; a 429 is reported only if one actually came back.
+- ``threshold_tuning`` is offline: it scores the redacted corpus, rewrites
+  ``docs/tuning/threshold-results.json`` and stays MANUAL until the owner attests the
+  review. It never edits config or enables linking.
 - ``unknown_select`` (only with ``--probe-unknown-select``) creates a second
   marked Job Order with an unknown Department option, which Notion may add to
   the schema; delete the option by hand if it does.
@@ -64,10 +73,9 @@ import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
-import httpx
-
 from jo_watchdog.adapters.notion import NotionAdapter, NotionError, QueryRequest
 from jo_watchdog.adapters.protocols import ClassifyResult, IncomingUpdate
+from jo_watchdog.app.caches import person_from_page
 from jo_watchdog.app.config import (
     SECRET_KEYS,
     Config,
@@ -75,7 +83,9 @@ from jo_watchdog.app.config import (
     missing_secrets,
     placeholder_keys,
     require_live_keys,
+    resolve_settings,
 )
+from jo_watchdog.app.model_smoke import ModelCheck, check_deepseek, check_jev
 from jo_watchdog.app.smoke_gate import (
     FAIL,
     MANUAL,
@@ -86,6 +96,14 @@ from jo_watchdog.app.smoke_gate import (
     load_attestations,
     verdict,
     verify_capture,
+)
+from jo_watchdog.app.tuning import (
+    assignee_mentions,
+    build_report,
+    fuzzy_cases,
+    match_samples,
+    read_report,
+    write_report,
 )
 from jo_watchdog.app.wiring import build_adapters, build_worker, missing_wiring
 from jo_watchdog.core.extraction import EXTRACTED_FIELDS, PROMPT_TAG, Extraction
@@ -113,11 +131,6 @@ JEV_REGRESSION_DELIVERABLES = [
     "Someone Someday WK11 VFX",
     "Mag-Iina FTR SCR",
 ]
-JEV_CRITERIA = {
-    "match": "The Job Order is clearly work for this Deliverable.",
-    "maybe": "The Job Order could be for this Deliverable, but the text doesn't make it clear.",
-    "no": "The Job Order is not for this Deliverable.",
-}
 
 
 class RecordingTelegram:
@@ -567,124 +580,81 @@ async def step_unknown_select(s: Smoke) -> Result:
     )
 
 
+def _print_check(check: ModelCheck) -> Result:
+    for line in check.lines:
+        print(f"    {line}")
+    return check.result
+
+
 async def step_deepseek(s: Smoke) -> Result:
     key = os.environ.get("DEEPSEEK_API_KEY")
     if not key:
         return skip("DEEPSEEK_API_KEY not set")
-    from jo_watchdog.adapters.deepseek import DeepSeekClassifier
-
-    classifier = DeepSeekClassifier(
-        key,
-        base_url=s.config.deepseek_base_url,
-        model=s.config.deepseek_model,
-        timeout_seconds=s.config.deepseek_timeout_seconds,
-    )
-    try:
-        result = await classifier.classify(
-            outbound_text("SOMSOM - TOC - #0163\nTask: conform reel 3\npw: hunter22").text, []
+    return _print_check(
+        await check_deepseek(
+            key,
+            base_url=s.config.deepseek_base_url,
+            model=s.config.deepseek_model,
+            timeout=s.config.deepseek_timeout_seconds,
         )
-    finally:
-        await classifier.close()
-    if result.extraction is None:
-        return fail(f"{result.outcome}: {result.error}")
-    print(f"    returned model: {result.returned_model}; tokens "
-          f"{result.input_tokens}/{result.output_tokens}; {result.latency_ms} ms")
-    if result.extraction.verdict != "jo":
-        return manual(f"structured output OK but verdict {result.extraction.verdict!r}")
-    return ok(f"structured extraction from {result.returned_model}")
-
-
-def _jev_job_order_text(page: dict) -> tuple[str, str]:
-    props = page["properties"]
-    lines = []
-    for name in ("Name", "Title", "Task", "Purpose", "Notes", "Platform"):
-        if name in props and _plain(props[name]):
-            lines.append(f"{name}: {_plain(props[name])}")
-    project = _plain(props["Name"]).split(" - ")[0] if "Name" in props else ""
-    return project, outbound_text("\n".join(lines)).text
+    )
 
 
 async def step_jev(s: Smoke) -> Result:
+    """One Decisions request holding all three regression pairs; needs no Notion access."""
     key = os.environ.get("OPENROUTER_API_KEY")
     if not key:
         return skip("OPENROUTER_API_KEY not set")
-    if not s.notion or not s.deliverable_ids:
-        return skip("needs the relation_contains step to find the regression pairs")
-
-    jo_schema = await s.schema(s.config.job_orders_data_source_id)
-    target = s.config.deliverables_data_source_id.replace("-", "")
-    relation = next(
-        n
-        for n, p in jo_schema["properties"].items()
-        if p["type"] == "relation"
-        and p["relation"].get("data_source_id", "").replace("-", "") == target
+    return _print_check(
+        await check_jev(
+            key,
+            ROOT / "tests/fixtures/jev/regression_pairs.json",
+            url=s.config.jev_url,
+            model=s.config.jev_model,
+            timeout=s.config.jev_timeout_seconds,
+            t_link=s.config.t_link,
+            t_hint=s.config.t_hint,
+        )
     )
-    names = list(s.deliverable_ids)
-    questions = {
-        f"c{i}": {
-            "type": "choice",
-            "instructions": f"Does this Job Order belong to the Deliverable '{name}'?",
-            "criteria": JEV_CRITERIA,
-        }
-        for i, name in enumerate(names)
-    }
-    lines, wrong, rate_headers, snapshot = [], [], set(), None
-    async with httpx.AsyncClient(timeout=s.config.jev_timeout_seconds) as client:
-        for expected in names:
-            linked = await s.notion.query_data_source(
-                s.config.job_orders_data_source_id,
-                QueryRequest(
-                    page_size=1,
-                    filter={
-                        "property": relation,
-                        "relation": {"contains": s.deliverable_ids[expected]},
-                    },
-                ),
-            )
-            if not linked.results:
-                continue
-            project, text = _jev_job_order_text(linked.results[0])
-            resp = await client.post(
-                s.config.jev_url,
-                headers={"Authorization": f"Bearer {key}"},
-                json={
-                    "model": s.config.jev_model,
-                    "state": {"project": project, "job_order": text},
-                    "questions": questions,
-                },
-            )
-            limits = [h for h in resp.headers if h.lower().startswith("x-ratelimit")]
-            rate_headers |= set(limits)
-            if "retry-after" in resp.headers:
-                rate_headers.add("retry-after")
-            if resp.status_code == 429:
-                return fail(
-                    f"429; Retry-After={resp.headers.get('retry-after')}, X-RateLimit-*={limits}"
-                )
-            if resp.status_code != 200:
-                return fail(f"HTTP {resp.status_code}: {resp.text[:200]}")
-            data = resp.json()
-            snapshot = data.get("model")
-            for i, name in enumerate(names):
-                answer = data["answers"][f"c{i}"]
-                probs = answer["probabilities"]
-                lines.append(
-                    f"{expected} JO vs {name}: match={probs['match']:.2f} "
-                    f"maybe={probs['maybe']:.2f} no={probs['no']:.2f}"
-                )
-                if name == expected and answer["choice"] != "match":
-                    wrong.append(f"{expected} not top match")
-                would_link = answer["choice"] == "match" and probs["match"] >= s.config.t_link
-                if name != expected and would_link:
-                    wrong.append(f"{expected} JO would link to {name}")
-    print(f"    snapshot: {snapshot}")
-    print(f"    rate-limit headers seen: {sorted(rate_headers) or 'none'}")
-    for line in lines:
-        print(f"    {line}")
-    if wrong:
-        # Shadow mode exists to observe this; report but do not block go-live.
-        return manual("review before enabling linking: " + "; ".join(wrong))
-    return ok(f"{len(names)} regression pairs scored by {snapshot}")
+
+
+async def step_threshold_tuning(s: Smoke) -> Result:
+    """Score the corpus offline, retain the results, and leave the review to the owner."""
+    fixtures = ROOT / "tests/fixtures"
+    corpus = json.loads((fixtures / "redacted_corpus.json").read_text(encoding="utf-8"))
+    pages = []
+    for name in ("contacts_query_page1.json", "contacts_query_page2.json"):
+        pages += json.loads((fixtures / "notion" / name).read_text(encoding="utf-8"))["results"]
+    settings = resolve_settings(s.config)
+    cases = fuzzy_cases(assignee_mentions(corpus), [person_from_page(p) for p in pages], settings)
+    pairs = json.loads((fixtures / "jev/regression_pairs.json").read_text(encoding="utf-8"))
+    out = ROOT / "docs/tuning/threshold-results.json"
+    report = build_report(
+        corpus_size=len(corpus),
+        cases=cases,
+        samples=match_samples(pairs),
+        current={
+            "fuzzy_min_score": s.config.fuzzy_min_score,
+            "fuzzy_min_lead": s.config.fuzzy_min_lead,
+            "t_link": s.config.t_link,
+            "t_hint": s.config.t_hint,
+        },
+        sample_source="recorded regression pairs (synthesized until a live capture is retained)",
+        previous=read_report(out),
+    )
+    write_report(out, report)
+    results = report["results"]
+    print(f"    {len(corpus)} corpus messages; {len(cases)} mentions reach fuzzy matching")
+    print(f"    {results['match_samples']} recorded Jev answers; "
+          f"{len(results['refused_loosening'])} looser fuzzy point(s) refused")
+    print(f"    results retained at {out.relative_to(ROOT)} (digest {report['results_digest']})")
+    review = report["owner_review"]
+    if review["status"] != "reviewed":
+        return manual(
+            "owner must review the fuzzy/link/hint thresholds in the retained results and "
+            "attest (actor, time, scope, evidence); linking stays disabled"
+        )
+    return ok(f"owner review by {review['reviewed_by']} covers digest {report['results_digest']}")
 
 
 class OnlyMessage:
@@ -772,7 +742,7 @@ STEPS: list[tuple[str, Callable[[Smoke], Awaitable[Result]]]] = [
     ("jev", step_jev),
     ("dry_run", step_dry_run),
     ("live_telegram", step_live_telegram),
-    ("threshold_tuning", pending("#22/#26", "fuzzy and Deliverable thresholds against the corpus")),
+    ("threshold_tuning", step_threshold_tuning),
     ("readback_mismatch", pending("#23", "read-back mismatch reporting to ops")),
     ("outbox_retry", pending("#23", "outbox retry after a failed ops post")),
     ("forward_origins", pending("#24", "user, hidden_user, chat and channel forward origins")),
