@@ -131,6 +131,15 @@ from jo_watchdog.app.smoke_probes import (
     evaluate_reactions,
     load_forward_fixtures,
 )
+from jo_watchdog.app.smoke_scenarios import SCENARIOS
+from jo_watchdog.app.tuning import (
+    assignee_mentions,
+    build_report,
+    fuzzy_cases,
+    match_samples,
+    read_report,
+    write_report,
+)
 from jo_watchdog.app.wiring import build_adapters, build_worker, missing_wiring
 from jo_watchdog.core.extraction import EXTRACTED_FIELDS, PROMPT_TAG, Extraction
 from jo_watchdog.core.masker import WITHHELD, outbound_text
@@ -863,14 +872,14 @@ STEPS: list[tuple[str, Callable[[Smoke], Awaitable[Result]]]] = [
     ("dry_run_scenario", step_dry_run_scenario),
     ("live_telegram", step_live_telegram),
     ("threshold_tuning", step_threshold_tuning),
-    ("readback_mismatch", pending("#23", "read-back mismatch reporting to ops")),
-    ("outbox_retry", pending("#23", "outbox retry after a failed ops post")),
+    ("readback_mismatch", step_readback_mismatch),
+    ("outbox_retry", step_outbox_retry),
     ("forward_origins", step_forward_origins),
     ("channel_link", step_channel_link),
     ("notion_retry_after", step_notion_retry_after),
-    ("heartbeat_format", pending("#25", "heartbeat formatting in the ops topic")),
-    ("matcher_failure", pending("#26", "Jev failure leaves Deliverable blank and posts one line")),
-    ("shadow_mode", pending("#26", "shadow mode writes no Deliverable relation")),
+    ("heartbeat_format", step_heartbeat_format),
+    ("matcher_failure", step_matcher_failure),
+    ("shadow_mode", step_shadow_mode),
 ]
 
 
