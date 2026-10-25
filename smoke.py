@@ -16,6 +16,7 @@ ATTESTED. The run ends with a verdict, and only FULL VERIFICATION exits 0:
     python smoke.py --config config.yaml --live-telegram --live-message-id 12345
     python smoke.py --config config.yaml --fixture-message-id 900001 --attestations att.json
     python smoke.py --config config.yaml --only reactions,notion_access
+    python smoke.py --config config.yaml --forward-fixtures fw.json --reaction-message-id 12345
 
 Secrets come from the environment (``.env``): TELEGRAM_BOT_TOKEN,
 NOTION_API_KEY, DEEPSEEK_API_KEY, OPENROUTER_API_KEY.
@@ -42,6 +43,15 @@ Side effects, by step:
 - ``unknown_select`` (only with ``--probe-unknown-select``) creates a second
   marked Job Order with an unknown Department option, which Notion may add to
   the schema; delete the option by hand if it does.
+- ``reciprocal_relation`` (only with ``--probe-relation-write``) creates a marked
+  Job Order whose Deliverable relation points at one Deliverable, then checks the
+  Deliverable's reciprocal side and a ``relation_contains`` query. The integration
+  cannot archive it; delete the row by hand (URL printed). Without the flag it
+  SKIPs, so a full verification needs it.
+- ``notion_retry_after`` (only with ``--probe-retry-after``) sends at most
+  ``--retry-after-requests`` (cap 100) schema reads, stops at the first 429 and
+  honours its Retry-After. No 429 inside the bound is MANUAL ("not observed"), never
+  a pass; it creates nothing to clean up. Without the flag it SKIPs.
 - ``live_telegram`` (only with ``--live-telegram --live-message-id N``) waits for
   the one intake post with that Telegram message id and ignores every other
   update. Post a test JO in the intake topic first and note its message id. It
@@ -50,6 +60,17 @@ Side effects, by step:
   report and one smoke line to the ops topic, then runs the same checks.
   Stop the running watchdog first: two pollers cannot share one bot token.
   Cleanup: delete the Notion row by hand (URL printed) and the smoke line.
+
+- ``forward_origins`` and ``channel_link`` read ``--forward-fixtures``: a JSON object
+  keyed ``user``, ``hidden_user``, ``chat``, ``channel`` whose values are the raw Bot API
+  message (or update, as stored in the ledger's ``raw_source``) of a real forward.
+  Forward real posts to the bot to capture them. A missing origin is a gap (SKIP); the
+  channel link must match the raw chat and message id; every other origin must have none.
+- ``reaction_apply`` (needs ``--reaction-message-id``) sets the configured reaction on
+  that real intake message with the production client; ``reactions`` rejects a
+  configured reaction missing from ``getChat``'s list (or non-standard when it is absent).
+- ``owner_handle`` is MANUAL until an attestation whose scope or evidence names both
+  configured handles settles it.
 
 Steps the script cannot run report SKIP (or MANUAL). A person who checked one by
 hand records it in an ``--attestations`` JSON list of ``{step, actor, at, scope,
@@ -97,13 +118,18 @@ from jo_watchdog.app.smoke_gate import (
     verdict,
     verify_capture,
 )
-from jo_watchdog.app.tuning import (
-    assignee_mentions,
-    build_report,
-    fuzzy_cases,
-    match_samples,
-    read_report,
-    write_report,
+from jo_watchdog.app.smoke_notion_probes import (
+    STATUS_OPTION,
+    check_schemas,
+    probe_reciprocal_relation,
+    probe_retry_after,
+)
+from jo_watchdog.app.smoke_probes import (
+    evaluate_channel_link,
+    evaluate_forward_origins,
+    evaluate_owner_handle,
+    evaluate_reactions,
+    load_forward_fixtures,
 )
 from jo_watchdog.app.wiring import build_adapters, build_worker, missing_wiring
 from jo_watchdog.core.extraction import EXTRACTED_FIELDS, PROMPT_TAG, Extraction
@@ -113,17 +139,6 @@ from jo_watchdog.ledger.db import Ledger
 
 ROOT = Path(__file__).resolve().parent
 SMOKE_MARK = "SMOKE TEST — delete this row"
-
-# Exact live property names the watchdog reads or writes (job-order field
-# mapping; note the trailing space in "Blocker " and the emoji in Coordinator).
-JOB_ORDER_PROPERTIES = [
-    "Name", "JO Number", "Title", "Subtitle", "Date", "Deadline", "Department", "Status",
-    "Task", "Purpose", "Source / Source Drive", "Platform", "Link Settings", "Watermark",
-    "Mode of Transfer", "Blocker ", "Pending", "Notes", "Telegram Key", "🗂️ Coordinator",
-]
-CONTACT_PROPERTIES = ["Name", "TelegramUserID", "TelegramHandle", "Aliases", "End of Shift"]
-PROJECT_PROPERTIES = ["Name", "Project Code"]
-STATUS_OPTION = "Needs Intake Review"
 
 # The three real JO-to-Deliverable pairs (deliverable-matching design, #26).
 JEV_REGRESSION_DELIVERABLES = [
@@ -210,6 +225,7 @@ class Smoke:
         self.schemas: dict[str, dict] = {}
         self.deliverable_ids: dict[str, str] = {}
         self.smoke_page_key: str | None = None
+        self.attestations: dict = {}
         # One explicit identity for the synthetic fixture, printed so it can be traced.
         self.fixture_message_id = args.fixture_message_id or int(time.time() * 1000) % 2_000_000_000
 
@@ -288,15 +304,29 @@ async def step_reactions(s: Smoke) -> Result:
     if not s.bot:
         return skip("TELEGRAM_BOT_TOKEN not set")
     chat = await s.bot.get_chat(s.config.intake_chat_id)
-    available = chat.available_reactions
-    if available is None:
-        print("    available_reactions: absent (all standard emoji allowed)")
-        return ok(f"{s.config.captured_reaction} allowed (no restriction)")
-    emoji = [r.emoji for r in available if getattr(r, "type", "") == "emoji"]
-    print(f"    available_reactions: {' '.join(emoji) or '(none)'}")
-    if s.config.captured_reaction not in emoji:
-        return fail(f"captured_reaction {s.config.captured_reaction} is not in the list above")
-    return ok(f"{s.config.captured_reaction} is available")
+    result, shown = evaluate_reactions(chat.available_reactions, s.config.captured_reaction)
+    print(f"    available_reactions: {shown}")
+    return result
+
+
+async def step_reaction_apply(s: Smoke) -> Result:
+    """Apply the configured reaction to one real intake message through the production client."""
+    if not s.args.reaction_message_id:
+        return skip("--reaction-message-id <id> (a real message in the intake group) is required")
+    if missing_secrets():
+        return skip(f"production Telegram client needs every secret; missing {missing_secrets()}")
+    chat_id, message_id = s.config.intake_chat_id, s.args.reaction_message_id
+    adapters = build_adapters(s.config)
+    try:
+        await adapters.telegram.set_reaction(chat_id, message_id, s.config.captured_reaction)
+    except Exception as exc:
+        return fail(f"{type(exc).__name__}: {outbound_text(str(exc)).text}")
+    finally:
+        await adapters.close()
+    return ok(
+        f"Telegram accepted {s.config.captured_reaction} on {chat_id}:{message_id}; "
+        "look at that message to see it"
+    )
 
 
 async def step_bot_rights(s: Smoke) -> Result:
@@ -316,11 +346,23 @@ async def step_bot_rights(s: Smoke) -> Result:
 
 
 async def step_owner_handle(s: Smoke) -> Result:
-    return manual(
-        f"confirm {s.config.owner_telegram_handle} (owner) and "
-        f"{s.config.leizette_telegram_handle} (Leizette) are the real handles; "
-        "the Bot API cannot look a handle up"
+    return evaluate_owner_handle(
+        s.config.owner_telegram_handle,
+        s.config.leizette_telegram_handle,
+        s.attestations.get("owner_handle"),
     )
+
+
+def _forward_fixtures(s: Smoke) -> dict | None:
+    return load_forward_fixtures(s.args.forward_fixtures) if s.args.forward_fixtures else None
+
+
+async def step_forward_origins(s: Smoke) -> Result:
+    return evaluate_forward_origins(_forward_fixtures(s))
+
+
+async def step_channel_link(s: Smoke) -> Result:
+    return evaluate_channel_link(_forward_fixtures(s))
 
 
 async def step_notion_access(s: Smoke) -> Result:
@@ -347,29 +389,22 @@ async def step_notion_access(s: Smoke) -> Result:
 async def step_notion_schema(s: Smoke) -> Result:
     if not s.notion:
         return skip("NOTION_API_KEY not set")
-    jo = (await s.schema(s.config.job_orders_data_source_id))["properties"]
-    contacts = (await s.schema(s.config.contacts_data_source_id))["properties"]
-    projects = (await s.schema(s.config.projects_data_source_id))["properties"]
-    missing = (
-        [f"Job Orders.{n!r}" for n in JOB_ORDER_PROPERTIES if n not in jo]
-        + [f"Contacts.{n!r}" for n in CONTACT_PROPERTIES if n not in contacts]
-        + [f"Projects.{n!r}" for n in PROJECT_PROPERTIES if n not in projects]
-    )
-    problems = list(missing)
-    status = jo.get("Status", {})
-    status_options = [o["name"] for o in status.get(status.get("type"), {}).get("options", [])]
-    if STATUS_OPTION not in status_options:
-        problems.append(f"Status has no {STATUS_OPTION!r} option")
-    department = jo.get("Department", {})
-    departments = [o["name"] for o in department.get("select", {}).get("options", [])]
-    if department and department.get("type") != "select":
-        problems.append(f"Department is {department.get('type')}, want select")
+    ids = {
+        "Job Orders": s.config.job_orders_data_source_id,
+        "Contacts": s.config.contacts_data_source_id,
+        "Projects": s.config.projects_data_source_id,
+        "Deliverables": s.config.deliverables_data_source_id,
+    }
+    schemas = {label: await s.schema(ds) for label, ds in ids.items()}
+    jo, contacts = schemas["Job Orders"]["properties"], schemas["Contacts"]["properties"]
+    departments = [o["name"] for o in jo.get("Department", {}).get("select", {}).get("options", [])]
     print(f"    Department options: {', '.join(departments) or '(none)'}")
     print(f"    Contacts End of Shift type: {contacts.get('End of Shift', {}).get('type')}")
     print(f"    Contacts Aliases type: {contacts.get('Aliases', {}).get('type')}")
+    problems = check_schemas(schemas, ids)
     if problems:
         return fail("; ".join(problems))
-    return ok("exact property names, Status and Department options present")
+    return ok("exact property names and types, relation targets, Status and Department present")
 
 
 async def step_deliverable_relation(s: Smoke) -> Result:
@@ -432,6 +467,56 @@ async def step_relation_contains(s: Smoke) -> Result:
     if any(entry.endswith(": 0 JO") for entry in found):
         return fail("relation_contains returned no JO for: " + "; ".join(found))
     return ok("relation_contains works; " + "; ".join(found))
+
+
+async def step_reciprocal_relation(s: Smoke) -> Result:
+    """Write a Job Order -> Deliverable relation and read it back from both sides."""
+    if not getattr(s.args, "probe_relation_write", False):
+        return skip("pass --probe-relation-write (creates one marked Job Order)")
+    if not s.notion:
+        return skip("NOTION_API_KEY not set")
+    jo = (await s.schema(s.config.job_orders_data_source_id))["properties"]
+    target = s.config.deliverables_data_source_id.replace("-", "")
+    found = next(
+        (
+            (n, p["relation"])
+            for n, p in jo.items()
+            if p["type"] == "relation"
+            and p["relation"].get("data_source_id", "").replace("-", "") == target
+        ),
+        None,
+    )
+    if found is None or found[1].get("type") != "dual_property":
+        return fail("Job Orders has no reciprocal relation to Deliverables")
+    name, relation = found
+    deliverable_id = next(iter(s.deliverable_ids.values()), None)
+    if deliverable_id is None:
+        page = await s.notion.query_data_source(
+            s.config.deliverables_data_source_id, QueryRequest(page_size=1)
+        )
+        if not page.results:
+            return fail("Deliverables has no row to link the probe Job Order to")
+        deliverable_id = page.results[0]["id"]
+    return await probe_reciprocal_relation(
+        s.notion,
+        job_orders_ds=s.config.job_orders_data_source_id,
+        relation_name=name,
+        reciprocal_name=relation["dual_property"]["synced_property_name"],
+        deliverable_id=deliverable_id,
+    )
+
+
+async def step_notion_retry_after(s: Smoke) -> Result:
+    """Bounded burst of cheap schema reads to observe a real 429 and its Retry-After."""
+    if not getattr(s.args, "probe_retry_after", False):
+        return skip("pass --probe-retry-after (sends up to --retry-after-requests reads)")
+    if not s.notion:
+        return skip("NOTION_API_KEY not set")
+    return await probe_retry_after(
+        s.notion,
+        s.config.job_orders_data_source_id,
+        max_requests=getattr(s.args, "retry_after_requests", 40),
+    )
 
 
 async def step_masker(s: Smoke) -> Result:
@@ -728,12 +813,14 @@ STEPS: list[tuple[str, Callable[[Smoke], Awaitable[Result]]]] = [
     ("config", step_config),
     ("storage", step_storage),
     ("reactions", step_reactions),
+    ("reaction_apply", step_reaction_apply),
     ("bot_rights", step_bot_rights),
     ("owner_handle", step_owner_handle),
     ("notion_access", step_notion_access),
     ("notion_schema", step_notion_schema),
     ("deliverable_relation", step_deliverable_relation),
     ("relation_contains", step_relation_contains),
+    ("reciprocal_relation", step_reciprocal_relation),
     ("masker", step_masker),
     ("pipeline", step_pipeline),
     ("query_visibility", step_query_visibility),
@@ -745,9 +832,9 @@ STEPS: list[tuple[str, Callable[[Smoke], Awaitable[Result]]]] = [
     ("threshold_tuning", step_threshold_tuning),
     ("readback_mismatch", pending("#23", "read-back mismatch reporting to ops")),
     ("outbox_retry", pending("#23", "outbox retry after a failed ops post")),
-    ("forward_origins", pending("#24", "user, hidden_user, chat and channel forward origins")),
-    ("channel_link", pending("#24", "real channel-origin message link")),
-    ("notion_retry_after", pending("#25", "Notion 429 Retry-After handling")),
+    ("forward_origins", step_forward_origins),
+    ("channel_link", step_channel_link),
+    ("notion_retry_after", step_notion_retry_after),
     ("heartbeat_format", pending("#25", "heartbeat formatting in the ops topic")),
     ("matcher_failure", pending("#26", "Jev failure leaves Deliverable blank and posts one line")),
     ("shadow_mode", pending("#26", "shadow mode writes no Deliverable relation")),
@@ -770,6 +857,7 @@ async def run(args: argparse.Namespace) -> int:
         print(f"bad attestations file: {exc}")
         return 2
     s = Smoke(config, args)
+    s.attestations = attestations
     await s.open()
     results: dict[str, Result] = {}
     try:
@@ -812,8 +900,34 @@ def main() -> None:
         help="message id for the synthetic fixture (default: derived from the clock)",
     )
     parser.add_argument(
+        "--forward-fixtures",
+        help="JSON {user, hidden_user, chat, channel: raw Bot API message of a real forward}; "
+        "an omitted origin is a gap, not a pass",
+    )
+    parser.add_argument(
+        "--reaction-message-id",
+        type=int,
+        help="a real intake-group message to apply the configured captured reaction to",
+    )
+    parser.add_argument(
         "--attestations",
         help="JSON list of {step, actor, at, scope, evidence} settling SKIP/MANUAL steps by hand",
+    )
+    parser.add_argument(
+        "--probe-relation-write",
+        action="store_true",
+        help="create one marked Job Order linked to a Deliverable and read the relation back",
+    )
+    parser.add_argument(
+        "--probe-retry-after",
+        action="store_true",
+        help="send a bounded burst of Notion reads to observe a 429 and its Retry-After",
+    )
+    parser.add_argument(
+        "--retry-after-requests",
+        type=int,
+        default=40,
+        help="request bound for --probe-retry-after (capped at 100)",
     )
     parser.add_argument(
         "--probe-unknown-select",

@@ -8,7 +8,7 @@
 # --- Telegram intake (#18) ---
 intake_chat_id: -1000000000000      # FILL IN: the intake supergroup's chat id
 intake_topic_id: 1                  # FILL IN: the intake forum topic's message_thread_id
-captured_reaction: "✅"             # pick from the list smoke.py prints
+captured_reaction: "👍"             # pick from the list smoke.py prints
 
 # --- Polling (#18) ---
 poll_timeout: 50                    # Telegram long-poll timeout (seconds, max 50)

@@ -672,11 +672,15 @@ class Worker:
     def _annotate_duplicate(self, msg: dict, plan: JobOrderPlan) -> str | None:
         """Look for an earlier exact re-post or reused JO Number; return the jo_key.
 
+        Without a complete key (D1) no content-duplicate lookup runs at all.
+
         A match never blocks or merges: the new row is still written, with an
         ``Earlier row:`` Notes line and a finding stored in the plan.
         """
         key = msg["telegram_key"]
         dup_key, jo_number = self._jo_key(plan)
+        if dup_key is None:
+            return None
         posted_at = _ledger_time(msg)
         earlier = [
             EarlierCapture(
