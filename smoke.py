@@ -51,6 +51,7 @@ from jo_watchdog.app.config import (
     Config,
     load_config,
     missing_secrets,
+    placeholder_keys,
     require_live_keys,
 )
 from jo_watchdog.app.worker import Worker
@@ -218,11 +219,7 @@ def _plain(prop: dict) -> str:
 
 async def step_config(s: Smoke) -> Result:
     require_live_keys(s.config)
-    placeholders = [
-        key
-        for key in ("leizette_contact_page_id", "leizette_telegram_handle", "owner_telegram_handle")
-        if str(getattr(s.config, key)).startswith(("00000000", "@leizette_handle", "@owner_handle"))
-    ]
+    placeholders = placeholder_keys(s.config)
     missing = missing_secrets()
     if missing or placeholders:
         return fail(f"missing secrets: {missing or '-'}; placeholder values: {placeholders or '-'}")
