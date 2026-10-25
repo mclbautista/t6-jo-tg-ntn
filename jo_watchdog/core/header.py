@@ -8,7 +8,7 @@ a number part; otherwise Name falls back to the posted first line.
 from __future__ import annotations
 
 import re
-from collections.abc import Collection, Mapping
+from collections.abc import Mapping
 
 from pydantic import BaseModel
 
@@ -82,15 +82,14 @@ def parse_header(header_raw: str | None, aliases: Mapping[str, str]) -> Header |
 def canonical_name(
     header: Header | None,
     fallback: str,
-    valid_departments: Collection[str] | None = None,
+    department: str | None = None,
 ) -> str:
     """``<project> - <DEPT> - JO #<digits>``, or ``fallback`` when it can't be built.
 
-    ``valid_departments`` is the live option set from the resolution slice
-    (#22). ``None`` means validation has not run yet, so the token is accepted.
+    ``department`` is the validated live option from the resolution slice
+    (#22), used verbatim. ``None`` means validation has not run, so the header's
+    own token is accepted.
     """
     if header is None:
         return fallback
-    if valid_departments is not None and header.department not in valid_departments:
-        return fallback
-    return f"{header.project} - {header.department} - JO #{header.number}"
+    return f"{header.project} - {department or header.department} - JO #{header.number}"

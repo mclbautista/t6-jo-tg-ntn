@@ -356,6 +356,15 @@ class DepartmentTests(unittest.TestCase):
             [(f.code, f.params) for f in out.findings], [("unknown_department", {"token": "EDIT"})]
         )
 
+    def test_live_option_variations_resolve_to_exact_spelling(self):
+        out = resolve_department("TO", [" toc"], {"TO": "TOC"})
+        self.assertEqual(out.department, " toc")
+
+    def test_ambiguous_live_options_stay_blank_with_finding(self):
+        out = resolve_department("TOC", ["TOC", "toc "], {})
+        self.assertIsNone(out.department)
+        self.assertEqual([f.code for f in out.findings], ["unknown_department"])
+
     def test_option_set_is_live_not_hard_coded(self):
         self.assertEqual(resolve_department("GRADE", ["GRADE"], {}).department, "GRADE")
         self.assertFalse(resolve_department("TOC", ["GRADE"], {}).valid)

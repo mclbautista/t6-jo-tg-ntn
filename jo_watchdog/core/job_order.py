@@ -186,7 +186,7 @@ def plan_job_order(
     posted_at: datetime,
     source_block: str,
     department_aliases: Mapping[str, str],
-    valid_departments: Collection[str] | None = None,
+    department_resolution: DepartmentResolution | None = None,
     assignee_shifts: Sequence[tuple[str, str | time | None]] = (),
 ) -> JobOrderPlan:
     """Build the deterministic plan for one Job Order.
@@ -194,8 +194,9 @@ def plan_job_order(
     ``posted_at`` is the intake posting or forwarding time, never the forwarded
     original's time. ``source_block`` is the rendered provenance block (#24's
     ``provenance.source_block``); it is masked here like all source text.
-    ``valid_departments`` and ``assignee_shifts`` come from the
-    resolution slice (#22); ``None`` departments means validation has not run.
+    ``department_resolution`` and ``assignee_shifts`` come from the
+    resolution slice (#22). The resolved live option spelling is authoritative
+    for Department and the canonical Name; ``None`` means validation has not run.
     """
     # The posted first line is authoritative; the extracted header is never trusted over it.
     header_raw = first_line_of(raw_text)
@@ -206,8 +207,8 @@ def plan_job_order(
         department = header.department
     elif extraction.department_raw and extraction.department_raw.strip():
         department = normalize_department(extraction.department_raw, department_aliases)
-    if valid_departments is not None and department not in valid_departments:
-        department = None
+    if department_resolution is not None:
+        department = department_resolution.department
 
     digits = header.number if header is not None else parse_number(extraction.jo_number_raw)
 

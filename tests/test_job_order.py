@@ -15,6 +15,7 @@ from jo_watchdog.core.job_order import (
     build_notes,
     plan_job_order,
 )
+from jo_watchdog.core.resolve import resolve_department
 
 ALIASES = {"TO": "TOC"}
 POSTED = datetime(2026, 9, 15, 10, 0, tzinfo=MANILA)
@@ -98,6 +99,14 @@ class NameTests(unittest.TestCase):
             valid_departments={"TOC"},
         )
         self.assertEqual(p.name, "MFG - TOC - JO #74")
+
+    def test_live_option_spelling_is_authoritative(self):
+        p = plan(
+            extraction(header_raw="MFG - TO - JO #74"),
+            department_resolution=resolve_department("TO", [" toc "], ALIASES),
+        )
+        self.assertEqual(p.name, "MFG -  toc  - JO #74")
+        self.assertEqual(p.properties["Department"], {"select": {"name": " toc "}})
 
     def test_fallback_name_is_masked(self):
         p = plan(extraction(header_raw="pw: hunter2"), raw_text="pw: hunter2")

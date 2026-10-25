@@ -471,7 +471,7 @@ class Worker:
             posted_at=_posted_at(msg, _raw_update(msg)) or _ledger_time(msg),
             source_block=self._source_block(msg),
             department_aliases=aliases,
-            valid_departments=caches.departments if caches is not None else None,
+            department_resolution=department,
             assignee_shifts=[(s.name, s.end_of_shift) for s in people.assignee_shifts]
             if people is not None
             else (),

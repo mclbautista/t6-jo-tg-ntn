@@ -36,7 +36,14 @@ def make_caches(ledger, config, *, people=PEOPLE, departments=("TOC", "VID")):
 
 
 class Harness:
-    def __init__(self, test, *, text="MFG - TOC - JO #74\nTask: cut teaser", **fields):
+    def __init__(
+        self,
+        test,
+        *,
+        text="MFG - TOC - JO #74\nTask: cut teaser",
+        departments=("TOC", "VID"),
+        **fields,
+    ):
         tmp = tempfile.TemporaryDirectory()
         test.addCleanup(tmp.cleanup)
         self.ledger = Ledger(Path(tmp.name) / "ledger.db")
@@ -53,7 +60,7 @@ class Harness:
         self.telegram = FakeTelegram(
             [update(7, message_id=42, text=text, extra=fields.pop("extra", None))]
         )
-        self.caches = make_caches(self.ledger, self.config)
+        self.caches = make_caches(self.ledger, self.config, departments=departments)
         self.worker = Worker(
             ledger=self.ledger,
             telegram=self.telegram,
