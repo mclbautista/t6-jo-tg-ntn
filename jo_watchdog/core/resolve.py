@@ -338,17 +338,22 @@ def resolve_mention(
     return _fuzzy(raw, role, norm, index, settings)
 
 
-def _fuzzy(
-    raw: str, role: str, norm: str, index: PeopleIndex, settings: ResolveSettings
-) -> MentionResult:
-    if not norm:
-        return MentionResult(raw=raw, role=role, status="unresolved")
+def fuzzy_ranking(norm: str, index: PeopleIndex) -> list[tuple[str, float]]:
+    """Contacts page ids with their best title score for ``norm``, highest first."""
     best: dict[str, float] = {}
     for title, page_id in index.titles:
         score = fuzz.WRatio(norm, title)
         if score > best.get(page_id, -1):
             best[page_id] = score
-    ranked = sorted(best.items(), key=lambda kv: kv[1], reverse=True)
+    return sorted(best.items(), key=lambda kv: kv[1], reverse=True)
+
+
+def _fuzzy(
+    raw: str, role: str, norm: str, index: PeopleIndex, settings: ResolveSettings
+) -> MentionResult:
+    if not norm:
+        return MentionResult(raw=raw, role=role, status="unresolved")
+    ranked = fuzzy_ranking(norm, index)
     if not ranked:
         return MentionResult(raw=raw, role=role, status="unresolved")
     top_id, top = ranked[0]

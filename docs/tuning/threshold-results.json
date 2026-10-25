@@ -1,0 +1,557 @@
+{
+  "adopted": {
+    "fuzzy_min_lead": 8.0,
+    "fuzzy_min_score": 90.0,
+    "t_hint": 0.5,
+    "t_link": 0.9
+  },
+  "link_enabled": false,
+  "owner_review": {
+    "evidence": null,
+    "reviewed_at": null,
+    "reviewed_by": null,
+    "status": "pending"
+  },
+  "recommendation": "keep the adopted thresholds; nothing here enables linking or loosens ambiguity protection",
+  "results": {
+    "corpus_messages": 77,
+    "fuzzy_cases": [
+      {
+        "lead": 30.0,
+        "mention": "Paul",
+        "runner_up": "Alec Gaba",
+        "runner_up_score": 60.0,
+        "top": "Paul Garcia",
+        "top_score": 90.0
+      },
+      {
+        "lead": 30.0,
+        "mention": "Paul",
+        "runner_up": "Alec Gaba",
+        "runner_up_score": 60.0,
+        "top": "Paul Garcia",
+        "top_score": 90.0
+      },
+      {
+        "lead": 8.0,
+        "mention": "Majo Jade",
+        "runner_up": "Majo Cruz",
+        "runner_up_score": 58.5,
+        "top": "Jade Santos",
+        "top_score": 66.5
+      },
+      {
+        "lead": 30.0,
+        "mention": "Paul",
+        "runner_up": "Alec Gaba",
+        "runner_up_score": 60.0,
+        "top": "Paul Garcia",
+        "top_score": 90.0
+      },
+      {
+        "lead": 30.0,
+        "mention": "Paul",
+        "runner_up": "Alec Gaba",
+        "runner_up_score": 60.0,
+        "top": "Paul Garcia",
+        "top_score": 90.0
+      },
+      {
+        "lead": 30.0,
+        "mention": "Paul",
+        "runner_up": "Alec Gaba",
+        "runner_up_score": 60.0,
+        "top": "Paul Garcia",
+        "top_score": 90.0
+      },
+      {
+        "lead": 30.0,
+        "mention": "Paul",
+        "runner_up": "Alec Gaba",
+        "runner_up_score": 60.0,
+        "top": "Paul Garcia",
+        "top_score": 90.0
+      },
+      {
+        "lead": 11.5,
+        "mention": "Jade Majo",
+        "runner_up": "Majo Cruz",
+        "runner_up_score": 58.5,
+        "top": "Jade Santos",
+        "top_score": 70.0
+      },
+      {
+        "lead": 11.5,
+        "mention": "Jade Majo",
+        "runner_up": "Majo Cruz",
+        "runner_up_score": 58.5,
+        "top": "Jade Santos",
+        "top_score": 70.0
+      }
+    ],
+    "fuzzy_sweep": [
+      {
+        "ambiguous": 0,
+        "below_score": 3,
+        "fuzzy_min_lead": 0.0,
+        "fuzzy_min_score": 80.0,
+        "resolved": 6
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 3,
+        "fuzzy_min_lead": 4.0,
+        "fuzzy_min_score": 80.0,
+        "resolved": 6
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 3,
+        "fuzzy_min_lead": 8.0,
+        "fuzzy_min_score": 80.0,
+        "resolved": 6
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 3,
+        "fuzzy_min_lead": 12.0,
+        "fuzzy_min_score": 80.0,
+        "resolved": 6
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 3,
+        "fuzzy_min_lead": 16.0,
+        "fuzzy_min_score": 80.0,
+        "resolved": 6
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 3,
+        "fuzzy_min_lead": 0.0,
+        "fuzzy_min_score": 85.0,
+        "resolved": 6
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 3,
+        "fuzzy_min_lead": 4.0,
+        "fuzzy_min_score": 85.0,
+        "resolved": 6
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 3,
+        "fuzzy_min_lead": 8.0,
+        "fuzzy_min_score": 85.0,
+        "resolved": 6
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 3,
+        "fuzzy_min_lead": 12.0,
+        "fuzzy_min_score": 85.0,
+        "resolved": 6
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 3,
+        "fuzzy_min_lead": 16.0,
+        "fuzzy_min_score": 85.0,
+        "resolved": 6
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 3,
+        "fuzzy_min_lead": 0.0,
+        "fuzzy_min_score": 88.0,
+        "resolved": 6
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 3,
+        "fuzzy_min_lead": 4.0,
+        "fuzzy_min_score": 88.0,
+        "resolved": 6
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 3,
+        "fuzzy_min_lead": 8.0,
+        "fuzzy_min_score": 88.0,
+        "resolved": 6
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 3,
+        "fuzzy_min_lead": 12.0,
+        "fuzzy_min_score": 88.0,
+        "resolved": 6
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 3,
+        "fuzzy_min_lead": 16.0,
+        "fuzzy_min_score": 88.0,
+        "resolved": 6
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 3,
+        "fuzzy_min_lead": 0.0,
+        "fuzzy_min_score": 90.0,
+        "resolved": 6
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 3,
+        "fuzzy_min_lead": 4.0,
+        "fuzzy_min_score": 90.0,
+        "resolved": 6
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 3,
+        "fuzzy_min_lead": 8.0,
+        "fuzzy_min_score": 90.0,
+        "resolved": 6
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 3,
+        "fuzzy_min_lead": 12.0,
+        "fuzzy_min_score": 90.0,
+        "resolved": 6
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 3,
+        "fuzzy_min_lead": 16.0,
+        "fuzzy_min_score": 90.0,
+        "resolved": 6
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 9,
+        "fuzzy_min_lead": 0.0,
+        "fuzzy_min_score": 92.0,
+        "resolved": 0
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 9,
+        "fuzzy_min_lead": 4.0,
+        "fuzzy_min_score": 92.0,
+        "resolved": 0
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 9,
+        "fuzzy_min_lead": 8.0,
+        "fuzzy_min_score": 92.0,
+        "resolved": 0
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 9,
+        "fuzzy_min_lead": 12.0,
+        "fuzzy_min_score": 92.0,
+        "resolved": 0
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 9,
+        "fuzzy_min_lead": 16.0,
+        "fuzzy_min_score": 92.0,
+        "resolved": 0
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 9,
+        "fuzzy_min_lead": 0.0,
+        "fuzzy_min_score": 95.0,
+        "resolved": 0
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 9,
+        "fuzzy_min_lead": 4.0,
+        "fuzzy_min_score": 95.0,
+        "resolved": 0
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 9,
+        "fuzzy_min_lead": 8.0,
+        "fuzzy_min_score": 95.0,
+        "resolved": 0
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 9,
+        "fuzzy_min_lead": 12.0,
+        "fuzzy_min_score": 95.0,
+        "resolved": 0
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 9,
+        "fuzzy_min_lead": 16.0,
+        "fuzzy_min_score": 95.0,
+        "resolved": 0
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 9,
+        "fuzzy_min_lead": 0.0,
+        "fuzzy_min_score": 98.0,
+        "resolved": 0
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 9,
+        "fuzzy_min_lead": 4.0,
+        "fuzzy_min_score": 98.0,
+        "resolved": 0
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 9,
+        "fuzzy_min_lead": 8.0,
+        "fuzzy_min_score": 98.0,
+        "resolved": 0
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 9,
+        "fuzzy_min_lead": 12.0,
+        "fuzzy_min_score": 98.0,
+        "resolved": 0
+      },
+      {
+        "ambiguous": 0,
+        "below_score": 9,
+        "fuzzy_min_lead": 16.0,
+        "fuzzy_min_score": 98.0,
+        "resolved": 0
+      }
+    ],
+    "match_sample_source": "recorded regression pairs (synthesized until a live capture is retained)",
+    "match_samples": 3,
+    "match_sweep": [
+      {
+        "false_links": 0,
+        "missed_links": 0,
+        "t_hint": 0.3,
+        "t_link": 0.7,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 0,
+        "t_hint": 0.4,
+        "t_link": 0.7,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 0,
+        "t_hint": 0.5,
+        "t_link": 0.7,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 0,
+        "t_hint": 0.6,
+        "t_link": 0.7,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 0,
+        "t_hint": 0.7,
+        "t_link": 0.7,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 0,
+        "t_hint": 0.3,
+        "t_link": 0.8,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 0,
+        "t_hint": 0.4,
+        "t_link": 0.8,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 0,
+        "t_hint": 0.5,
+        "t_link": 0.8,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 0,
+        "t_hint": 0.6,
+        "t_link": 0.8,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 0,
+        "t_hint": 0.7,
+        "t_link": 0.8,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 0,
+        "t_hint": 0.3,
+        "t_link": 0.85,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 0,
+        "t_hint": 0.4,
+        "t_link": 0.85,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 0,
+        "t_hint": 0.5,
+        "t_link": 0.85,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 0,
+        "t_hint": 0.6,
+        "t_link": 0.85,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 0,
+        "t_hint": 0.7,
+        "t_link": 0.85,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 0,
+        "t_hint": 0.3,
+        "t_link": 0.9,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 0,
+        "t_hint": 0.4,
+        "t_link": 0.9,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 0,
+        "t_hint": 0.5,
+        "t_link": 0.9,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 0,
+        "t_hint": 0.6,
+        "t_link": 0.9,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 0,
+        "t_hint": 0.7,
+        "t_link": 0.9,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 2,
+        "t_hint": 0.3,
+        "t_link": 0.95,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 2,
+        "t_hint": 0.4,
+        "t_link": 0.95,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 2,
+        "t_hint": 0.5,
+        "t_link": 0.95,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 2,
+        "t_hint": 0.6,
+        "t_link": 0.95,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 2,
+        "t_hint": 0.7,
+        "t_link": 0.95,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 2,
+        "t_hint": 0.3,
+        "t_link": 0.98,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 2,
+        "t_hint": 0.4,
+        "t_link": 0.98,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 2,
+        "t_hint": 0.5,
+        "t_link": 0.98,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 2,
+        "t_hint": 0.6,
+        "t_link": 0.98,
+        "wrong_hints": 0
+      },
+      {
+        "false_links": 0,
+        "missed_links": 2,
+        "t_hint": 0.7,
+        "t_link": 0.98,
+        "wrong_hints": 0
+      }
+    ],
+    "refused_loosening": []
+  },
+  "results_digest": "4f0423ffba306dfa",
+  "schema_version": 1
+}

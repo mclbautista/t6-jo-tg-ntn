@@ -266,6 +266,14 @@ class JevMatcher:
         self, state: str, project_name: str, candidates: list[Candidate]
     ) -> MatchResult:
         body = build_request(state, project_name, candidates, model=self.model)
+        return await self.send(body, candidates)
+
+    async def send(self, body: dict, candidates: list[Candidate]) -> MatchResult:
+        """Post one prepared Decisions request and validate it against ``candidates``.
+
+        ``match`` uses this for every Job Order; the manual smoke uses it for its
+        one three-pair request, so both go through the same response validation.
+        """
         try:
             resp = await self._client.post(self.url, json=body)
         except httpx.TimeoutException as exc:
@@ -283,7 +291,7 @@ class JevMatcher:
             data = resp.json()
         except ValueError as exc:
             raise MatcherError("invalid_body", "response is not JSON") from exc
-        return parse_response(data, candidates, requested_model=self.model)
+        return parse_response(data, candidates, requested_model=body.get("model", self.model))
 
 
 def _error_message(resp: httpx.Response) -> str:
