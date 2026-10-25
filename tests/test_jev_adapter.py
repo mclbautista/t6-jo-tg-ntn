@@ -162,6 +162,47 @@ class MalformedResponseTests(unittest.IsolatedAsyncioTestCase):
         body["answers"]["c0"]["choice"] = "Moonglow FTR SCR"  # a name echo
         await self.assert_invalid(body)
 
+    async def test_extra_reason_field_is_rejected(self):
+        body = ok_body()
+        body["answers"]["c0"]["reason"] = "It is clearly the FTR SCR."
+        await self.assert_invalid(body)
+
+    async def test_extra_name_echo_field_is_rejected(self):
+        body = ok_body()
+        body["answers"]["c0"]["name"] = "Moonglow FTR SCR"
+        await self.assert_invalid(body)
+
+    async def test_rejection_keeps_model_usage_and_probabilities_as_evidence(self):
+        body = ok_body()
+        body["answers"]["c0"]["reason"] = "echo"
+        with self.assertRaises(MatcherError) as ctx:
+            await call(responding(200, body))
+        ev = ctx.exception.evidence
+        self.assertEqual(ev.returned_model, body["model"])
+        self.assertEqual(ev.input_tokens, body["usage"]["input_tokens"])
+        self.assertEqual(ev.output_tokens, body["usage"]["output_tokens"])
+        self.assertEqual(ev.requested_model, JEV_MODEL)
+        self.assertEqual(ev.probabilities[CANDIDATES[0].page_id]["match"], 0.93)
+
+    async def test_partial_body_keeps_only_safely_parsed_evidence(self):
+        body = ok_body()
+        del body["answers"]["c1"]
+        body["answers"]["c0"]["probabilities"]["no"] = "lots"
+        body["usage"] = {"input_tokens": -5, "output_tokens": 12}
+        with self.assertRaises(MatcherError) as ctx:
+            await call(responding(200, body))
+        ev = ctx.exception.evidence
+        self.assertEqual(ev.probabilities[CANDIDATES[0].page_id].keys(), {"match", "maybe"})
+        self.assertNotIn(CANDIDATES[1].page_id, ev.probabilities)
+        self.assertIsNone(ev.input_tokens)
+        self.assertEqual(ev.output_tokens, 12)
+
+    async def test_nonsense_body_yields_empty_evidence(self):
+        with self.assertRaises(MatcherError) as ctx:
+            await call(responding(200, [1, 2]))
+        self.assertIsNone(ctx.exception.evidence.returned_model)
+        self.assertEqual(ctx.exception.evidence.probabilities, {})
+
     async def test_missing_model(self):
         body = ok_body()
         del body["model"]
