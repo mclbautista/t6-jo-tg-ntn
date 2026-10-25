@@ -8,6 +8,8 @@ from types import SimpleNamespace
 from jo_watchdog.core.deadline import MANILA
 from jo_watchdog.core.header import canonical_name, parse_header
 from jo_watchdog.core.job_order import (
+    ASAP_NOTE,
+    WATCHDOG_MARKER,
     JobOrderPlan,
     build_job_order_payload,
     build_notes,
@@ -83,7 +85,8 @@ class NameTests(unittest.TestCase):
     def test_invalid_department_blanks_department_and_falls_back(self):
         p = plan(
             extraction(header_raw="MFG - XYZ - JO #74"),
-            department_resolution=resolve_department("XYZ", ["TOC", "AE"], ALIASES),
+            raw_text="MFG - XYZ - JO #74",
+            valid_departments={"TOC", "AE"},
         )
         self.assertEqual(p.name, "MFG - XYZ - JO #74")
         self.assertNotIn("Department", p.properties)
@@ -92,7 +95,8 @@ class NameTests(unittest.TestCase):
     def test_validated_department_keeps_canonical_name(self):
         p = plan(
             extraction(header_raw="MFG - toc - JO #74"),
-            department_resolution=resolve_department("toc", ["TOC"], ALIASES),
+            raw_text="MFG - toc - JO #74",
+            valid_departments={"TOC"},
         )
         self.assertEqual(p.name, "MFG - TOC - JO #74")
 
@@ -171,12 +175,54 @@ class FieldTests(unittest.TestCase):
             ("Burned-in: English", "Burned-in: English"),
             ("None", "None"),
             ("English", None),
-            ("-", None),
             (None, None),
         ]:
             p = plan(extraction(header_raw="MFG - TOC - JO #74", subtitle=value))
             actual = text_of(p.properties["Subtitle"]) if "Subtitle" in p.properties else None
             self.assertEqual(actual, expected, value)
+
+    def test_poster_subtitle_placeholders_survive_as_posted(self):
+        for value in ["-", "N/A", "none"]:
+            p = plan(extraction(header_raw="MFG - TOC - JO #74", subtitle=value))
+            self.assertEqual(text_of(p.properties["Subtitle"]), value)
+
+    def test_title_and_notes_keep_whitespace_and_nbsp(self):
+        p = plan(
+            extraction(
+                header_raw="MFG - TOC - JO #74", title="  keep\u00a0this\n", notes="  a\u00a0b\n"
+            )
+        )
+        self.assertEqual(text_of(p.properties["Title"]), "  keep\u00a0this\n")
+        self.assertEqual(text_of(p.properties["Notes"]), "  a\u00a0b\n")
+
+    def test_whitespace_only_title_and_notes_are_blank(self):
+        p = plan(extraction(header_raw="MFG - TOC - JO #74", title="\u00a0 ", notes=" \n"))
+        self.assertNotIn("Title", p.properties)
+        self.assertNotIn("Notes", p.properties)
+
+    def test_notes_poster_text_separator_items_and_chunking(self):
+        poster = " " + "x" * 2500 + "\n"
+        p = plan(
+            extraction(header_raw="MFG - TOC - JO #74", notes=poster, deadline_raw="ASAP"),
+        )
+        notes = p.properties["Notes"]["rich_text"]
+        self.assertTrue(all(len(i["text"]["content"]) <= 2000 for i in notes))
+        self.assertEqual(
+            text_of(p.properties["Notes"]),
+            f"{poster}\n\n{WATCHDOG_MARKER}\nDeadline as posted: ASAP\n{ASAP_NOTE}",
+        )
+
+    def test_name_ignores_inconsistent_extracted_header(self):
+        p = plan(
+            extraction(header_raw="Other header"),
+            raw_text="\n  Actual posted first line \nbody",
+        )
+        self.assertEqual(p.name, "Actual posted first line")
+        p = plan(
+            extraction(header_raw="Other header"),
+            raw_text="MFG - TOC - JO #74\nbody",
+        )
+        self.assertEqual(p.name, "MFG - TOC - JO #74")
 
     def test_deadline_property_and_source(self):
         p = plan(extraction(header_raw="MFG - TOC - JO #74", deadline_raw="September 16, 2am"))

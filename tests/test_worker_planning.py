@@ -123,24 +123,30 @@ class PlannerWiringTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(h.ledger.get_message(KEY)["jo_key"], "proj-mfg|TOC|74")
 
-    async def test_live_option_case_and_whitespace_flow_through_the_worker(self):
-        h = Harness(self, text="MFG - TO - JO #74\nTask: cut", departments=(" toc ",), task="Cut")
+    async def test_posted_fields_survive_extraction_plan_and_notion_payload(self):
+        notes = "  keep\u00a0this\n" + "n" * 2100
+        h = Harness(
+            self,
+            text="MFG - TOC - JO #74\nTask: cut teaser",
+            header_raw="Some other extracted header",
+            title="  Teaser\u00a0cut\n",
+            notes=notes,
+            subtitle="N/A",
+        )
         await h.run()
 
-        props = h.notion.created[0]["properties"]
-        self.assertEqual(props["Department"], {"select": {"name": " toc "}})
-        self.assertEqual(props["Name"]["title"][0]["text"]["content"], "MFG -  toc  - JO #74")
-        self.assertEqual(h.plan()["resolution"]["department"], " toc ")
-        self.assertEqual(h.ledger.get_message(KEY)["jo_key"], "proj-mfg| toc |74")
-        self.assertNotIn("unknown_department", h.codes())
+        [payload] = h.notion.created
+        props = payload["properties"]
 
-    async def test_ambiguous_department_options_yield_no_key(self):
-        h = Harness(self, departments=("TOC", "toc"), task="Cut")
-        await h.run()
+        def text(prop):
+            return "".join(i["text"]["content"] for i in props[prop]["rich_text"])
 
-        self.assertNotIn("Department", h.notion.created[0]["properties"])
-        self.assertIn("unknown_department", h.codes())
-        self.assertIsNone(h.ledger.get_message(KEY)["jo_key"])
+        self.assertEqual(props["Name"]["title"][0]["text"]["content"], "MFG - TOC - JO #74")
+        self.assertEqual(text("Title"), "  Teaser\u00a0cut\n")
+        self.assertEqual(text("Notes"), notes)
+        self.assertEqual(text("Subtitle"), "N/A")
+        self.assertTrue(all(len(i["text"]["content"]) <= 2000 for i in props["Notes"]["rich_text"]))
+        self.assertEqual(h.plan()["properties"]["Notes"], props["Notes"])
 
     async def test_unresolved_project_and_unknown_department_stay_blank(self):
         h = Harness(self, text="ZZZ - XYZ - JO #74\nTask: cut", task="Cut")
@@ -173,6 +179,42 @@ class PlannerWiringTests(unittest.IsolatedAsyncioTestCase):
             [{"raw": "Nobody Here", "role": "assignee", "status": "unresolved"}],
         )
 
+    async def test_conditional_assignee_is_not_assigned_and_keeps_its_wording(self):
+        h = Harness(self, task="Cut", assignees_raw="Ana if available", cc_raw="Benjamin")
+        await h.run()
+
+        props = h.notion.created[0]["properties"]
+        self.assertEqual(props["Assigned"], {"relation": []})
+        self.assertEqual(
+            h.plan()["resolution"]["unresolved"],
+            [{"raw": "Ana if available", "role": "assignee", "status": "ambiguous"}],
+        )
+        self.assertIn("ambiguous_person", h.codes())
+        self.assertIn("Ana if available", h.telegram.sent[-1][2])
+
+    async def test_overlapping_entity_does_not_assign_the_wrong_person(self):
+        people = [
+            {"page_id": "c-jo", "name": "Jo Lim", "telegram_user_id": "123"},
+            {"page_id": "c-majo", "name": "Majo Cruz", "aliases": "Majo"},
+            {"page_id": LEIZETTE, "name": "Leizette"},
+        ]
+        h = Harness(
+            self,
+            task="Cut",
+            assignees_raw="Majo",
+            extra={
+                "entities": [
+                    {"type": "text_mention", "offset": 0, "length": 2, "user": {"id": 123}}
+                ]
+            },
+        )
+        h.worker.caches = make_caches(h.ledger, h.config, people=people)
+        await h.run()
+
+        self.assertEqual(
+            h.notion.created[0]["properties"]["Assigned"], {"relation": [{"id": "c-majo"}]}
+        )
+
     async def test_planner_and_resolver_findings_reach_the_capture_report(self):
         h = Harness(self, text="ZZZ - TOC - JO #74\nTask: cut", task="Cut", deadline_raw="ASAP")
         await h.run()
@@ -182,6 +224,40 @@ class PlannerWiringTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ZZZ", text)
         self.assertIn("asap", h.codes())
         self.assertIn("unresolved_project", h.codes())
+
+
+class ExplicitDeadlineYearTests(unittest.IsolatedAsyncioTestCase):
+    """#48: a posted year is honored end to end, and past deadlines are stored and reported."""
+
+    async def test_explicit_future_year_resolves_stores_and_notes_the_posted_text(self):
+        h = Harness(
+            self,
+            task="Cut",
+            assignees_raw="Benjamin",
+            deadline_raw="Sep 30, 2030 end of shift",
+            notes="keep this",
+        )
+        await h.run()
+
+        props = h.notion.created[0]["properties"]
+        self.assertEqual(props["Deadline"]["date"]["start"], "2030-09-30T22:00:00+08:00")
+        notes = props["Notes"]["rich_text"][0]["text"]["content"]
+        self.assertIn("Deadline as posted: Sep 30, 2030 end of shift", notes)
+        self.assertTrue(notes.startswith("keep this"))
+        self.assertNotIn("deadline_past", h.codes())
+
+    async def test_explicit_past_year_is_stored_and_reported_not_rolled_forward(self):
+        h = Harness(self, task="Cut", assignees_raw="Benjamin", deadline_raw="Sep 16, 2020 5PM")
+        await h.run()
+
+        props = h.notion.created[0]["properties"]
+        self.assertEqual(props["Deadline"]["date"]["start"], "2020-09-16T17:00:00+08:00")
+        self.assertIn(
+            "Deadline as posted: Sep 16, 2020 5PM",
+            props["Notes"]["rich_text"][0]["text"]["content"],
+        )
+        self.assertIn("deadline_past", h.codes())
+        self.assertIn("Deadline is before the message was posted", h.telegram.sent[-1][2])
 
 
 class StoredPlanReplayTests(unittest.IsolatedAsyncioTestCase):
@@ -205,6 +281,21 @@ class StoredPlanReplayTests(unittest.IsolatedAsyncioTestCase):
         [payload] = h.notion.created
         self.assertEqual(payload["properties"]["Assigned"], {"relation": [{"id": "c-ben"}]})
         self.assertEqual(payload["properties"]["Department"], {"select": {"name": "TOC"}})
+        self.assertEqual(h.ledger.get_message(KEY)["plan_json"], stored)
+
+
+class ConditionalReplayTests(unittest.IsolatedAsyncioTestCase):
+    async def test_conditional_mention_is_not_backfilled_on_resume(self):
+        h = Harness(self, task="Cut", assignees_raw="Ana if available")
+        h.worker.config = h.config.model_copy(update={"dry_run": True})
+        await h.run()
+        stored = h.ledger.get_message(KEY)["plan_json"]
+
+        h.worker.config = h.config.model_copy(update={"dry_run": False})
+        await h.worker.drain_once()
+
+        [payload] = h.notion.created
+        self.assertEqual(payload["properties"]["Assigned"], {"relation": []})
         self.assertEqual(h.ledger.get_message(KEY)["plan_json"], stored)
 
 

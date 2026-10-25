@@ -2,7 +2,11 @@
 
 import json
 import unittest
+from pathlib import Path
 
+import httpx
+
+from jo_watchdog.adapters.deepseek import DeepSeekClassifier
 from jo_watchdog.ledger.states import State
 from tests.fakes import FakeClassifier, failed_result, ok_result, update
 from tests.test_worker import make_worker
@@ -120,6 +124,36 @@ class ModelInputTests(unittest.IsolatedAsyncioTestCase):
         await worker.run_once()
         self.assertIsNone(classifier.calls[0][1])
 
+    async def test_worker_to_deepseek_adapter_sends_no_credential(self):
+        recorded = json.loads(
+            (Path(__file__).parent / "fixtures" / "deepseek_recorded.json").read_text("utf-8")
+        )["jo"]
+        seen: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.append(request)
+            return httpx.Response(recorded["status"], json=recorded["body"])
+
+        client = httpx.AsyncClient(
+            base_url="https://api.deepseek.test", transport=httpx.MockTransport(handler)
+        )
+        classifier = DeepSeekClassifier("sk-test", client=client)
+        self.addAsyncCleanup(classifier.close)
+        extra = {
+            "from": {"first_name": "Lei pw: origin-secret"},
+            "forward_origin": {"type": "channel"},
+        }
+        worker, ledger, *_, cleanup = make_worker(
+            [update(7, message_id=42, text="MFG - TOC - JO #74\nPW: hunter2", extra=extra)],
+            classifier=classifier,
+        )
+        self.addCleanup(cleanup)
+        await worker.run_once()
+        self.assertEqual(len(seen), 1)
+        outbound = seen[0].content.decode("utf-8")
+        self.assertNotIn("hunter2", outbound)
+        self.assertNotIn("origin-secret", outbound)
+
 
 class FailureTests(unittest.IsolatedAsyncioTestCase):
     async def test_every_failure_class_stays_queued_without_a_row(self):
@@ -139,6 +173,41 @@ class FailureTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(ledger.stage_result(KEY, "extract"), None)
                 (call,) = rows(ledger, "SELECT outcome FROM llm_calls")
                 self.assertEqual(call["outcome"], outcome)
+                cleanup()
+
+    async def test_malformed_deepseek_response_is_one_retryable_failed_attempt(self):
+        import httpx
+
+        from jo_watchdog.adapters.deepseek import DeepSeekClassifier
+        from tests.test_deepseek import MALFORMED_ENVELOPES
+
+        for name, body in MALFORMED_ENVELOPES.items():
+            if name.startswith("usage"):
+                continue  # still a successful call
+            with self.subTest(name):
+                calls = []
+
+                def handler(request, body=body):
+                    calls.append(request)
+                    return httpx.Response(200, json=body)
+
+                client = httpx.AsyncClient(
+                    base_url="https://api.deepseek.test", transport=httpx.MockTransport(handler)
+                )
+                worker, ledger, telegram, notion, cleanup = make_worker(
+                    [update(7, message_id=42)],
+                    classifier=DeepSeekClassifier("sk-test", client=client),
+                )
+                await worker.run_once()  # no uncaught error
+                msg = ledger.get_message(KEY)
+                self.assertEqual(msg["state"], "received")
+                self.assertEqual(msg["attempts"], 1)
+                self.assertIsNotNone(msg["next_attempt_at"])
+                self.assertIn("malformed envelope", msg["last_error"])
+                self.assertEqual(len(calls), 1)  # no repair call
+                self.assertEqual(notion.created, [])
+                (call,) = rows(ledger, "SELECT outcome FROM llm_calls")
+                self.assertEqual(call["outcome"], "api_error")
                 cleanup()
 
     async def test_retry_waits_then_succeeds_and_resets_attempts(self):

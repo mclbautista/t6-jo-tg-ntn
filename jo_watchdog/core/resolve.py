@@ -23,7 +23,7 @@ FLEXIBLE_SHIFT = "Flexible / Variable"
 
 # Mention separators: commas, slashes, ampersands, " and ", and line breaks.
 _SPLIT_RE = re.compile(r"\s*(?:,|/|&|\n|\band\b)\s*", re.IGNORECASE)
-_HEDGE_RE = re.compile(r"\b(?:but|maybe|or|baka)\b", re.IGNORECASE)
+_HEDGE_RE = re.compile(r"\b(?:but|maybe|or|baka|if|kung)\b", re.IGNORECASE)
 _CONDITION_RE = re.compile(r"\b(?:if|kung)\b.*$", re.IGNORECASE | re.DOTALL)
 _LEADING_FOR_RE = re.compile(r"^for\s+", re.IGNORECASE)
 _COURTESY_TAIL_RE = re.compile(
@@ -185,14 +185,24 @@ def _strip_courtesy(segment: str) -> str:
 def split_mentions(raw: str | None) -> list[str]:
     """Split an ``assignees_raw``/``cc_raw`` value into individual mentions.
 
-    A trailing condition (``if abutin the next day``, ``kung sakaling ...``) is
-    dropped, ``@handles`` are split from the names around them, and a hedged
-    mention (``Piolo but maybe Majo``) is kept whole so it is reported as one
-    ambiguous mention, quoted as written.
+    ``@handles`` are split from the names around them. A hedged mention
+    (``Piolo but maybe Majo``) is kept whole so it is reported as one ambiguous
+    mention, quoted as written. A condition (``if abutin the next day``,
+    ``kung sakaling ...``) is joined, complete, to the mention before it, so
+    that mention is ambiguous and nothing is assigned on a condition.
     """
     if not raw or not raw.strip():
         return []
-    text = _CONDITION_RE.sub("", raw)
+    condition = _CONDITION_RE.search(raw)
+    head = raw[: condition.start()] if condition else raw
+    out = _split_head(head)
+    if condition:
+        tail = condition.group(0).strip()
+        out = [*out[:-1], f"{out[-1]} {tail}"] if out else [tail]
+    return out
+
+
+def _split_head(text: str) -> list[str]:
     out = []
     for part in _SPLIT_RE.split(text):
         part = _strip_courtesy(part)
@@ -251,10 +261,24 @@ class PeopleIndex:
                 self.titles.append((title, p.page_id))
 
 
-def _entity_for(segment: str, entities: Sequence[MentionEntity]) -> MentionEntity | None:
-    folded = segment.casefold()
+def _entity_for(
+    segment: str, entities: Sequence[MentionEntity], honorifics: Iterable[str] = DEFAULT_HONORIFICS
+) -> MentionEntity | None:
+    """The entity that is this mention itself, never one that merely overlaps it.
+
+    A ``mention`` entity binds when its ``@handle`` is a whole token of the
+    segment; a ``text_mention`` binds when its display text equals the segment
+    after normalization. ``Jo`` therefore never supplies identity for ``Majo``.
+    """
+    handles = {normalize_handle(m.group(1)) for m in _HANDLE_RE.finditer(segment)}
+    norm = normalize_name(segment, honorifics)
     for entity in entities:
-        if entity.text and entity.text.casefold() in folded:
+        if not entity.text:
+            continue
+        if entity.text.startswith("@"):
+            if normalize_handle(entity.text) in handles:
+                return entity
+        elif normalize_name(entity.text, honorifics) == norm:
             return entity
     return None
 
@@ -284,7 +308,7 @@ def resolve_mention(
     if _HEDGE_RE.search(raw):
         return MentionResult(raw=raw, role=role, status="ambiguous")
 
-    entity = _entity_for(raw, entities)
+    entity = _entity_for(raw, entities, settings.honorifics)
 
     # 1. TelegramUserID from a mention/text_mention entity.
     if entity and entity.user_id and entity.user_id in index.by_user_id:

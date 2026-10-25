@@ -9,14 +9,14 @@ only the stored plan, never the extraction or the clock.
 from __future__ import annotations
 
 import json
-import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from datetime import datetime, time
 from typing import Any, Protocol
 
 from pydantic import BaseModel, Field
 
 from jo_watchdog.core.deadline import MANILA, DeadlineSource, resolve_deadline
+from jo_watchdog.core.extraction import is_subtitle_value
 from jo_watchdog.core.findings import ASAP, Finding
 from jo_watchdog.core.header import (
     canonical_name,
@@ -51,8 +51,6 @@ TEXT_PROPERTIES: dict[str, str] = {
     "blocker": "Blocker ",
     "pending": "Pending",
 }
-
-_SUBTITLE = re.compile(r"^(?:Burned-in: \S.*|None)$")
 
 
 class Extraction(Protocol):
@@ -155,12 +153,19 @@ def _clean(value: str | None) -> str:
     return outbound_text(value.replace("\xa0", " ").strip()).text
 
 
+def _verbatim(value: str | None) -> str:
+    """Mask a verbatim field but keep its whitespace and NBSP; trimming only decides emptiness."""
+    if value is None or not value.strip():
+        return ""
+    return outbound_text(value).text
+
+
 def build_notes(poster_notes: str | None, deadline_raw: str | None, asap: bool) -> str:
     """Poster notes verbatim, then the watchdog block when it has anything to add.
 
     ``Earlier row:`` lines are appended by #24 after this block.
     """
-    notes = _clean(poster_notes)
+    notes = _verbatim(poster_notes)
     added: list[str] = []
     deadline = _clean(deadline_raw)
     if deadline:
@@ -193,7 +198,8 @@ def plan_job_order(
     resolution slice (#22). The resolved live option spelling is authoritative
     for Department and the canonical Name; ``None`` means validation has not run.
     """
-    header_raw = extraction.header_raw or first_line_of(raw_text)
+    # The posted first line is authoritative; the extracted header is never trusted over it.
+    header_raw = first_line_of(raw_text)
     header = parse_header(header_raw, department_aliases)
 
     department: str | None = None
@@ -206,11 +212,7 @@ def plan_job_order(
 
     digits = header.number if header is not None else parse_number(extraction.jo_number_raw)
 
-    if department_resolution is not None and department is None:
-        name_header = None
-    else:
-        name_header = header
-    name = _clean(canonical_name(name_header, first_line_of(header_raw), department))
+    name = outbound_text(canonical_name(header, header_raw, valid_departments)).text
 
     deadline = resolve_deadline(extraction.deadline_raw, posted_at, assignee_shifts)
     asap = any(f.code == ASAP for f in deadline.findings)
@@ -230,11 +232,12 @@ def plan_job_order(
             "date": {"start": manila_iso(deadline.deadline), "time_zone": TIME_ZONE}
         }
     for field, prop in TEXT_PROPERTIES.items():
-        value = _clean(getattr(extraction, field))
+        raw_value = getattr(extraction, field)
+        value = _verbatim(raw_value) if field == "title" else _clean(raw_value)
         if value:
             properties[prop] = {"rich_text": rich_text(value)}
     subtitle = _clean(extraction.subtitle)
-    if _SUBTITLE.match(subtitle):
+    if subtitle and is_subtitle_value(subtitle):
         properties["Subtitle"] = {"rich_text": rich_text(subtitle)}
     notes = build_notes(extraction.notes, extraction.deadline_raw, asap)
     if notes:

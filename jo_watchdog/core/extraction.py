@@ -49,6 +49,13 @@ RAW_FIELDS = (
 EXTRACTED_FIELDS = RAW_FIELDS + ("subtitle",)
 
 _SUBTITLE = re.compile(r"Burned-in: \S.*")
+# Placeholders a poster may write in the Subtitle field; they pass through as posted.
+_SUBTITLE_PLACEHOLDERS = frozenset({"-", "n/a", "none"})
+
+
+def is_subtitle_value(value: str) -> bool:
+    """True for a Subtitle the pipeline may keep: inferred form or poster placeholder."""
+    return bool(_SUBTITLE.fullmatch(value)) or value.strip().casefold() in _SUBTITLE_PLACEHOLDERS
 
 
 class Extraction(BaseModel):
@@ -92,9 +99,11 @@ class Extraction(BaseModel):
     @field_validator("subtitle")
     @classmethod
     def _subtitle_is_bounded(cls, value: str | None) -> str | None:
-        if value is None or value == "None" or _SUBTITLE.fullmatch(value):
+        if value is None or is_subtitle_value(value):
             return value
-        raise ValueError("subtitle must be 'Burned-in: <language>', 'None', or null")
+        raise ValueError(
+            "subtitle must be 'Burned-in: <language>', 'None', a poster placeholder, or null"
+        )
 
     @field_validator(*RAW_FIELDS)
     @classmethod
@@ -143,9 +152,13 @@ def forward_origin_lines(raw_message: dict[str, Any]) -> list[str] | None:
     ]
 
 
-def build_user_message(masked_text: str, origin_lines: list[str] | None = None) -> str:
-    """The single user message: masked text, then the origin block for forwards only."""
-    parts = [masked_text]
+def build_user_message(text: str, origin_lines: list[str] | None = None) -> str:
+    """The single user message: masked text, then the origin block for forwards only.
+
+    Masking is enforced here, not trusted from the caller, so no caller can send
+    an unmasked credential to the model.
+    """
+    parts = [outbound_text(text).text]
     if origin_lines:
         header = "--- forward origin (context only, not field values) ---"
         block = "\n".join([header, *origin_lines])
