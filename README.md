@@ -184,6 +184,7 @@ example) field by field against `tests/fixtures/extraction_golden.json`.
 python smoke.py --config config.yaml                    # access, schema, models, pipeline
 python smoke.py --config config.yaml --live-telegram --live-message-id 12345  # one real post
 python smoke.py --config config.yaml --only reactions   # a single step
+python smoke.py --config config.yaml --forward-fixtures fw.json --reaction-message-id 12345
 ```
 
 Each step prints PASS, FAIL, SKIP, MANUAL or ATTESTED. Only a run where every
