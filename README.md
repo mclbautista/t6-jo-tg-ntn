@@ -78,9 +78,10 @@ seams. The real-account checks live in `smoke.py` and are run by hand.
    ```
 
    The `reactions` step prints the intake group's allowed reactions; set
-   `captured_reaction` to one of them and re-run. Then run once more with
-   `--live-telegram` and post a test JO in the intake topic to capture one real
-   message end to end. Delete the smoke rows it creates in Notion by hand.
+   `captured_reaction` to one of them and re-run. Then post a test JO in
+   the intake topic and run once more with `--live-telegram --live-message-id <its
+   Telegram message id>` (watchdog stopped) to capture that one real message end
+   to end. Delete the smoke rows it creates in Notion by hand.
 7. Start the container and watch for the first capture in Notion and the next
    07:00 heartbeat in the ops topic:
 
@@ -174,12 +175,15 @@ example) field by field against `tests/fixtures/extraction_golden.json`.
 
 ```sh
 python smoke.py --config config.yaml                    # access, schema, models, pipeline
-python smoke.py --config config.yaml --live-telegram    # plus one real intake post
+python smoke.py --config config.yaml --live-telegram --live-message-id 12345  # one real post
 python smoke.py --config config.yaml --only reactions   # a single step
 ```
 
-Each step prints PASS, FAIL, SKIP or MANUAL, and the script exits 1 on any
-failure. See the docstring in `smoke.py` for the side effects of each step.
+Each step prints PASS, FAIL, SKIP, MANUAL or ATTESTED. Only a run where every
+required step is PASS or ATTESTED reports FULL VERIFICATION and exits 0; a
+failure exits 1, and skipped or manual required steps (or `--only`) exit 3.
+Record hand-checked steps with `--attestations` (actor, time, scope, evidence).
+See the docstring in `smoke.py` for fixture selection, side effects and cleanup.
 
 See `docs/ledger-schema.md` for the versioned ledger contract and
 `docs/adr/` (once added) for decision records. Design sources live in `map/`
