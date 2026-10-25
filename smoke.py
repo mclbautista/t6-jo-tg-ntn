@@ -802,12 +802,44 @@ async def step_live_telegram(s: Smoke) -> Result:
     return ok(f"{result.detail}; ops line posted")
 
 
+async def _relay_ops_posts(s: Smoke, name: str, posts: list[str]) -> None:
+    """With --live-telegram, post the scenario's rendered ops lines to the real ops topic."""
+    if not (s.bot and s.args.live_telegram):
+        return
+    for text in posts:
+        await s.bot.send_message(
+            s.config.ops_chat_id,
+            f"🧪 Smoke scenario {name} (controlled, not a real event)\n{text}",
+            message_thread_id=s.config.ops_topic_id,
+            parse_mode="HTML",
+        )
+
+
+def scenario_step(name: str) -> Callable[[Smoke], Awaitable[Result]]:
+    """A controlled operational scenario (#62): production wiring, scripted failures, no network."""
+
+    async def step(s: Smoke) -> Result:
+        run = await SCENARIOS[name](s.config)
+        if run.result.status == PASS:
+            await _relay_ops_posts(s, name, run.ops_posts)
+        return run.result
+
+    return step
+
+
 def pending(ticket: str, what: str) -> Callable[[Smoke], Awaitable[Result]]:
     async def step(_: Smoke) -> Result:
         return skip(f"{what} — not automated yet ({ticket}); check by hand")
 
     return step
 
+
+step_readback_mismatch = scenario_step("readback_mismatch")
+step_outbox_retry = scenario_step("outbox_retry")
+step_heartbeat_format = scenario_step("heartbeat_format")
+step_matcher_failure = scenario_step("matcher_failure")
+step_shadow_mode = scenario_step("shadow_mode")
+step_dry_run_scenario = scenario_step("dry_run_scenario")
 
 STEPS: list[tuple[str, Callable[[Smoke], Awaitable[Result]]]] = [
     ("config", step_config),
@@ -828,6 +860,7 @@ STEPS: list[tuple[str, Callable[[Smoke], Awaitable[Result]]]] = [
     ("deepseek", step_deepseek),
     ("jev", step_jev),
     ("dry_run", step_dry_run),
+    ("dry_run_scenario", step_dry_run_scenario),
     ("live_telegram", step_live_telegram),
     ("threshold_tuning", step_threshold_tuning),
     ("readback_mismatch", pending("#23", "read-back mismatch reporting to ops")),

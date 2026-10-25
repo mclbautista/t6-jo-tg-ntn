@@ -193,6 +193,13 @@ failure exits 1, and skipped or manual required steps (or `--only`) exit 3.
 Record hand-checked steps with `--attestations` (actor, time, scope, evidence).
 See the docstring in `smoke.py` for fixture selection, side effects and cleanup.
 
+The operational scenarios (`readback_mismatch`, `outbox_retry`, `heartbeat_format`,
+`matcher_failure`, `shadow_mode`, `dry_run_scenario`) run the production worker against
+scripted stand-ins on a throwaway ledger with a fake clock: no secrets, no network, no
+Notion rows. They are also covered offline by `tests/test_smoke_scenarios.py`. Adding
+`--live-telegram` relays their rendered ops posts to the real ops topic (delete them by
+hand); that is the only opt-in, and the only thing they leave behind.
+
 See `docs/ledger-schema.md` for the versioned ledger contract and
 `docs/adr/` (once added) for decision records. Design sources live in `map/`
 (mirrors of the closed design issues #1–#17). The PRD and open build tickets
