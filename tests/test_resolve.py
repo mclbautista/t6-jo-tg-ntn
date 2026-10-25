@@ -108,8 +108,14 @@ class MentionSplittingTests(unittest.TestCase):
         "@raedsss tyvmmmm": ["@raedsss"],
         "ate Debbie thank u!": ["ate Debbie"],
         "Majo po": ["Majo"],
-        "Jade / @raedsss kung sakaling umabot kay raedss": ["Jade", "@raedsss"],
-        "ate Majo / Piolo, if abutin the next day": ["ate Majo", "Piolo"],
+        "Jade / @raedsss kung sakaling umabot kay raedss": [
+            "Jade",
+            "@raedsss kung sakaling umabot kay raedss",
+        ],
+        "ate Majo / Piolo, if abutin the next day": [
+            "ate Majo",
+            "Piolo if abutin the next day",
+        ],
         "Piolo @raedsss // @debz0313": ["Piolo", "@raedsss", "@debz0313"],
         "@debz0313  @joshua0826": ["@debz0313", "@joshua0826"],
         "ate @debz38 / Piolo": ["ate @debz38", "Piolo"],
@@ -136,6 +142,29 @@ class PeopleStepTests(unittest.TestCase):
             with self.subTest(raw=raw):
                 result = resolve(raw)
                 self.assertEqual((result.method, result.page_id), ("handle", page_id))
+
+    def test_entity_for_jo_cannot_supply_identity_for_majo(self):
+        crowd = [
+            Person(page_id="p-jo", name="Jo Lim", telegram_user_id="123"),
+            Person(page_id="p-majo", name="Majo Cruz", aliases="Majo"),
+        ]
+        entity = MentionEntity(text="Jo", user_id="123")
+        result = resolve_mention("Majo", "assignee", PeopleIndex(crowd), SETTINGS, [entity])
+        self.assertEqual((result.method, result.page_id), ("alias", "p-majo"))
+        own = resolve_mention("Jo", "assignee", PeopleIndex(crowd), SETTINGS, [entity])
+        self.assertEqual((own.method, own.page_id), ("user_id", "p-jo"))
+
+    def test_handle_entity_binds_only_a_whole_handle_token(self):
+        crowd = [
+            Person(page_id="p-rae", name="Rae", telegram_handle="@rae"),
+            Person(page_id="p-raed", name="Raed", telegram_handle="@raed"),
+        ]
+        index = PeopleIndex(crowd)
+        entity = MentionEntity(text="@rae", handle="rae")
+        result = resolve_mention("@raed", "assignee", index, SETTINGS, [entity])
+        self.assertEqual(result.page_id, "p-raed")
+        spaced = resolve_mention("ate @rae", "assignee", index, SETTINGS, [entity])
+        self.assertEqual(spaced.page_id, "p-rae")
 
     def test_step2_handle_from_mention_entity(self):
         entity = MentionEntity(text="@raedsss", handle="raedsss")
@@ -225,6 +254,23 @@ class ResolvePeopleTests(unittest.TestCase):
                 ("unresolved_person", "@nobody", "cc"),
             ],
         )
+
+    def test_conditional_mention_stays_ambiguous_with_complete_wording(self):
+        out = resolve_people("Majo if available", "Jade kung free", people(), SETTINGS)
+        self.assertEqual(out.assigned, [])
+        self.assertEqual(out.cc, [LEIZETTE])
+        self.assertEqual(
+            [(m.raw, m.status) for m in out.mentions],
+            [("Majo if available", "ambiguous"), ("Jade kung free", "ambiguous")],
+        )
+        self.assertEqual(
+            [f.params["raw"] for f in out.findings], ["Majo if available", "Jade kung free"]
+        )
+
+    def test_unconditional_mentions_beside_a_conditional_one_still_resolve(self):
+        out = resolve_people("ate Majo / Piolo, if abutin the next day", None, people(), SETTINGS)
+        self.assertEqual(out.assigned, [MAJO])
+        self.assertEqual(out.findings[0].params["raw"], "Piolo if abutin the next day")
 
     def test_assignee_shifts_feed_deadline_resolver(self):
         out = resolve_people("Piolo, Jade / ate Majo", None, people(), SETTINGS)
