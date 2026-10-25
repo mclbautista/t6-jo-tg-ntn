@@ -9,7 +9,7 @@ only the stored plan, never the extraction or the clock.
 from __future__ import annotations
 
 import json
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime, time
 from typing import Any, Protocol
 
@@ -212,7 +212,11 @@ def plan_job_order(
 
     digits = header.number if header is not None else parse_number(extraction.jo_number_raw)
 
-    name = outbound_text(canonical_name(header, header_raw, valid_departments)).text
+    if department_resolution is not None and department is None:
+        name_header = None
+    else:
+        name_header = header
+    name = outbound_text(canonical_name(name_header, header_raw, department)).text
 
     deadline = resolve_deadline(extraction.deadline_raw, posted_at, assignee_shifts)
     asap = any(f.code == ASAP for f in deadline.findings)

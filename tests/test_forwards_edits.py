@@ -216,8 +216,8 @@ class Migration6Tests(unittest.TestCase):
 
 class RepostAndReuseTests(unittest.IsolatedAsyncioTestCase):
     async def test_exact_repost_gets_its_own_row_note_and_finding(self):
-        h = Harness(self)
-        text = "frameio cleanup JO 033\nTask: tidy  the folders"
+        h = Harness(self, caches=True)
+        text = "MFG - TOC - JO #033\nTask: tidy  the folders"
         await h.feed(message_update(1, 10, text))
         await h.feed(message_update(2, 11, text.replace("  ", " "), date=POSTED_AT_UNIX + 86400))
 
@@ -263,6 +263,25 @@ class RepostAndReuseTests(unittest.IsolatedAsyncioTestCase):
         await h.feed(message_update(2, 11, text))
         await h.feed(message_update(3, 12, text))
         self.assertTrue(h.notes(2).endswith("https://www.notion.so/page2 (exact re-post)"))
+
+    async def test_identical_text_without_a_complete_key_is_not_a_duplicate(self):
+        # D1: no content-duplicate lookup without Project + Department + number.
+        texts = {
+            "no caches (nothing resolves)": (False, "MFG - TOC - JO #33\nTask: same"),
+            "unknown project": (True, "ZZZ - TOC - JO #33\nTask: same"),
+            "unknown department": (True, "MFG - NOPE - JO #33\nTask: same"),
+            "no JO number": (True, "MFG - TOC\nTask: same"),
+            "unstructured": (True, "frameio cleanup\nTask: same"),
+        }
+        for name, (caches, text) in texts.items():
+            with self.subTest(name):
+                h = Harness(self, caches=caches)
+                await h.feed(message_update(1, 10, text))
+                await h.feed(message_update(2, 11, text))
+                self.assertEqual(len(h.notion.created), 2)  # still one row per message
+                self.assertIsNone(h.notes(1))
+                self.assertIsNone(json.loads(h.row(11)["plan_json"])["duplicate"])
+                self.assertFalse(any("re-post" in p for p in h.posts()))
 
     async def test_incomplete_key_skips_reuse_detection(self):
         h = Harness(self, caches=True)

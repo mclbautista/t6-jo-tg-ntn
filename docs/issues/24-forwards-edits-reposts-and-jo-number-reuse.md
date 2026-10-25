@@ -56,7 +56,8 @@ The block always shows `Posted by: <sender display name> (@username)`, `Posted a
 
 - `jo_key` = `<Project page id>|<Department option>|<jo_number_int>`, set only when all three resolve.
 - `text_sha256` = SHA-256 of the whitespace-normalized original text.
-- Exact re-post: an earlier message with the same `text_sha256` and a Notion page. Number reuse: an earlier message with the same `jo_key` and different text. Exact re-post wins if both apply. The earliest matching row is referenced.
+- Both exact-repost and number-reuse detection require a complete, unambiguous `jo_key`: resolved Project page ID, validated Department option and integer JO Number. If any component is missing or ambiguous, skip all content-duplicate detection, including hash-only exact-repost lookups. `Telegram Key` idempotency always applies separately, and every new Telegram message still creates a new row.
+- Exact re-post (complete key only): an earlier message with the same `text_sha256` and a Notion page. Number reuse (complete key only): an earlier message with the same `jo_key` and different text. Exact re-post wins if both apply. The earliest matching row is referenced.
 
 ### Migration 6
 
