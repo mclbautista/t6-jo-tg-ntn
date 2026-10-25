@@ -8,7 +8,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -624,6 +624,119 @@ class MigrationSevenTests(unittest.TestCase):
                 ledger._conn.execute(
                     "INSERT INTO heartbeats VALUES ('w', 'x', 999, 'now')"
                 )  # outbox_id must reference a real outbox row
+
+
+class CaptureWindowTests(unittest.IsolatedAsyncioTestCase):
+    """#54: a capture stays in the window it was written in (real SQLite, fake clock)."""
+
+    def at_0659_59(self):
+        # 06:59:59 Manila on Oct 22 is 22:59:59 UTC on Oct 21.
+        return FakeClock(datetime(2026, 10, 21, 22, 59, 59, tzinfo=UTC))
+
+    def windows(self, p):
+        zone = ZoneInfo("Asia/Manila")
+        before = heartbeat_window(datetime(2026, 10, 21, 23, 0, 1, tzinfo=UTC), "07:00", zone)
+        after = heartbeat_window(datetime(2026, 10, 22, 23, 0, 1, tzinfo=UTC), "07:00", zone)
+        return p.ledger.heartbeat_stats(*before), p.ledger.heartbeat_stats(*after)
+
+    def assert_only_in_first(self, p):
+        first, second = self.windows(p)
+        self.assertEqual((first["captured"], second["captured"]), (1, 0))
+
+    async def test_reaction_retries_crossing_0700_do_not_move_the_capture(self):
+        clock = self.at_0659_59()
+        p = Pipeline(self, [jo()], clock=clock)
+        p.telegram.fail_reaction = True
+
+        async def sleep(seconds):
+            clock.advance(seconds=seconds)
+
+        p.worker = p.make_worker(p.ledger, sleep=sleep)
+        await p.worker.run_once()
+        row = p.message()
+        self.assertEqual((row["state"], row["reaction_state"]), ("done", "failed"))
+        self.assertGreater(row["updated_at"], row["written_at"])  # the reaction came later
+        self.assertEqual(row["written_at"], "2026-10-21T22:59:59Z")
+        self.assert_only_in_first(p)
+
+    async def test_flagged_follows_the_same_window(self):
+        clock = self.at_0659_59()
+        p = Pipeline(self, [jo(text="MG - TOC - JO #41\nPassword: hunter22\nTask: x")], clock=clock)
+        await p.worker.run_once()
+        clock.advance(minutes=5)
+        p.ledger.set_reaction_state(KEY, "set")
+        first, second = self.windows(p)
+        self.assertEqual((first["flagged"], second["flagged"]), (1, 0))
+
+    async def test_restart_and_delayed_recovery_keep_the_capture_in_its_window(self):
+        class CrashOnReaction(FakeTelegram):
+            async def set_reaction(self, *args):
+                raise Crash
+
+        clock = self.at_0659_59()
+        p = Pipeline(self, [jo()], clock=clock, telegram=CrashOnReaction([jo()]))
+        with self.assertRaises(Crash):
+            await p.worker.run_once()
+        self.assertEqual(p.message()["state"], "written")
+
+        clock.advance(hours=3)  # the restart is long after 07:00
+        p.telegram = FakeTelegram()
+        p.start()
+        await p.worker.run_once()
+        row = p.message()
+        self.assertEqual((row["state"], row["reaction_state"]), ("done", "set"))
+        self.assertEqual(row["written_at"], "2026-10-21T22:59:59Z")
+        self.assertGreater(row["updated_at"], "2026-10-22T00:00:00Z")
+        self.assert_only_in_first(p)
+
+    async def test_written_at_is_set_once_by_mark_written(self):
+        p = Pipeline(self, [jo()], clock=self.at_0659_59())
+        self.assertIsNone(p.ledger._conn.execute("SELECT written_at FROM messages").fetchone())
+        await p.worker.run_once()
+        stamp = p.message()["written_at"]
+        p.clock.advance(hours=5)
+        p.ledger.record_mismatch(KEY, "late")
+        p.ledger.set_reaction_state(KEY, "failed")
+        self.assertEqual(p.message()["written_at"], stamp)
+
+    async def test_the_heartbeat_labels_and_counts_the_preceding_24_hours_at_0700_manila(self):
+        clock = self.at_0659_59()
+        p = Pipeline(self, [jo()], clock=clock)
+        await p.worker.run_once()  # 06:59:59; the brand-new ledger skips its first window
+        self.assertEqual(p.outbox("heartbeat"), [])
+        clock.advance(seconds=1)  # 07:00:00 Manila closes the window holding the capture
+        await p.worker.run_once()
+        (row,) = p.outbox("heartbeat")
+        self.assertIn("Daily heartbeat — Oct 21 07:00 → Oct 22 07:00", row["text"])
+        self.assertIn("Captured: 1", row["text"])
+
+    async def test_legacy_rows_without_written_at_fall_back_to_updated_at(self):
+        p = Pipeline(self, [jo()], clock=self.at_0659_59())
+        await p.worker.run_once()
+        p.ledger._conn.execute("UPDATE messages SET written_at = NULL")
+        first, second = self.windows(p)
+        self.assertEqual((first["captured"], second["captured"]), (1, 0))
+        # Nothing invents a capture time for the legacy row.
+        self.assertIsNone(p.message()["written_at"])
+
+
+class MigrationEightTests(unittest.TestCase):
+    def test_upgrade_adds_a_nullable_written_at_and_leaves_legacy_rows_null(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "ledger.db"
+            prior = {v: m for v, m in MIGRATIONS.items() if v < 8}
+            with mock.patch("jo_watchdog.ledger.db.MIGRATIONS", prior):
+                old = Ledger(path)
+                old.accept_message(-100123, 42, 7, "{}", "PROJ - EDT - JO #1", "PROJ - EDT - JO #1")
+                old._conn.execute("UPDATE messages SET state = 'done'")
+                old.close()
+            ledger = Ledger(path)
+            self.addCleanup(ledger.close)
+            info = ledger._conn.execute("PRAGMA table_info(messages)")
+            columns = {r[1]: (r[2], r[3]) for r in info}
+            self.assertEqual(columns["written_at"], ("TEXT", 0))
+            (value,) = ledger._conn.execute("SELECT written_at FROM messages").fetchone()
+            self.assertIsNone(value)
 
 
 if __name__ == "__main__":

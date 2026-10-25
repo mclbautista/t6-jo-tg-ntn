@@ -53,6 +53,7 @@ keys before commit, so tables that reference `messages(id)` stay valid.
 | verdict            | TEXT    | DeepSeek verdict: `jo`, `unsure` or `not_jo` (v3)  |
 | ignore_reason      | TEXT    | `not_jo` or `no_text` for `ignored` rows (v3)      |
 | exhausted_at       | TEXT    | v7: ISO-8601 UTC when the retry schedule ran out; NULL otherwise. An exhausted row keeps its state and plan, is never picked up again, and is made eligible by `retry` |
+| written_at         | TEXT    | v8 (#54): ISO-8601 UTC, set once in the `mark_written` transaction and never updated; NULL for rows written before v8 |
 | jo_key             | TEXT    | v6: `<Project page id>\|<Department option>\|<jo_number_int>`, set at planning only when all three resolve; NULL otherwise |
 | text_sha256        | TEXT    | v6: SHA-256 of the whitespace-normalized original `text`; set on intake (backfilled) |
 | forward_origin_type| TEXT    | v6: `user`, `hidden_user`, `chat` or `channel`; NULL for a non-forward (backfilled from `raw_source`) |
@@ -225,8 +226,16 @@ restarts.
 
 Every heartbeat figure is a query over `messages`, `ignore_log`, `outbox`,
 `stage_results` and `llm_calls` for that window; there are no counters.
-"Captured" is a message in `written` or `done` whose `updated_at` falls in the
-window (the reaction and `done` follow the write within the same cycle).
+"Captured" is a message in `written` or `done` whose immutable `written_at`
+falls in the window, so a reaction retry or restart recovery after 07:00 never
+moves a capture into the next window. "Flagged" is the captured subset with
+findings. Legacy policy (migration 8): rows written before it keep
+`written_at` NULL, because their exact capture time was never recorded and is
+not invented. The heartbeat counts such a row by `COALESCE(written_at,
+updated_at)` at query time (the old behaviour, an approximation that can only
+be late), and nothing writes that guess back. Migration 8 only adds a nullable
+column, so the previous release still opens the ledger; rows it writes keep
+`written_at` NULL and fall under the same fallback.
 
 ## Attempt accounting
 

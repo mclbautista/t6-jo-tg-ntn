@@ -302,6 +302,14 @@ MIGRATION_7 = [
     """,
 ]
 
+# Migration 8 (#54): the immutable write time. ``mark_written`` stamps it once;
+# heartbeat totals read it instead of the mutable ``updated_at``. Existing
+# rows stay NULL: their exact capture time was never recorded and is not guessed.
+# The column is nullable, so the prior release still opens the ledger.
+MIGRATION_8 = [
+    "ALTER TABLE messages ADD COLUMN written_at TEXT",
+]
+
 Migration = list[str] | Callable[[sqlite3.Connection], None]
 
 # Keyed by number and applied in ascending order of the numbers not yet recorded.
@@ -313,6 +321,7 @@ MIGRATIONS: dict[int, Migration] = {
     5: MIGRATION_5,
     6: MIGRATION_6,
     7: MIGRATION_7,
+    8: MIGRATION_8,
 }
 
 # Migrations that rebuild a referenced table run with foreign-key enforcement off.

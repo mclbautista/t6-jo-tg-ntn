@@ -615,12 +615,18 @@ class Ledger:
     def heartbeat_stats(self, window_start: datetime, window_end: datetime) -> dict:
         """Everything the heartbeat reports, straight from ledger rows (no counters).
 
-        A message's last ``updated_at`` after it reaches ``written`` is the
-        write time: the reaction and ``done`` follow within the same cycle.
+        A capture belongs to the window holding its immutable ``written_at``
+        (set once by ``mark_written``), so a reaction or ``done`` landing after
+        the boundary never moves it. Rows written before migration 8 have no
+        ``written_at``; they fall back to ``updated_at`` at query time, which is
+        never stored as a capture time.
         """
         start, end = fmt_utc(window_start), fmt_utc(window_end)
         one = lambda sql, *args: self._conn.execute(sql, args).fetchone()[0]  # noqa: E731
-        captured = "state IN ('written', 'done') AND updated_at >= ? AND updated_at < ?"
+        captured = (
+            "state IN ('written', 'done')"
+            " AND COALESCE(written_at, updated_at) >= ? AND COALESCE(written_at, updated_at) < ?"
+        )
         ignored = "FROM ignore_log WHERE reason = ? AND created_at >= ? AND created_at < ?"
         deliverables = {
             outcome: one(
@@ -810,12 +816,13 @@ class Ledger:
             cur = self._conn.execute(
                 "UPDATE messages SET state = ?, notion_page_id = ?, findings_json = ?,"
                 " reaction_state = 'pending', attempts = 0, next_attempt_at = NULL,"
-                " last_error = NULL, updated_at = ?"
+                " last_error = NULL, written_at = ?, updated_at = ?"
                 " WHERE telegram_key = ? AND state = ?",
                 (
                     State.WRITTEN.value,
                     notion_page_id,
                     json.dumps(findings or [], ensure_ascii=False),
+                    now,
                     now,
                     key,
                     State.WRITING.value,
