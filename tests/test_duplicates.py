@@ -92,10 +92,9 @@ class FindDuplicateTests(unittest.TestCase):
         self.assertIsNone(find("new", earlier, key=None))
         self.assertIsNone(find("new", [row("-1001:1", "old")], key=None))
 
-    def test_exact_repost_still_found_without_jo_key(self):
-        self.assertEqual(
-            find("same", [row("-1001:1", "same", key=None)], key=None).kind, "exact_repost"
-        )
+    def test_exact_repost_is_skipped_without_a_complete_key(self):
+        self.assertIsNone(find("same", [row("-1001:1", "same", key=None)], key=None))
+        self.assertIsNone(find("same", [row("-1001:1", "same")], key=None))
 
     def test_rows_without_a_notion_page_are_not_referenced(self):
         self.assertIsNone(find("same", [row("-1001:1", "same", url=None)]))

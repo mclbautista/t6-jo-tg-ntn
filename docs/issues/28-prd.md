@@ -352,7 +352,7 @@ The watchdog will:
     - After create, retrieve the page by ID and compare fields against the stored plan.
     - Report mismatches and do not automatically patch the row.
     - Normalize the content-duplicate key as Project + Department + JO Number parsed as an integer.
-    - Skip content-duplicate detection unless all three components parse.
+    - Skip all content-duplicate detection, exact re-post and number reuse alike, unless Project page ID, validated Department and integer JO Number are all resolved and unambiguous.
     - Always create a new row for a new Telegram message, including exact reposts and reused JO Numbers.
     - Add a reference to the earlier row in Notes and report the repost or possible number reuse.
 

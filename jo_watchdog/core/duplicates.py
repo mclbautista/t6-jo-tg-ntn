@@ -62,11 +62,14 @@ def find_duplicate(
 ) -> DuplicateMatch | None:
     """Classify a new message against earlier captured rows.
 
-    Exact re-post: same ``text_sha256`` and a Notion page. Number reuse: same
-    ``jo_key`` with different text (skipped when the key is incomplete). An
-    exact re-post wins over reuse, and the earliest matching row is referenced.
-    Only rows with a Notion page count, since the reference is a link to it.
+    Both kinds need a complete ``key`` (D1): without one nothing is detected,
+    not even a hash-only exact re-post. Exact re-post: same ``text_sha256`` and
+    a Notion page. Number reuse: same ``jo_key`` with different text. An exact
+    re-post wins over reuse, and the earliest matching row is referenced. Only
+    rows with a Notion page count, since the reference is a link to it.
     """
+    if key is None:
+        return None
     candidates = sorted(
         (e for e in earlier if e.telegram_key != telegram_key and e.page_url),
         key=lambda e: e.posted_at,
@@ -76,7 +79,7 @@ def find_duplicate(
         if e.text_sha256 == text_sha:
             match = ("exact_repost", e)
             break
-    if match is None and key is not None:
+    if match is None:
         for e in candidates:
             if e.jo_key == key and e.text_sha256 != text_sha:
                 match = ("number_reuse", e)

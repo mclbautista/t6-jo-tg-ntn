@@ -86,7 +86,7 @@ class NameTests(unittest.TestCase):
         p = plan(
             extraction(header_raw="MFG - XYZ - JO #74"),
             raw_text="MFG - XYZ - JO #74",
-            valid_departments={"TOC", "AE"},
+            department_resolution=resolve_department("XYZ", ["TOC", "AE"], ALIASES),
         )
         self.assertEqual(p.name, "MFG - XYZ - JO #74")
         self.assertNotIn("Department", p.properties)
@@ -96,13 +96,14 @@ class NameTests(unittest.TestCase):
         p = plan(
             extraction(header_raw="MFG - toc - JO #74"),
             raw_text="MFG - toc - JO #74",
-            valid_departments={"TOC"},
+            department_resolution=resolve_department("toc", ["TOC"], ALIASES),
         )
         self.assertEqual(p.name, "MFG - TOC - JO #74")
 
     def test_live_option_spelling_is_authoritative(self):
         p = plan(
             extraction(header_raw="MFG - TO - JO #74"),
+            raw_text="MFG - TO - JO #74",
             department_resolution=resolve_department("TO", [" toc "], ALIASES),
         )
         self.assertEqual(p.name, "MFG -  toc  - JO #74")
