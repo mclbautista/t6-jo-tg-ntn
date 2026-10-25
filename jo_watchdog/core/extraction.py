@@ -143,9 +143,13 @@ def forward_origin_lines(raw_message: dict[str, Any]) -> list[str] | None:
     ]
 
 
-def build_user_message(masked_text: str, origin_lines: list[str] | None = None) -> str:
-    """The single user message: masked text, then the origin block for forwards only."""
-    parts = [masked_text]
+def build_user_message(text: str, origin_lines: list[str] | None = None) -> str:
+    """The single user message: masked text, then the origin block for forwards only.
+
+    Masking is enforced here, not trusted from the caller, so no caller can send
+    an unmasked credential to the model.
+    """
+    parts = [outbound_text(text).text]
     if origin_lines:
         header = "--- forward origin (context only, not field values) ---"
         block = "\n".join([header, *origin_lines])

@@ -52,6 +52,25 @@ class RequestShapeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(last.startswith("text\n\n--- forward origin"))
         self.assertIn("Origin type: channel", last)
 
+    async def test_unmasked_credentials_never_reach_the_outbound_json(self):
+        secrets = ("probe-secret", "hunter2", "origin-secret")
+        classifier, seen = classifier_for(replay("jo"))
+        await classifier.classify(
+            "PW: probe-secret\nPassword:\n\nhunter2",
+            ["Origin type: channel", "Forwarded by: Lei pw: origin-secret"],
+        )
+        outbound = seen[0].content.decode("utf-8")
+        for secret in secrets:
+            self.assertNotIn(secret, outbound)
+        last = json.loads(outbound)["messages"][-1]["content"]
+        self.assertIn("PW: [password withheld", last)
+
+    async def test_text_without_credentials_is_sent_unchanged(self):
+        classifier, seen = classifier_for(replay("jo"))
+        text = "MFG - TOC - JO #74\nTask: upload\nNotes: pass the file along"
+        await classifier.classify(text, None)
+        self.assertEqual(json.loads(seen[0].content)["messages"][-1]["content"], text)
+
 
 class OutcomeTests(unittest.IsolatedAsyncioTestCase):
     async def test_verdicts_validate_and_carry_trace(self):
