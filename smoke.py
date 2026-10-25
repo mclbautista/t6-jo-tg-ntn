@@ -34,6 +34,15 @@ Side effects, by step:
 - ``unknown_select`` (only with ``--probe-unknown-select``) creates a second
   marked Job Order with an unknown Department option, which Notion may add to
   the schema; delete the option by hand if it does.
+- ``reciprocal_relation`` (only with ``--probe-relation-write``) creates a marked
+  Job Order whose Deliverable relation points at one Deliverable, then checks the
+  Deliverable's reciprocal side and a ``relation_contains`` query. The integration
+  cannot archive it; delete the row by hand (URL printed). Without the flag it
+  SKIPs, so a full verification needs it.
+- ``notion_retry_after`` (only with ``--probe-retry-after``) sends at most
+  ``--retry-after-requests`` (cap 100) schema reads, stops at the first 429 and
+  honours its Retry-After. No 429 inside the bound is MANUAL ("not observed"), never
+  a pass; it creates nothing to clean up. Without the flag it SKIPs.
 - ``live_telegram`` (only with ``--live-telegram --live-message-id N``) waits for
   the one intake post with that Telegram message id and ignores every other
   update. Post a test JO in the intake topic first and note its message id. It
@@ -99,6 +108,12 @@ from jo_watchdog.app.smoke_gate import (
     verdict,
     verify_capture,
 )
+from jo_watchdog.app.smoke_notion_probes import (
+    STATUS_OPTION,
+    check_schemas,
+    probe_reciprocal_relation,
+    probe_retry_after,
+)
 from jo_watchdog.app.smoke_probes import (
     evaluate_channel_link,
     evaluate_forward_origins,
@@ -114,17 +129,6 @@ from jo_watchdog.ledger.db import Ledger
 
 ROOT = Path(__file__).resolve().parent
 SMOKE_MARK = "SMOKE TEST — delete this row"
-
-# Exact live property names the watchdog reads or writes (job-order field
-# mapping; note the trailing space in "Blocker " and the emoji in Coordinator).
-JOB_ORDER_PROPERTIES = [
-    "Name", "JO Number", "Title", "Subtitle", "Date", "Deadline", "Department", "Status",
-    "Task", "Purpose", "Source / Source Drive", "Platform", "Link Settings", "Watermark",
-    "Mode of Transfer", "Blocker ", "Pending", "Notes", "Telegram Key", "🗂️ Coordinator",
-]
-CONTACT_PROPERTIES = ["Name", "TelegramUserID", "TelegramHandle", "Aliases", "End of Shift"]
-PROJECT_PROPERTIES = ["Name", "Project Code"]
-STATUS_OPTION = "Needs Intake Review"
 
 # The three real JO-to-Deliverable pairs (deliverable-matching design, #26).
 JEV_REGRESSION_DELIVERABLES = [
@@ -380,29 +384,22 @@ async def step_notion_access(s: Smoke) -> Result:
 async def step_notion_schema(s: Smoke) -> Result:
     if not s.notion:
         return skip("NOTION_API_KEY not set")
-    jo = (await s.schema(s.config.job_orders_data_source_id))["properties"]
-    contacts = (await s.schema(s.config.contacts_data_source_id))["properties"]
-    projects = (await s.schema(s.config.projects_data_source_id))["properties"]
-    missing = (
-        [f"Job Orders.{n!r}" for n in JOB_ORDER_PROPERTIES if n not in jo]
-        + [f"Contacts.{n!r}" for n in CONTACT_PROPERTIES if n not in contacts]
-        + [f"Projects.{n!r}" for n in PROJECT_PROPERTIES if n not in projects]
-    )
-    problems = list(missing)
-    status = jo.get("Status", {})
-    status_options = [o["name"] for o in status.get(status.get("type"), {}).get("options", [])]
-    if STATUS_OPTION not in status_options:
-        problems.append(f"Status has no {STATUS_OPTION!r} option")
-    department = jo.get("Department", {})
-    departments = [o["name"] for o in department.get("select", {}).get("options", [])]
-    if department and department.get("type") != "select":
-        problems.append(f"Department is {department.get('type')}, want select")
+    ids = {
+        "Job Orders": s.config.job_orders_data_source_id,
+        "Contacts": s.config.contacts_data_source_id,
+        "Projects": s.config.projects_data_source_id,
+        "Deliverables": s.config.deliverables_data_source_id,
+    }
+    schemas = {label: await s.schema(ds) for label, ds in ids.items()}
+    jo, contacts = schemas["Job Orders"]["properties"], schemas["Contacts"]["properties"]
+    departments = [o["name"] for o in jo.get("Department", {}).get("select", {}).get("options", [])]
     print(f"    Department options: {', '.join(departments) or '(none)'}")
     print(f"    Contacts End of Shift type: {contacts.get('End of Shift', {}).get('type')}")
     print(f"    Contacts Aliases type: {contacts.get('Aliases', {}).get('type')}")
+    problems = check_schemas(schemas, ids)
     if problems:
         return fail("; ".join(problems))
-    return ok("exact property names, Status and Department options present")
+    return ok("exact property names and types, relation targets, Status and Department present")
 
 
 async def step_deliverable_relation(s: Smoke) -> Result:
@@ -465,6 +462,56 @@ async def step_relation_contains(s: Smoke) -> Result:
     if any(entry.endswith(": 0 JO") for entry in found):
         return fail("relation_contains returned no JO for: " + "; ".join(found))
     return ok("relation_contains works; " + "; ".join(found))
+
+
+async def step_reciprocal_relation(s: Smoke) -> Result:
+    """Write a Job Order -> Deliverable relation and read it back from both sides."""
+    if not getattr(s.args, "probe_relation_write", False):
+        return skip("pass --probe-relation-write (creates one marked Job Order)")
+    if not s.notion:
+        return skip("NOTION_API_KEY not set")
+    jo = (await s.schema(s.config.job_orders_data_source_id))["properties"]
+    target = s.config.deliverables_data_source_id.replace("-", "")
+    found = next(
+        (
+            (n, p["relation"])
+            for n, p in jo.items()
+            if p["type"] == "relation"
+            and p["relation"].get("data_source_id", "").replace("-", "") == target
+        ),
+        None,
+    )
+    if found is None or found[1].get("type") != "dual_property":
+        return fail("Job Orders has no reciprocal relation to Deliverables")
+    name, relation = found
+    deliverable_id = next(iter(s.deliverable_ids.values()), None)
+    if deliverable_id is None:
+        page = await s.notion.query_data_source(
+            s.config.deliverables_data_source_id, QueryRequest(page_size=1)
+        )
+        if not page.results:
+            return fail("Deliverables has no row to link the probe Job Order to")
+        deliverable_id = page.results[0]["id"]
+    return await probe_reciprocal_relation(
+        s.notion,
+        job_orders_ds=s.config.job_orders_data_source_id,
+        relation_name=name,
+        reciprocal_name=relation["dual_property"]["synced_property_name"],
+        deliverable_id=deliverable_id,
+    )
+
+
+async def step_notion_retry_after(s: Smoke) -> Result:
+    """Bounded burst of cheap schema reads to observe a real 429 and its Retry-After."""
+    if not getattr(s.args, "probe_retry_after", False):
+        return skip("pass --probe-retry-after (sends up to --retry-after-requests reads)")
+    if not s.notion:
+        return skip("NOTION_API_KEY not set")
+    return await probe_retry_after(
+        s.notion,
+        s.config.job_orders_data_source_id,
+        max_requests=getattr(s.args, "retry_after_requests", 40),
+    )
 
 
 async def step_masker(s: Smoke) -> Result:
@@ -843,6 +890,7 @@ STEPS: list[tuple[str, Callable[[Smoke], Awaitable[Result]]]] = [
     ("notion_schema", step_notion_schema),
     ("deliverable_relation", step_deliverable_relation),
     ("relation_contains", step_relation_contains),
+    ("reciprocal_relation", step_reciprocal_relation),
     ("masker", step_masker),
     ("pipeline", step_pipeline),
     ("query_visibility", step_query_visibility),
@@ -857,10 +905,10 @@ STEPS: list[tuple[str, Callable[[Smoke], Awaitable[Result]]]] = [
     ("outbox_retry", pending("#23", "outbox retry after a failed ops post")),
     ("forward_origins", step_forward_origins),
     ("channel_link", step_channel_link),
-    ("notion_retry_after", pending("#25", "Notion 429 Retry-After handling")),
-    ("heartbeat_format", step_heartbeat_format),
-    ("matcher_failure", step_matcher_failure),
-    ("shadow_mode", step_shadow_mode),
+    ("notion_retry_after", step_notion_retry_after),
+    ("heartbeat_format", pending("#25", "heartbeat formatting in the ops topic")),
+    ("matcher_failure", pending("#26", "Jev failure leaves Deliverable blank and posts one line")),
+    ("shadow_mode", pending("#26", "shadow mode writes no Deliverable relation")),
 ]
 
 
@@ -935,6 +983,22 @@ def main() -> None:
     parser.add_argument(
         "--attestations",
         help="JSON list of {step, actor, at, scope, evidence} settling SKIP/MANUAL steps by hand",
+    )
+    parser.add_argument(
+        "--probe-relation-write",
+        action="store_true",
+        help="create one marked Job Order linked to a Deliverable and read the relation back",
+    )
+    parser.add_argument(
+        "--probe-retry-after",
+        action="store_true",
+        help="send a bounded burst of Notion reads to observe a 429 and its Retry-After",
+    )
+    parser.add_argument(
+        "--retry-after-requests",
+        type=int,
+        default=40,
+        help="request bound for --probe-retry-after (capped at 100)",
     )
     parser.add_argument(
         "--probe-unknown-select",
