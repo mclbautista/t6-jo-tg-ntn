@@ -10,6 +10,7 @@ shape and anything else is a ``MatcherError``.
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass, field
 from email.utils import parsedate_to_datetime
 from typing import Literal
 
@@ -33,14 +34,37 @@ CRITERIA = {
 MAX_RETRY_AFTER_SECONDS = 30.0
 
 
+@dataclass
+class MatchEvidence:
+    """What a malformed or partial response still told us, for the audit trail.
+
+    ``probabilities`` maps candidate page id to the match/maybe/no numbers that
+    could be read safely. Nothing here ever becomes a link decision.
+    """
+
+    requested_model: str | None = None
+    returned_model: str | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    probabilities: dict[str, dict[str, float]] = field(default_factory=dict)
+
+
 class MatcherError(Exception):
     """One failed matcher call: an HTTP error, a timeout, or an invalid body."""
 
-    def __init__(self, failure: str, message: str, *, retry_after: float | None = None):
+    def __init__(
+        self,
+        failure: str,
+        message: str,
+        *,
+        retry_after: float | None = None,
+        evidence: MatchEvidence | None = None,
+    ):
         super().__init__(f"{failure}: {message}")
         self.failure = failure
         self.message = message
         self.retry_after = retry_after
+        self.evidence = evidence
 
 
 class _Probabilities(BaseModel):
@@ -52,6 +76,9 @@ class _Probabilities(BaseModel):
 
 
 class _ChoiceAnswer(BaseModel):
+    # No reason or candidate-name echo is requested, so none is accepted.
+    model_config = ConfigDict(extra="forbid")
+
     type: Literal["choice"]
     choice: Literal["match", "maybe", "no"]
     confidence: float | None = None  # ignored: concentration, not correctness
@@ -97,22 +124,31 @@ def parse_response(
     body: object, candidates: list[Candidate], *, requested_model: str
 ) -> MatchResult:
     """Validate a response body and map its answers back to candidate page ids."""
+    evidence = salvage_evidence(body, candidates, requested_model=requested_model)
     try:
         parsed = DecisionsResponse.model_validate(body)
     except ValidationError as exc:
-        raise MatcherError("invalid_body", f"{exc.error_count()} validation error(s)") from exc
+        raise MatcherError(
+            "invalid_body", f"{exc.error_count()} validation error(s)", evidence=evidence
+        ) from exc
 
     keys = {question_key(i): c for i, c in enumerate(candidates)}
     if set(parsed.answers) != set(keys):
         missing = len(set(keys) - set(parsed.answers))
         unknown = len(set(parsed.answers) - set(keys))
-        raise MatcherError("invalid_body", f"{missing} missing and {unknown} unknown answer key(s)")
+        raise MatcherError(
+            "invalid_body",
+            f"{missing} missing and {unknown} unknown answer key(s)",
+            evidence=evidence,
+        )
 
     decisions = []
     for key, candidate in keys.items():
         p = parsed.answers[key].probabilities
         if not sums_to_one(p.match, p.maybe, p.no):
-            raise MatcherError("invalid_body", f"probabilities for {key} do not sum to 1")
+            raise MatcherError(
+                "invalid_body", f"probabilities for {key} do not sum to 1", evidence=evidence
+            )
         decisions.append(
             CandidateDecision(
                 page_id=candidate.page_id, p_match=p.match, p_maybe=p.maybe, p_no=p.no
@@ -125,6 +161,49 @@ def parse_response(
         input_tokens=parsed.usage.input_tokens if parsed.usage else None,
         output_tokens=parsed.usage.output_tokens if parsed.usage else None,
     )
+
+
+def _number(value: object) -> float | None:
+    """A finite non-bool number, else None."""
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    return float(value) if value == value and abs(value) != float("inf") else None
+
+
+def _count(value: object) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+
+
+def salvage_evidence(
+    body: object, candidates: list[Candidate], *, requested_model: str
+) -> MatchEvidence:
+    """Read whatever model, usage and probabilities a possibly malformed body holds.
+
+    Never raises and never trusts: only well-typed values are kept, and only
+    for the question keys this request asked.
+    """
+    evidence = MatchEvidence(requested_model=requested_model)
+    if not isinstance(body, dict):
+        return evidence
+    if isinstance(body.get("model"), str):
+        evidence.returned_model = body["model"]
+    usage = body.get("usage")
+    if isinstance(usage, dict):
+        evidence.input_tokens = _count(usage.get("input_tokens"))
+        evidence.output_tokens = _count(usage.get("output_tokens"))
+    answers = body.get("answers")
+    if isinstance(answers, dict):
+        for i, candidate in enumerate(candidates):
+            answer = answers.get(question_key(i))
+            probs = answer.get("probabilities") if isinstance(answer, dict) else None
+            if not isinstance(probs, dict):
+                continue
+            safe = {
+                k: n for k in ("match", "maybe", "no") if (n := _number(probs.get(k))) is not None
+            }
+            if safe:
+                evidence.probabilities[candidate.page_id] = safe
+    return evidence
 
 
 def retry_after_seconds(headers: httpx.Headers, *, now: float | None = None) -> float | None:

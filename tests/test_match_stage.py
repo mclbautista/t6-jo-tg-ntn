@@ -10,7 +10,7 @@ from pathlib import Path
 
 import httpx
 
-from jo_watchdog.adapters.jev import JevMatcher, MatcherError
+from jo_watchdog.adapters.jev import JevMatcher, MatcherError, MatchEvidence
 from jo_watchdog.app.config import Config
 from jo_watchdog.app.matching import ResolvedProject, run_match_stage, with_deliverable
 from jo_watchdog.core.masker import WITHHELD
@@ -187,6 +187,29 @@ class FailureTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(call.outcome, "invalid_result")
         self.assertEqual(call.returned_model, "typesafe/jev-1.14-20261014")
         self.assertEqual(call.input_tokens, 200)
+
+    async def test_invalid_result_detail_keeps_its_probabilities(self):
+        bad = {"d-ftr": (0.95, 0.04, 0.01)}  # missing d-promo
+        result = await stage(FakeMatcher(bad, bad))
+        detail = json.loads(result.llm_calls[0].detail_json)
+        self.assertEqual(detail["candidates"][0]["p_match"], 0.95)
+        self.assertNotIn("p_match", detail["candidates"][1])
+
+    async def test_matcher_error_evidence_is_stored_without_a_decision(self):
+        ev = MatchEvidence(
+            returned_model="m-1",
+            input_tokens=5,
+            output_tokens=6,
+            probabilities={"d-ftr": {"match": 0.7}},
+        )
+        err = MatcherError("invalid_body", "x", evidence=ev)
+        result = await stage(FakeMatcher(err, err))
+        call = result.llm_calls[0]
+        self.assertEqual(
+            (call.returned_model, call.input_tokens, call.output_tokens), ("m-1", 5, 6)
+        )
+        self.assertEqual(json.loads(call.detail_json)["candidates"][0]["p_match"], 0.7)
+        self.assertIsNone(result.decision)
 
     async def test_unexpected_exception_never_escapes(self):
         result = await stage(FakeMatcher(ValueError("bug"), KeyError("bug")))

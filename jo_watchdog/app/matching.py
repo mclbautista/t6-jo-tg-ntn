@@ -16,7 +16,7 @@ from collections.abc import Awaitable, Callable
 
 from pydantic import BaseModel, Field
 
-from jo_watchdog.adapters.jev import PROMPT_TAG, MatcherError
+from jo_watchdog.adapters.jev import PROMPT_TAG, MatcherError, MatchEvidence
 from jo_watchdog.adapters.protocols import DeliverableMatcher, DeliverableSource
 from jo_watchdog.app.config import Config
 from jo_watchdog.core.masker import MASKER_VERSION, mask_text, outbound_text
@@ -183,26 +183,27 @@ def _skipped(
 
 
 def _detail(
-    project: ResolvedProject, candidates: list[Candidate], result: MatchResult | None
+    project: ResolvedProject,
+    candidates: list[Candidate],
+    result: MatchResult | None,
+    evidence: MatchEvidence | None = None,
 ) -> str:
-    probs = {d.page_id: d for d in result.decisions} if result else {}
+    probs: dict[str, dict[str, float]] = {}
+    if result:
+        probs = {
+            d.page_id: {"p_match": d.p_match, "p_maybe": d.p_maybe, "p_no": d.p_no}
+            for d in result.decisions
+        }
+    elif evidence:
+        probs = {
+            page_id: {f"p_{k}": v for k, v in found.items()}
+            for page_id, found in evidence.probabilities.items()
+        }
     return json.dumps(
         {
             "project": project.model_dump(),
             "candidates": [
-                {
-                    "page_id": c.page_id,
-                    "name": c.name,
-                    **(
-                        {
-                            "p_match": probs[c.page_id].p_match,
-                            "p_maybe": probs[c.page_id].p_maybe,
-                            "p_no": probs[c.page_id].p_no,
-                        }
-                        if c.page_id in probs
-                        else {}
-                    ),
-                }
+                {"page_id": c.page_id, "name": c.name, **probs.get(c.page_id, {})}
                 for c in candidates
             ],
         },
@@ -233,16 +234,21 @@ def _failed_call(
     elapsed: float,
     result: MatchResult | None,
 ) -> LlmCallRecord:
-    """A failed attempt; a parsed-but-invalid result still keeps its model metadata."""
+    """A failed attempt keeps whatever model, usage and probabilities were readable."""
     failure = exc.failure if isinstance(exc, MatcherError) else "invalid_result"
+    evidence = exc.evidence if isinstance(exc, MatcherError) else None
     return LlmCallRecord(
         requested_model=result.requested_model if result else config.jev_model,
-        returned_model=result.returned_model if result else None,
+        returned_model=(
+            result.returned_model if result else evidence.returned_model if evidence else None
+        ),
         prompt_tag=PROMPT_TAG,
-        input_tokens=result.input_tokens if result else None,
-        output_tokens=result.output_tokens if result else None,
+        input_tokens=result.input_tokens if result else evidence.input_tokens if evidence else None,
+        output_tokens=(
+            result.output_tokens if result else evidence.output_tokens if evidence else None
+        ),
         latency_ms=round(elapsed * 1000),
         outcome=failure,
         error=mask_text(str(exc))[:500],
-        detail_json=_detail(project, candidates, None),
+        detail_json=_detail(project, candidates, result, evidence),
     )
