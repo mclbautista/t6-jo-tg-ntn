@@ -468,8 +468,10 @@ def resolve_department(
     if not token or not token.strip():
         return DepartmentResolution()
     normalized = normalize_department_token(token, aliases)
-    live = {" ".join(o.split()).casefold(): o for o in options}
-    match = live.get(normalized.casefold())
+    wanted = " ".join(normalized.split()).casefold()
+    # More than one live option folding to the same spelling is ambiguous.
+    matches = {o for o in options if " ".join(o.split()).casefold() == wanted}
+    match = next(iter(matches)) if len(matches) == 1 else None
     if match is None:
         return DepartmentResolution(
             token=token.strip(),

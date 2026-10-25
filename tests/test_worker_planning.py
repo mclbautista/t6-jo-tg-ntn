@@ -36,7 +36,14 @@ def make_caches(ledger, config, *, people=PEOPLE, departments=("TOC", "VID")):
 
 
 class Harness:
-    def __init__(self, test, *, text="MFG - TOC - JO #74\nTask: cut teaser", **fields):
+    def __init__(
+        self,
+        test,
+        *,
+        text="MFG - TOC - JO #74\nTask: cut teaser",
+        departments=("TOC", "VID"),
+        **fields,
+    ):
         tmp = tempfile.TemporaryDirectory()
         test.addCleanup(tmp.cleanup)
         self.ledger = Ledger(Path(tmp.name) / "ledger.db")
@@ -53,7 +60,7 @@ class Harness:
         self.telegram = FakeTelegram(
             [update(7, message_id=42, text=text, extra=fields.pop("extra", None))]
         )
-        self.caches = make_caches(self.ledger, self.config)
+        self.caches = make_caches(self.ledger, self.config, departments=departments)
         self.worker = Worker(
             ledger=self.ledger,
             telegram=self.telegram,
@@ -115,6 +122,25 @@ class PlannerWiringTests(unittest.IsolatedAsyncioTestCase):
             },
         )
         self.assertEqual(h.ledger.get_message(KEY)["jo_key"], "proj-mfg|TOC|74")
+
+    async def test_live_option_case_and_whitespace_flow_through_the_worker(self):
+        h = Harness(self, text="MFG - TO - JO #74\nTask: cut", departments=(" toc ",), task="Cut")
+        await h.run()
+
+        props = h.notion.created[0]["properties"]
+        self.assertEqual(props["Department"], {"select": {"name": " toc "}})
+        self.assertEqual(props["Name"]["title"][0]["text"]["content"], "MFG -  toc  - JO #74")
+        self.assertEqual(h.plan()["resolution"]["department"], " toc ")
+        self.assertEqual(h.ledger.get_message(KEY)["jo_key"], "proj-mfg| toc |74")
+        self.assertNotIn("unknown_department", h.codes())
+
+    async def test_ambiguous_department_options_yield_no_key(self):
+        h = Harness(self, departments=("TOC", "toc"), task="Cut")
+        await h.run()
+
+        self.assertNotIn("Department", h.notion.created[0]["properties"])
+        self.assertIn("unknown_department", h.codes())
+        self.assertIsNone(h.ledger.get_message(KEY)["jo_key"])
 
     async def test_unresolved_project_and_unknown_department_stay_blank(self):
         h = Harness(self, text="ZZZ - XYZ - JO #74\nTask: cut", task="Cut")
