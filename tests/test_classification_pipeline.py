@@ -2,7 +2,11 @@
 
 import json
 import unittest
+from pathlib import Path
 
+import httpx
+
+from jo_watchdog.adapters.deepseek import DeepSeekClassifier
 from jo_watchdog.ledger.states import State
 from tests.fakes import FakeClassifier, failed_result, ok_result, update
 from tests.test_worker import make_worker
@@ -119,6 +123,36 @@ class ModelInputTests(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(cleanup)
         await worker.run_once()
         self.assertIsNone(classifier.calls[0][1])
+
+    async def test_worker_to_deepseek_adapter_sends_no_credential(self):
+        recorded = json.loads(
+            (Path(__file__).parent / "fixtures" / "deepseek_recorded.json").read_text("utf-8")
+        )["jo"]
+        seen: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.append(request)
+            return httpx.Response(recorded["status"], json=recorded["body"])
+
+        client = httpx.AsyncClient(
+            base_url="https://api.deepseek.test", transport=httpx.MockTransport(handler)
+        )
+        classifier = DeepSeekClassifier("sk-test", client=client)
+        self.addAsyncCleanup(classifier.close)
+        extra = {
+            "from": {"first_name": "Lei pw: origin-secret"},
+            "forward_origin": {"type": "channel"},
+        }
+        worker, ledger, *_, cleanup = make_worker(
+            [update(7, message_id=42, text="MFG - TOC - JO #74\nPW: hunter2", extra=extra)],
+            classifier=classifier,
+        )
+        self.addCleanup(cleanup)
+        await worker.run_once()
+        self.assertEqual(len(seen), 1)
+        outbound = seen[0].content.decode("utf-8")
+        self.assertNotIn("hunter2", outbound)
+        self.assertNotIn("origin-secret", outbound)
 
 
 class FailureTests(unittest.IsolatedAsyncioTestCase):
