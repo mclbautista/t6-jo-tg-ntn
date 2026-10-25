@@ -453,7 +453,7 @@ class Worker:
 
         people = project = department = None
         if caches is not None:
-            header = parse_header(extraction.header_raw or first_line_of(msg["text"]), aliases)
+            header = parse_header(first_line_of(msg["text"]), aliases)
             if header is not None:
                 project_raw, department_token = header.project, header.department
             else:

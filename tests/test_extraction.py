@@ -57,9 +57,9 @@ class SchemaTests(unittest.TestCase):
             Extraction.model_validate(valid(confidence="0.9"))
 
     def test_subtitle_is_restricted(self):
-        for ok in (None, "None", "Burned-in: English"):
+        for ok in (None, "None", "Burned-in: English", "-", "N/A", "none"):
             self.assertEqual(Extraction.model_validate(valid(subtitle=ok)).subtitle, ok)
-        for bad in ("English", "Burned-in:", "-"):
+        for bad in ("English", "Burned-in:", "Spanish subs"):
             with self.subTest(bad), self.assertRaises(ValidationError):
                 Extraction.model_validate(valid(subtitle=bad))
 
