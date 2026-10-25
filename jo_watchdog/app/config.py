@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
@@ -26,6 +27,21 @@ from jo_watchdog.core.resolve import ResolveSettings
 
 _HANDLE_RE = re.compile(r"^@?[A-Za-z0-9_]{5,32}$")
 _HHMM_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+_NOTION_ID_RE = re.compile(
+    r"^[0-9a-fA-F]{32}$|^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$"
+)
+_NOTION_VERSION_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+# Notion ids a live service must hold real, well-formed values for.
+_NOTION_ID_KEYS = (
+    "job_orders_data_source_id",
+    "contacts_data_source_id",
+    "projects_data_source_id",
+    "deliverables_data_source_id",
+    "leizette_contact_page_id",
+)
+_URL_KEYS = ("deepseek_base_url", "jev_url")
+_NON_EMPTY_KEYS = ("deepseek_model", "jev_model", "ledger_path")
 
 # Keys the running service cannot do without; checked by ``require_live_keys``.
 LIVE_REQUIRED_KEYS = (
@@ -182,11 +198,61 @@ def resolve_settings(config: Config) -> ResolveSettings:
     )
 
 
+def _production_problems(config: Config) -> list[str]:
+    """Why ``config`` is not fit to boot against live providers.
+
+    Messages name the key and the rule, never the value.
+    """
+    problems = [
+        f"{key} is missing"
+        for key in LIVE_REQUIRED_KEYS
+        if getattr(config, key) in (None, "", 0)
+    ]
+    for key in _NOTION_ID_KEYS:
+        value = getattr(config, key)
+        if value and not _NOTION_ID_RE.match(value.strip()):
+            problems.append(f"{key} is not a Notion id (32 hex characters, dashes optional)")
+        elif not value and key not in LIVE_REQUIRED_KEYS:
+            problems.append(f"{key} must not be empty")
+    for key in _URL_KEYS:
+        parts = urlsplit(getattr(config, key).strip())
+        if parts.scheme not in ("http", "https") or not parts.hostname:
+            problems.append(f"{key} must be an http(s) URL with a host")
+    for key in _NON_EMPTY_KEYS:
+        if not getattr(config, key).strip():
+            problems.append(f"{key} must not be empty")
+    if not _NOTION_VERSION_RE.match(config.notion_version):
+        problems.append("notion_version must look like YYYY-MM-DD")
+    for key in ("intake_topic_id", "ops_topic_id"):
+        if getattr(config, key) <= 0:
+            problems.append(f"{key} must be a positive topic id")
+    # Chat ids are not topic ids: supergroups are legitimately negative, so only
+    # zero is rejected (the model already refuses it).
+    return problems
+
+
 def require_live_keys(config: Config) -> None:
-    """Fail boot when a key the running service needs is missing."""
-    missing = [key for key in LIVE_REQUIRED_KEYS if getattr(config, key) in (None, "", 0)]
-    if missing:
-        raise ValueError(f"config.yaml is missing required keys: {', '.join(missing)}")
+    """Fail boot when the config is unfit to run against live providers.
+
+    Checks structure only, so the example file passes it; ``placeholder_keys``
+    separately flags the FILL IN values that must be replaced.
+    """
+    problems = _production_problems(config)
+    if problems:
+        raise ValueError("config.yaml is not valid for production: " + "; ".join(problems))
+
+
+def placeholder_keys(config: Config) -> list[str]:
+    """Keys still holding the example file's FILL IN values (not production-ready)."""
+    placeholders = []
+    for key in ("leizette_contact_page_id", "leizette_telegram_handle", "owner_telegram_handle"):
+        if str(getattr(config, key)).startswith(("00000000", "@leizette_handle", "@owner_handle")):
+            placeholders.append(key)
+    if config.intake_chat_id == -1000000000000:
+        placeholders.append("intake_chat_id")
+    if config.ops_chat_id == -1000000000001:
+        placeholders.append("ops_chat_id")
+    return placeholders
 
 
 def load_config(path: str | Path) -> Config:

@@ -43,6 +43,13 @@ missing chat id, page id, handle or data source id stops the boot. All four
 secrets in `.env` (`TELEGRAM_BOT_TOKEN`, `NOTION_API_KEY`, `DEEPSEEK_API_KEY`,
 `OPENROUTER_API_KEY`) must be set. `config.example.yaml` documents every key.
 
+Boot also rejects structurally invalid values before any provider call:
+malformed Notion ids, non-positive topic ids, non-http(s) provider URLs, empty
+model aliases or ledger path, and a `notion_version` that is not `YYYY-MM-DD`.
+The error names each bad key, never its value. Negative Telegram chat ids are
+valid. The example file passes this check but still holds `FILL IN`
+placeholders; `smoke.py`'s config step flags those separately.
+
 ## Test
 
 ```sh

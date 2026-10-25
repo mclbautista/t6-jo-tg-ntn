@@ -13,6 +13,7 @@ from jo_watchdog.app.config import (
     SECRET_KEYS,
     Config,
     load_config,
+    placeholder_keys,
     require_live_keys,
 )
 
@@ -93,6 +94,70 @@ class ValidationTests(unittest.TestCase):
             require_live_keys(make())
         for key in LIVE_REQUIRED_KEYS:
             self.assertIn(key, str(ctx.exception))
+
+
+LIVE = dict(
+    leizette_contact_page_id="3d8fb4d5-9e59-8035-acbf-f9b01f1430cd",
+    leizette_telegram_handle="@leizette",
+    owner_telegram_handle="@cyril_owner",
+    job_orders_data_source_id="3d8fb4d5-9e59-8073-a0d0-000b77632947",
+)
+
+
+def live(**overrides) -> Config:
+    return make(**{**LIVE, **overrides})
+
+
+class ProductionReadinessTests(unittest.TestCase):
+    def test_valid_configuration_boots(self):
+        require_live_keys(live())
+        require_live_keys(live(leizette_contact_page_id="3d8fb4d59e5980358acbf9b01f1430cd"))
+        require_live_keys(live(deepseek_base_url="http://localhost:8080"))
+        require_live_keys(live(notion_version="2027-01-31"))
+
+    def test_negative_group_chat_ids_are_legitimate(self):
+        require_live_keys(live(intake_chat_id=-1001234567890, ops_chat_id=-4242))
+
+    def test_audited_invalid_values_are_rejected(self):
+        bad = {
+            "job_orders_data_source_id": ["", "ds-1", "not-a-uuid"],
+            "contacts_data_source_id": ["", "xyz"],
+            "projects_data_source_id": [""],
+            "deliverables_data_source_id": [""],
+            "leizette_contact_page_id": ["", "short"],
+            "intake_topic_id": [-5],
+            "ops_topic_id": [-1],
+            "deepseek_base_url": ["", "ftp://x.example", "api.deepseek.com", "https://"],
+            "jev_url": ["", "file:///etc/passwd"],
+            "deepseek_model": ["", "  "],
+            "jev_model": [""],
+            "ledger_path": ["", " "],
+            "notion_version": ["", "latest", "2026-3-1"],
+        }
+        for key, values in bad.items():
+            for value in values:
+                with self.subTest(key=key, value=value):
+                    with self.assertRaises(ValueError) as ctx:
+                        require_live_keys(live(**{key: value}))
+                    self.assertIn(key, str(ctx.exception))
+
+    def test_all_problems_are_reported_without_values(self):
+        with self.assertRaises(ValueError) as ctx:
+            require_live_keys(live(intake_topic_id=-7, jev_url="secret-looking-value"))
+        message = str(ctx.exception)
+        self.assertIn("intake_topic_id", message)
+        self.assertIn("jev_url", message)
+        self.assertNotIn("secret-looking-value", message)
+
+    def test_placeholders_are_distinct_from_readiness(self):
+        example = yaml.safe_load((ROOT / "config.example.yaml").read_text(encoding="utf-8"))
+        config = Config(**example)
+        require_live_keys(config)  # structurally valid...
+        self.assertEqual(  # ...yet still not production-ready
+            set(placeholder_keys(config)),
+            {"intake_chat_id", "ops_chat_id", "leizette_telegram_handle", "owner_telegram_handle"},
+        )
+        self.assertEqual(placeholder_keys(live()), [])
 
 
 class ExampleFilesTests(unittest.TestCase):
