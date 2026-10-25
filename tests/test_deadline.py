@@ -179,6 +179,35 @@ class DeadlineRuleTests(unittest.TestCase):
         self.assertEqual(result.deadline, at(8, 15, 15))
         self.assertEqual(codes(result), ["deadline_past"])
 
+    def test_explicit_past_year_is_honored_not_replaced_by_the_closest_year(self):
+        result = resolve_deadline("September 16, 2020 5PM", at(9, 15, 10))
+        self.assertEqual(result.deadline, at(9, 16, 17, year=2020))
+        self.assertEqual(codes(result), ["deadline_past"])
+
+    def test_explicit_future_year_is_honored(self):
+        result = resolve_deadline("Dec 30, 2028", at(1, 2, 10))
+        self.assertEqual(result.deadline, at(12, 30, 23, 59, year=2028))
+        self.assertEqual(codes(result), [])
+
+    def test_explicit_year_without_comma_or_with_weekday(self):
+        p = at(9, 1, 10)
+        self.assertEqual(resolve_deadline("Sept 5 2027", p).deadline, at(9, 5, 23, 59, year=2027))
+        result = resolve_deadline("Friday, September 3, 2027, 7PM", p)
+        self.assertEqual(result.deadline, at(9, 3, 19, year=2027))
+
+    def test_explicit_year_shift_deadline_uses_that_year(self):
+        result = resolve_deadline("Aug 26, 2027 end of shift", at(8, 26, 9), NIGHT)
+        self.assertEqual(result.deadline, at(8, 27, 5, year=2027))
+
+    def test_impossible_explicit_year_date_fails_closed(self):
+        result = resolve_deadline("Feb 29, 2027", at(9, 1, 10))
+        self.assertIsNone(result.deadline)
+        self.assertEqual(codes(result), ["deadline_unparsed"])
+
+    def test_clock_digits_after_the_day_are_not_a_year(self):
+        result = resolve_deadline("September 26 1130 PM", at(9, 1, 10))
+        self.assertEqual(result.deadline, at(9, 26, 23, 30))
+
     def test_time_formats(self):
         p = at(9, 1, 0, 30)
         for raw, expected in [

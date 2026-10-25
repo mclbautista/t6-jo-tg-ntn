@@ -158,6 +158,40 @@ class PlannerWiringTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("unresolved_project", h.codes())
 
 
+class ExplicitDeadlineYearTests(unittest.IsolatedAsyncioTestCase):
+    """#48: a posted year is honored end to end, and past deadlines are stored and reported."""
+
+    async def test_explicit_future_year_resolves_stores_and_notes_the_posted_text(self):
+        h = Harness(
+            self,
+            task="Cut",
+            assignees_raw="Benjamin",
+            deadline_raw="Sep 30, 2030 end of shift",
+            notes="keep this",
+        )
+        await h.run()
+
+        props = h.notion.created[0]["properties"]
+        self.assertEqual(props["Deadline"]["date"]["start"], "2030-09-30T22:00:00+08:00")
+        notes = props["Notes"]["rich_text"][0]["text"]["content"]
+        self.assertIn("Deadline as posted: Sep 30, 2030 end of shift", notes)
+        self.assertTrue(notes.startswith("keep this"))
+        self.assertNotIn("deadline_past", h.codes())
+
+    async def test_explicit_past_year_is_stored_and_reported_not_rolled_forward(self):
+        h = Harness(self, task="Cut", assignees_raw="Benjamin", deadline_raw="Sep 16, 2020 5PM")
+        await h.run()
+
+        props = h.notion.created[0]["properties"]
+        self.assertEqual(props["Deadline"]["date"]["start"], "2020-09-16T17:00:00+08:00")
+        self.assertIn(
+            "Deadline as posted: Sep 16, 2020 5PM",
+            props["Notes"]["rich_text"][0]["text"]["content"],
+        )
+        self.assertIn("deadline_past", h.codes())
+        self.assertIn("Deadline is before the message was posted", h.telegram.sent[-1][2])
+
+
 class StoredPlanReplayTests(unittest.IsolatedAsyncioTestCase):
     async def test_resumed_write_uses_the_stored_plan_after_a_cache_swap(self):
         h = Harness(self, task="Cut", assignees_raw="Benjamin")

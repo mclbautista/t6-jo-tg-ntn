@@ -16,6 +16,11 @@ ALIASES = {"TO": "TOC"}
 SHIFTS = [("Assignee", "7:00 PM")]
 
 
+def load_scenarios() -> list[dict]:
+    path = FIXTURES / "corpus_deadline_scenarios.json"
+    return json.loads(path.read_text(encoding="utf-8"))["cases"]
+
+
 def load_golden() -> dict:
     return json.loads((FIXTURES / "corpus_plan_golden.json").read_text(encoding="utf-8"))
 
@@ -87,6 +92,46 @@ class CorpusPlanGoldenTests(unittest.TestCase):
                 self.assertEqual(deadline["date"]["start"], f"{day}T23:59:00+08:00")
                 self.assertEqual(plan.deadline_source, "fallback")
                 self.assertIn("shift_fallback", [f.code for f in plan.findings])
+
+    def test_derived_scenarios_match_their_golden_deadlines(self):
+        corpus = load_corpus()
+        for case in load_scenarios():
+            with self.subTest(case=case["name"]):
+                text = corpus[case["base"]]
+                ext = extraction_for(text)
+                ext.deadline_raw = case["deadline_raw"]
+                plan = plan_job_order(
+                    ext,
+                    telegram_key="k",
+                    raw_text=text,
+                    posted_at=posted_at_for(text),
+                    source_block="",
+                    department_aliases=ALIASES,
+                    assignee_shifts=[tuple(shift) for shift in case["shifts"]],
+                )
+                deadline = plan.properties.get("Deadline")
+                self.assertEqual(
+                    {
+                        "deadline": deadline["date"]["start"] if deadline else None,
+                        "source": plan.deadline_source,
+                        "findings": [f.code for f in plan.findings],
+                    },
+                    {k: case[k] for k in ("deadline", "source", "findings")},
+                )
+
+    def test_derived_scenarios_cover_the_required_edge_cases(self):
+        names = " | ".join(case["name"] for case in load_scenarios())
+        for needed in (
+            "overnight",
+            "multiple assignees",
+            "23:59",
+            "hedged",
+            "past",
+            "future",
+            "unparsed",
+            "placeholder",
+        ):
+            self.assertIn(needed, names)
 
     def test_corpus_covers_every_deadline_family(self):
         sources = {m["deadline_source"] for m in load_golden()["messages"]}

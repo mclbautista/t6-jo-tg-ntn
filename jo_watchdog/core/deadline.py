@@ -38,7 +38,9 @@ _MONTHS = {
 }  # fmt: skip
 _DATE = re.compile(
     r"\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?"
-    r"|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2})\b",
+    r"|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2})\b"
+    # An optional posted year (`September 16, 2020`); `1130 PM` is a time, not a year.
+    r"(?:,?\s+(20\d{2})\b(?!\s*[ap]m\b))?",
     re.IGNORECASE,
 )
 # `5AM`, `5:00 AM`, `7pm`, `530PM` (= 17:30), `12:00 AM` (= 00:00).
@@ -91,6 +93,16 @@ def _closest_year(month: int, day: int, posted: date) -> date | None:
     if not candidates:
         return None
     return min(candidates, key=lambda d: abs((d - posted).days))
+
+
+def _stated_date(month: int, day: int, year: str | None, posted_at: datetime) -> date | None:
+    """An explicit year is honored; the closest year applies only when it is absent."""
+    if year is None:
+        return _closest_year(month, day, posted_at.date())
+    try:
+        return date(int(year), month, day)
+    except ValueError:
+        return None
 
 
 def _parse_time(match: re.Match[str]) -> time | None:
@@ -183,7 +195,7 @@ def resolve_deadline(
     date_match = _DATE.search(text)
     if date_match:
         month = _MONTHS[date_match.group(1).lower()[:3]]
-        stated = _closest_year(month, int(date_match.group(2)), posted_at.date())
+        stated = _stated_date(month, int(date_match.group(2)), date_match.group(3), posted_at)
         if stated is None:
             return _unparsed(original)
         text = text[: date_match.start()] + " " + text[date_match.end() :]
