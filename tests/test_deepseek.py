@@ -99,6 +99,24 @@ class OutcomeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.outcome, "timeout")
         self.assertIsNone(result.extraction)
 
+    async def test_retry_after_header_on_an_error_status_is_carried(self):
+        def limited(request):
+            return httpx.Response(429, headers={"Retry-After": "90"}, text="slow down")
+
+        classifier, _ = classifier_for(limited)
+        result = await classifier.classify("x", None)
+        self.assertEqual((result.outcome, result.retry_after), ("api_error", 90.0))
+
+    async def test_unusable_retry_after_is_ignored(self):
+        def limited(request):
+            return httpx.Response(
+                503, headers={"Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT"}, text="down"
+            )
+
+        classifier, _ = classifier_for(limited)
+        result = await classifier.classify("x", None)
+        self.assertIsNone(result.retry_after)
+
     async def test_connection_error_is_api_error(self):
         def refuse(request):
             raise httpx.ConnectError("refused", request=request)

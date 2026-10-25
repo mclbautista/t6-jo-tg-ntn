@@ -32,8 +32,9 @@ from jo_watchdog.ledger.states import State, can_transition
 
 CACHE_SNAPSHOTS_KEPT = 10
 
-# Ops-post retry delays: five attempts at 30s, 2m, 5m, 10m, 15m (#25).
-OUTBOX_RETRY_SECONDS = (30, 120, 300, 600, 900)
+# Ops-post retry delays (#25, D3): attempt one is immediate; the delays between
+# attempts are 30s, 2m, 5m, 10m, so there are five attempts in total.
+OUTBOX_RETRY_SECONDS = (30, 120, 300, 600)
 
 OUTBOX_KINDS = frozenset(
     {
@@ -432,6 +433,7 @@ class Ledger:
         call: dict,
         schedule: Sequence[int],
         now: datetime,
+        retry_after: float | None = None,
         on_exhausted: Callable[[str, int], OutboxMessage] | None = None,
     ) -> FailureResult:
         """Count one failed classify attempt and schedule the next; the row stays queued."""
@@ -441,6 +443,7 @@ class Ledger:
             error=error,
             schedule=schedule,
             now=now,
+            retry_after=retry_after,
             state=State.RECEIVED,
             call=call,
             on_exhausted=on_exhausted,
@@ -462,11 +465,12 @@ class Ledger:
     ) -> FailureResult:
         """Count one failed attempt, then schedule the next or give up.
 
-        The delay after the Nth failure is ``schedule[N-1]``, stretched to a
-        provider's ``Retry-After`` when that is longer. The failure that uses up the
-        schedule sets ``exhausted_at`` and queues the one outage alert
-        (``on_exhausted(masked_error, attempts)``) in the same transaction. The
-        row keeps its state and stored plan; nothing is deleted.
+        ``schedule`` holds the delays between attempts, so there are
+        ``len(schedule) + 1`` attempts in all. The delay after the Nth failure
+        is ``schedule[N-1]``, stretched to a provider's ``Retry-After`` when
+        that is longer. The failure of the last attempt sets ``exhausted_at`` and
+        queues the one outage alert (``on_exhausted(masked_error, attempts)``) in
+        the same transaction. The row keeps its state and stored plan; nothing is deleted.
         """
         masked = outbound_text(error).text
         stamp = fmt_utc(now)
@@ -479,9 +483,7 @@ class Ledger:
             if call is not None:
                 self._insert_llm_call(row["id"], call, stamp)
             attempts = row["attempts"] + 1
-            # Five attempts: the fifth failure gives up, so the last delay only
-            # ever applies as a floor (nothing waits 15 minutes for a sixth try).
-            exhausted = attempts >= len(schedule)
+            exhausted = attempts > len(schedule)
             if exhausted:
                 next_at = None
             else:
@@ -961,6 +963,7 @@ class Ledger:
         *,
         retry_seconds: Sequence[int] = OUTBOX_RETRY_SECONDS,
         now: float | None = None,
+        retry_after: float | None = None,
     ) -> str:
         """Count one failed post; schedule the next or give up. Returns the new state."""
         row = self._conn.execute(
@@ -968,13 +971,12 @@ class Ledger:
         ).fetchone()
         attempts = row["attempts"] + 1
         clock = time.time() if now is None else now
-        if attempts >= len(retry_seconds):
+        if attempts > len(retry_seconds):
             state, next_at = "failed", None
         else:
             state = "pending"
-            next_at = time.strftime(
-                "%Y-%m-%dT%H:%M:%SZ", time.gmtime(clock + retry_seconds[attempts - 1])
-            )
+            delay = max(retry_seconds[attempts - 1], retry_after or 0)
+            next_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(clock + delay))
         self._conn.execute(
             "UPDATE outbox SET state = ?, attempts = ?, next_attempt_at = ?, last_error = ?"
             " WHERE id = ?",

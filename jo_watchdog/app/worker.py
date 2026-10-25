@@ -295,7 +295,7 @@ class Worker:
         result = await self.classifier.classify(
             msg["masked_text"], forward_origin_lines(raw_message)
         )
-        trace = result.model_dump(exclude={"extraction"})
+        trace = result.model_dump(exclude={"extraction", "retry_after"})
         call = {
             "provider": "deepseek",
             "purpose": "classify_extract",
@@ -309,6 +309,7 @@ class Worker:
                 call=call,
                 schedule=self.config.retry_schedule_seconds,
                 now=self.clock(),
+                retry_after=result.retry_after,
                 on_exhausted=self._outage_alert(msg, CLASSIFICATION),
             )
             if failure.exhausted:
@@ -780,6 +781,7 @@ class Worker:
                     str(exc),
                     retry_seconds=self.config.retry_schedule_seconds,
                     now=self.clock().timestamp(),
+                    retry_after=getattr(exc, "retry_after", None),
                 )
                 log.warning(
                     "ops post outbox=%s kind=%s failed (%s): now %s",

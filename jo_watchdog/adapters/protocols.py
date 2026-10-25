@@ -55,6 +55,7 @@ class ClassifyResult(BaseModel):
     input_tokens: int | None = None
     output_tokens: int | None = None
     latency_ms: int | None = None
+    retry_after: float | None = None  # seconds, from the provider's Retry-After header
 
 
 @runtime_checkable

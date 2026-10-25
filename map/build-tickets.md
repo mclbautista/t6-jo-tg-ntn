@@ -29,7 +29,7 @@ The nine deterministic verification checks. Durable `outbox` table, same transac
 Four forward-origin types; source-block "posted by" / "originally from"; non-`user` origin reporting. Edits received and reported, never applied. Content-level duplicate detection (project+department+number as parsed integer); exact re-post or reused number always creates a new row, flagged both ways.
 
 ## 8. Reliability
-5-attempt backoff (30s→15m), the `writing`-state Notion reconciliation query, the in-process deadman (10-minute stale heartbeat → non-zero exit), the 07:00 Asia/Manila daily heartbeat as a pure SQL query over the last 24h of ledger rows.
+5-attempt backoff (30s→10m between attempts), the `writing`-state Notion reconciliation query, the in-process deadman (10-minute stale heartbeat → non-zero exit), the 07:00 Asia/Manila daily heartbeat as a pure SQL query over the last 24h of ledger rows.
 
 ## 9. Jev matcher, shadow mode
 Live `relation_contains` query on `🗺️ Projects`, one Choice question per candidate, probability-based link/hint/silent decision, `deliverable_link_enabled` flag (default off), the 3 fixed regression pairs, token-count storage.

@@ -131,7 +131,7 @@ class Crash(BaseException):
 
 
 async def exhaust(pipeline: Pipeline) -> None:
-    """Fail five attempts in a row (every delay is <= 15 minutes)."""
+    """Fail five attempts in a row (every delay is <= 10 minutes)."""
     for _ in range(5):
         await pipeline.worker.run_once()
-        pipeline.clock.advance(seconds=900)
+        pipeline.clock.advance(seconds=600)
