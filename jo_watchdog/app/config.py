@@ -66,7 +66,7 @@ class Config(BaseModel):
     # Telegram scope filter
     intake_chat_id: int
     intake_topic_id: int
-    captured_reaction: str = "✅"
+    captured_reaction: str = "👍"
 
     # Ops topic (#23): where capture reports and system messages go
     ops_chat_id: int
