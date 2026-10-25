@@ -116,6 +116,31 @@ class PlannerWiringTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(h.ledger.get_message(KEY)["jo_key"], "proj-mfg|TOC|74")
 
+    async def test_posted_fields_survive_extraction_plan_and_notion_payload(self):
+        notes = "  keep\u00a0this\n" + "n" * 2100
+        h = Harness(
+            self,
+            text="MFG - TOC - JO #74\nTask: cut teaser",
+            header_raw="Some other extracted header",
+            title="  Teaser\u00a0cut\n",
+            notes=notes,
+            subtitle="N/A",
+        )
+        await h.run()
+
+        [payload] = h.notion.created
+        props = payload["properties"]
+
+        def text(prop):
+            return "".join(i["text"]["content"] for i in props[prop]["rich_text"])
+
+        self.assertEqual(props["Name"]["title"][0]["text"]["content"], "MFG - TOC - JO #74")
+        self.assertEqual(text("Title"), "  Teaser\u00a0cut\n")
+        self.assertEqual(text("Notes"), notes)
+        self.assertEqual(text("Subtitle"), "N/A")
+        self.assertTrue(all(len(i["text"]["content"]) <= 2000 for i in props["Notes"]["rich_text"]))
+        self.assertEqual(h.plan()["properties"]["Notes"], props["Notes"])
+
     async def test_unresolved_project_and_unknown_department_stay_blank(self):
         h = Harness(self, text="ZZZ - XYZ - JO #74\nTask: cut", task="Cut")
         await h.run()
