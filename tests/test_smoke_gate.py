@@ -316,3 +316,10 @@ class RunTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StepRegistryTests(unittest.TestCase):
+    def test_no_step_is_a_pending_placeholder(self):
+        """A merge once restored placeholders that SKIPped the #62 scenarios (blocking FULL)."""
+        for name, step in smoke.STEPS:
+            self.assertNotEqual(step.__qualname__.split(".")[0], "pending", name)
