@@ -26,8 +26,13 @@ _ORIGIN_WORDS = {"hidden_user": "hidden user", "chat": "group", "channel": "chan
 
 
 def _field(value: Any) -> str:
-    """Mask, then HTML-escape, one source-derived value."""
-    return html.escape(outbound_text(str(value)).text, quote=False)
+    """Mask, flatten to one line, then HTML-escape, one source-derived value.
+
+    Masking runs first so a multiline credential assignment is still seen
+    whole; only the rendered copy is flattened, never a stored field.
+    """
+    masked = outbound_text(str(value)).text
+    return html.escape(" ".join(masked.split()), quote=False)
 
 
 def _link(text: str, url: str) -> str:

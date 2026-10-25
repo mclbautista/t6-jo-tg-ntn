@@ -664,7 +664,9 @@ class Worker:
             return None, None
         resolved = plan.resolution
         key = jo_key(resolved.project_page_id, resolved.department, plan.jo_number_int)
-        return key, f"#{plan.jo_number_int}"
+        shown = plan.properties.get("JO Number", {}).get("rich_text", [])
+        display = "".join(item["text"]["content"] for item in shown)
+        return key, display or f"#{plan.jo_number_int}"
 
     def _annotate_duplicate(self, msg: dict, plan: JobOrderPlan) -> str | None:
         """Look for an earlier exact re-post or reused JO Number; return the jo_key.

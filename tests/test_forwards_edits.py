@@ -244,6 +244,18 @@ class RepostAndReuseTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(h.posts()), 1)
         self.assertIn("#74 already used on", h.posts()[0])
 
+    async def test_padded_reuse_number_reads_the_display_number(self):
+        for second in ("JO 074", "JO #074"):
+            with self.subTest(second=second):
+                h = Harness(self, caches=True)
+                await h.feed(message_update(1, 10, "MFG - TOC - JO #74\nTask: cut teaser"))
+                await h.feed(message_update(2, 11, f"MFG - TOC - {second}\nTask: color pass"))
+                self.assertEqual(h.row(11)["jo_key"], "proj-mfg|TOC|74")
+                self.assertIn("#074 already used on", h.posts()[0])
+                self.assertEqual(
+                    json.loads(h.row(11)["plan_json"])["duplicate"]["jo_number"], "#074"
+                )
+
     async def test_exact_repost_wins_over_number_reuse(self):
         h = Harness(self, caches=True)
         text = "MFG - TOC - JO #074\nTask: cut teaser"

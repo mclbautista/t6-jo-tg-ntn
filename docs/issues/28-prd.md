@@ -125,7 +125,7 @@ The watchdog will:
 83. As an operator, I want duplicate `Telegram Key` rows detected and reported rather than deleted or merged automatically, so that destructive recovery is avoided.
 84. As a coordinator, I want exact reposts with new Telegram message IDs to create new rows and be flagged, so that one-row-per-message remains consistent.
 85. As a coordinator, I want reused JO Numbers to create new rows and be flagged as possible number reuse, so that legitimate reuse and mistakes remain human decisions.
-86. As a coordinator, I want duplicate detection based on Project, Department, and JO Number normalized as an integer, so that leading zeros and `#` formatting do not hide reuse.
+86. As a coordinator, I want duplicate detection based on Project, Department, and JO Number normalized as an integer, so that leading zeros and `#` formatting do not hide reuse. D2: reuse findings display the posted number (`074`/`#074` show `#074`, `#74` stays `#74`); only the key is integer-normalized.
 87. As a coordinator, I want content-duplicate checks skipped when the complete normalized key cannot be built, so that partial data does not create false-positive warnings.
 88. As a coordinator, I want edits received and reported without modifying the captured row, so that a changed source is visible while capture remains one-way.
 89. As a coordinator, I want corrections submitted as fresh messages, so that the watchdog never performs hidden write-back or in-place synchronization.

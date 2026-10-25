@@ -20,7 +20,7 @@ Complete Telegram provenance and correction behavior for forwards, edits, repost
 - [ ] Edits to an already captured message are received and reported as “edited after capture, row not updated”; no Notion property or body is changed.
 - [ ] Corrections require a fresh Telegram message and therefore a fresh `Telegram Key` and row.
 - [ ] Content-level duplicate detection runs only when Project, Department, and JO Number parsed as an integer are all available.
-- [ ] Leading-zero and `#` variants normalize to the same integer for reuse detection while the displayed JO Number remains verbatim.
+- [ ] Leading-zero and `#` variants normalize to the same integer for reuse detection while the displayed JO Number remains verbatim. D2 clarification: reuse findings and reports display the stored JO Number as posted (`074` and `#074` show `#074`, `#74` stays `#74`); only the integer reuse key is normalized, and the leading-`#` normalization of the displayed value is unchanged.
 - [ ] An exact repost or reused number with a new Telegram message ID always creates a new row, adds the earlier-row reference to Notes, and creates the correct ops finding.
 - [ ] Partial or ambiguous duplicate keys skip content-duplicate detection instead of generating a false-positive finding.
 - [ ] Tests verify one-row-per-message behavior, exact reposts, reused numbers, incomplete keys, edit handling, and provenance output through the whole pipeline with real SQLite and fake adapters.

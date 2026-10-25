@@ -13,7 +13,7 @@ Turn a validated extraction into a deterministic, exact Notion plan for the Job 
 ## Acceptance criteria
 
 - [ ] Name is `[PROJECT] - [DEPT] - JO #[N]` only when Project Code, Department, and JO Number all parse; otherwise it is the posted first line.
-- [ ] JO Number preserves its posted `#` form and leading zeros, while a separately parsed integer is available for later reuse detection.
+- [ ] JO Number preserves its posted `#` form and leading zeros, while a separately parsed integer is available for later reuse detection. D2 clarification: reuse findings and reports display the stored JO Number as posted (`074` and `#074` show `#074`, `#74` stays `#74`); only the integer reuse key is normalized, and the leading-`#` normalization of the displayed value is unchanged.
 - [ ] Title, Task, Purpose, Source / Source Drive, Platform, Link Settings, Watermark, Mode of Transfer, Blocker, Pending, and Notes follow the exact field-mapping rules and preserve source wording where required.
 - [ ] Subtitle is inferred only as `Burned-in: <language>`, `None`, or blank; poster-provided placeholders pass through, while absent values remain blank.
 - [ ] Date is derived from the intake posting/forwarding time and carries an explicit Asia/Manila offset; forwarded-original time is contextual only.
