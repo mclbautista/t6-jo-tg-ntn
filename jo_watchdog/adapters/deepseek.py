@@ -109,7 +109,10 @@ class DeepSeekClassifier:
 
         if response.status_code != 200:
             return self._result(
-                "api_error", started, error=f"HTTP {response.status_code}: {response.text[:500]}"
+                "api_error",
+                started,
+                error=f"HTTP {response.status_code}: {response.text[:500]}",
+                retry_after=_retry_after(response.headers.get("Retry-After")),
             )
         try:
             payload = response.json()
@@ -134,3 +137,10 @@ class DeepSeekClassifier:
                 "schema_violation", started, error=str(exc)[:1000], **trace
             )
         return self._result("ok", started, extraction=extraction, **trace)
+
+
+def _retry_after(value: str | None) -> float | None:
+    try:
+        return float(value) if value is not None else None
+    except ValueError:
+        return None

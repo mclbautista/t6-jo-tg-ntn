@@ -349,7 +349,7 @@ class AtLeastOnceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(h.outbox()[0]["attempts"], 1)
 
         clock = time.time()
-        for _ in range(len(OUTBOX_RETRY_SECONDS) - 1):
+        for _ in range(len(OUTBOX_RETRY_SECONDS)):
             h.ledger.outbox_failed_attempt(row["id"], "still down", now=clock)
         row = h.outbox()[0]
         self.assertEqual((row["state"], row["attempts"]), ("failed", 5))

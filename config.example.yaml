@@ -48,7 +48,7 @@ header_date_tolerance_days: 1
 
 # --- Reliability and heartbeat (#25) ---
 owner_telegram_handle: "@owner_handle"        # FILL IN
-retry_schedule_seconds: [30, 120, 300, 600, 900]
+retry_schedule_seconds: [30, 120, 300, 600]  # delays between attempts: five attempts in all
 deadman_stale_minutes: 10
 heartbeat_time: "07:00"
 timezone: "Asia/Manila"

@@ -43,7 +43,7 @@ class DefaultsTests(unittest.TestCase):
         self.assertEqual(config.fuzzy_min_lead, 8)
         self.assertEqual(config.honorifics, ["ate", "kuya", "sir"])
         self.assertEqual(config.header_date_tolerance_days, 1)
-        self.assertEqual(config.retry_schedule_seconds, [30, 120, 300, 600, 900])
+        self.assertEqual(config.retry_schedule_seconds, [30, 120, 300, 600])
         self.assertEqual(config.deadman_stale_minutes, 10)
         self.assertEqual(config.heartbeat_time, "07:00")
         self.assertEqual(config.timezone, "Asia/Manila")

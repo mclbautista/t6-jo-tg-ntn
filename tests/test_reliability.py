@@ -8,7 +8,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -113,6 +113,68 @@ class RetryScheduleTests(unittest.IsolatedAsyncioTestCase):
             p.message()["next_attempt_at"], fmt_utc(p.clock() + timedelta(seconds=600))
         )
 
+    async def test_classifier_retry_after_stretches_only_a_short_delay(self):
+        for retry_after, expected in ((900, 900), (10, 30)):
+            with self.subTest(retry_after=retry_after):
+                result = failed_result("api_error").model_copy(
+                    update={"retry_after": retry_after}
+                )
+                p = Pipeline(self, [jo()], classifier=FakeClassifier(result))
+                await p.worker.run_once()
+                self.assertEqual(
+                    p.message()["next_attempt_at"],
+                    fmt_utc(p.clock() + timedelta(seconds=expected)),
+                )
+
+    async def test_classifier_retry_after_applies_to_every_attempt(self):
+        result = failed_result("api_error").model_copy(update={"retry_after": 400})
+        p = Pipeline(self, [jo()], classifier=FakeClassifier(result))
+        waits = []
+        for _ in range(4):
+            await p.worker.run_once()
+            row = p.message()
+            self.assertIsNone(row["exhausted_at"])
+            due = row["next_attempt_at"]
+            due_at = datetime.strptime(due, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+            waits.append(round((due_at - p.clock()).total_seconds()))
+            p.clock.advance(seconds=waits[-1])
+        self.assertEqual(waits, [400, 400, 400, 600])
+        await p.worker.run_once()
+        self.assertIsNotNone(p.message()["exhausted_at"])
+
+    async def test_ops_post_retry_after_stretches_the_outbox_delay(self):
+        class Limited(FakeTelegram):
+            async def send_message(self, chat_id, topic_id, text):
+                raise RateLimited(600)
+
+        p = Pipeline(self, telegram=Limited())
+        p.ledger.enqueue_system(OutboxMessage("stale_cache", -100999, 7, "stale"))
+        await p.worker.run_once()
+        (row,) = p.outbox("stale_cache")
+        self.assertEqual(
+            row["next_attempt_at"], fmt_utc(p.clock() + timedelta(seconds=600))
+        )
+
+    async def test_ops_posts_make_five_attempts_with_the_same_delays(self):
+        p = Pipeline(self, telegram=FakeTelegram(fail_send=99))
+        p.ledger.enqueue_system(OutboxMessage("stale_cache", -100999, 7, "stale"))
+        start = p.clock()
+        attempted_at = []
+        for delay in (30, 120, 300, 600):
+            await p.worker.run_once()
+            (row,) = p.outbox("stale_cache")
+            attempted_at.append(round((p.clock() - start).total_seconds()))
+            self.assertEqual(row["state"], "pending")
+            self.assertEqual(
+                row["next_attempt_at"], fmt_utc(p.clock() + timedelta(seconds=delay))
+            )
+            p.clock.advance(seconds=delay)
+        self.assertEqual(attempted_at, [0, 30, 150, 450])
+        await p.worker.run_once()
+        (row,) = p.outbox("stale_cache")
+        self.assertEqual((row["state"], row["attempts"]), ("failed", 5))
+        self.assertIsNone(row["next_attempt_at"])
+
     async def test_a_successful_state_change_resets_the_attempt_counter(self):
         notion = FakeNotion(fail_retrieve=2)
         p = Pipeline(self, [jo()], notion=notion)
@@ -149,7 +211,7 @@ class RetryScheduleTests(unittest.IsolatedAsyncioTestCase):
     async def test_read_back_exhaustion_names_its_step(self):
         notion = FakeNotion(fail_retrieve=99)
         p = Pipeline(self, [jo()], notion=notion)
-        for delay in (30, 120, 300, 600, 900):
+        for delay in (30, 120, 300, 600, 600):
             await p.worker.run_once()
             p.clock.advance(seconds=delay)
         (alert,) = p.outbox("outage_alert")
@@ -167,7 +229,7 @@ class RetryScheduleTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(Crash):
             await p.worker.run_once()
         p.start()
-        for delay in (30, 120, 300, 600, 900):
+        for delay in (30, 120, 300, 600, 600):
             p.clock.advance(seconds=delay)
             await p.worker.run_once()
         (alert,) = p.outbox("outage_alert")
@@ -177,7 +239,7 @@ class RetryScheduleTests(unittest.IsolatedAsyncioTestCase):
         telegram = FakeTelegram([jo()], fail_send=99)
         p = Pipeline(self, telegram=telegram)
         p.ledger.enqueue_system(OutboxMessage("stale_cache", -100999, 7, "stale"))
-        for delay in (30, 120, 300, 600, 900):
+        for delay in (30, 120, 300, 600, 600):
             await p.worker.run_once()
             p.clock.advance(seconds=delay)
         (row,) = p.outbox("stale_cache")
@@ -238,7 +300,7 @@ class ManualRetryTests(unittest.IsolatedAsyncioTestCase):
     async def exhausted(self, **kwargs):
         notion = FakeNotion(fail_create=True)
         p = Pipeline(self, [jo(1, 42), jo(2, 43)], notion=notion, **kwargs)
-        for delay in (30, 120, 300, 600, 900):
+        for delay in (30, 120, 300, 600, 600):
             await p.worker.run_once()
             p.clock.advance(seconds=delay)
         self.assertEqual(len(p.ledger.exhausted_keys()), 2)
@@ -277,7 +339,7 @@ class ManualRetryTests(unittest.IsolatedAsyncioTestCase):
     async def test_a_message_can_exhaust_and_alert_again_after_a_retry(self):
         p, _ = await self.exhausted()
         p.ledger.retry(KEY, now=p.clock())
-        for delay in (30, 120, 300, 600, 900):
+        for delay in (30, 120, 300, 600, 600):
             await p.worker.run_once()
             p.clock.advance(seconds=delay)
         self.assertEqual(len(p.outbox("outage_alert")), 3)  # 2 first time, 1 again

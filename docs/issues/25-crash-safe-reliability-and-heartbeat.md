@@ -12,7 +12,7 @@ Make the completed capture path recover correctly from dependency failures and c
 
 ## Acceptance criteria
 
-- [ ] Classifier, Notion, and durable outbox failures use five attempts scheduled at 30 seconds, 2 minutes, 5 minutes, 10 minutes, and 15 minutes, while respecting provider retry timing when present.
+- [ ] Classifier, Notion, and durable outbox failures use five total attempts: attempt one is immediate and the delays between attempts are 30 seconds, 2 minutes, 5 minutes and 10 minutes, each extended by a longer provider `Retry-After` when present.
 - [ ] Attempt exhaustion retains the message for manual retry and sends one owner-tagged outage alert; no failed work is deleted or replaced with a partial Job Order.
 - [ ] The pipeline persists `received` → `extracted` → `planned` → `writing` → `written` → `done`, with stage results sufficient to resume without recomputing against changed caches.
 - [ ] Recovery from `writing` waits at least the first retry delay, queries Notion by `Telegram Key`, adopts one matching row, creates only when none exists, and reports multiple matches without deleting or merging them.
@@ -37,7 +37,7 @@ Make the completed capture path recover correctly from dependency failures and c
 
 | Work | Counter | Schedule | On exhaustion |
 |---|---|---|---|
-| DeepSeek call, Notion create, read-back retrieve, `Telegram Key` reconciliation query | `messages.attempts`, reset to 0 on every successful state change | 30s, 2m, 5m, 10m, 15m (or a longer `Retry-After`) | set `exhausted_at`, post one outage alert, keep the row in its state |
+| DeepSeek call, Notion create, read-back retrieve, `Telegram Key` reconciliation query | `messages.attempts`, reset to 0 on every successful state change | 30s, 2m, 5m, 10m between the five attempts (or a longer `Retry-After`) | set `exhausted_at`, post one outage alert, keep the row in its state |
 | Ops post | `outbox.attempts` | same | `outbox.state = failed`, logged, counted in the heartbeat queue line |
 | Jev matcher | none | one inline retry | `matcher_skipped` finding (#26) |
 | Captured reaction | none | inline retries after 2s and 5s | `reaction_state = failed`, counted in the heartbeat |
@@ -105,7 +105,7 @@ Ignored, first lines:
 
 ### Configuration
 
-`owner_telegram_handle`, `retry_schedule_seconds` (`[30, 120, 300, 600, 900]`), `deadman_stale_minutes` (10), `heartbeat_time` (`"07:00"`), `timezone` (`"Asia/Manila"`).
+`owner_telegram_handle`, `retry_schedule_seconds` (`[30, 120, 300, 600]`: the delays between attempts), `deadman_stale_minutes` (10), `heartbeat_time` (`"07:00"`), `timezone` (`"Asia/Manila"`).
 
 ## Blocked by
 

@@ -357,7 +357,7 @@ The watchdog will:
     - Add a reference to the earlier row in Notes and report the repost or possible number reuse.
 
 12. **Retries, liveness, and heartbeat**
-    - Retry classifier, Notion, and durable outbox failures up to five attempts using 30 seconds, 2 minutes, 5 minutes, 10 minutes, and 15 minutes.
+    - Retry classifier, Notion, and durable outbox failures up to five total attempts: attempt one is immediate, and the delays between attempts are 30 seconds, 2 minutes, 5 minutes and 10 minutes (each extended by a longer provider `Retry-After`).
     - Respect provider retry timing where available.
     - After attempt five, retain the message for manual retry and issue one outage alert.
     - Do not substitute a partial Notion row when DeepSeek is unavailable.

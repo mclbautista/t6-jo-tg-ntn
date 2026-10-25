@@ -89,7 +89,7 @@ class Config(BaseModel):
 
     # Reliability and heartbeat (#25)
     owner_telegram_handle: str | None = None
-    retry_schedule_seconds: list[int] = Field(default_factory=lambda: [30, 120, 300, 600, 900])
+    retry_schedule_seconds: list[int] = Field(default_factory=lambda: [30, 120, 300, 600])
     deadman_stale_minutes: int = Field(default=10, gt=0)
     heartbeat_time: str = "07:00"
     timezone: str = "Asia/Manila"
