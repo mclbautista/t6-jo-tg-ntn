@@ -21,6 +21,46 @@ DEFAULT_BASE_URL = "https://api.deepseek.com"
 DEFAULT_MODEL = "deepseek-chat"  # the provider's "latest" alias; never pinned
 
 
+def _count(value) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _safe_trace(payload) -> dict:
+    """Trace fields that are safe to store; anything of the wrong type is dropped."""
+    if not isinstance(payload, dict):
+        return {}
+    usage = payload.get("usage")
+    usage = usage if isinstance(usage, dict) else {}
+    model = payload.get("model")
+    return {
+        "returned_model": model if isinstance(model, str) else None,
+        "input_tokens": _count(usage.get("prompt_tokens")),
+        "output_tokens": _count(usage.get("completion_tokens")),
+    }
+
+
+def _content_of(payload) -> tuple[str | None, str | None]:
+    """The first choice's message content, or ``(None, why it is malformed)``.
+
+    A missing or null content is not malformed here: it is ``empty_content``.
+    """
+    if not isinstance(payload, dict):
+        return None, f"envelope is {type(payload).__name__}, not an object"
+    choices = payload.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return None, "choices is missing or empty"
+    choice = choices[0]
+    if not isinstance(choice, dict):
+        return None, f"choice is {type(choice).__name__}, not an object"
+    message = choice.get("message")
+    if not isinstance(message, dict):
+        return None, f"message is {type(message).__name__}, not an object"
+    content = message.get("content")
+    if content is not None and not isinstance(content, str):
+        return None, f"content is {type(content).__name__}, not a string"
+    return content or "", None
+
+
 class DeepSeekClassifier:
     def __init__(
         self,
@@ -73,18 +113,15 @@ class DeepSeekClassifier:
             )
         try:
             payload = response.json()
-            choice = payload["choices"][0]
-            content = choice["message"].get("content")
-        except (ValueError, KeyError, IndexError, TypeError) as exc:
+        except ValueError as exc:
             return self._result("api_error", started, error=f"malformed envelope: {exc!r}")
-
-        usage = payload.get("usage") or {}
-        trace = {
-            "returned_model": payload.get("model"),
-            "input_tokens": usage.get("prompt_tokens"),
-            "output_tokens": usage.get("completion_tokens"),
-        }
-        if not content or not content.strip():
+        trace = _safe_trace(payload)
+        content, problem = _content_of(payload)
+        if problem:
+            return self._result(
+                "api_error", started, error=f"malformed envelope: {problem}", **trace
+            )
+        if content is None or not content.strip():
             return self._result("empty_content", started, error="empty content", **trace)
         try:
             data = json.loads(content)
