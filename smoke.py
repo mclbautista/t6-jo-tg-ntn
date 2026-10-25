@@ -3,11 +3,18 @@
 
 Checks the assumptions CI deliberately excludes: live Telegram, Notion, DeepSeek
 and Jev behavior, the deployment's storage permissions, and the full capture
-pipeline against real accounts. Each step prints PASS, FAIL, SKIP or MANUAL;
-the script exits 1 when any step fails.
+pipeline against real accounts. Each step prints PASS, FAIL, SKIP, MANUAL or
+ATTESTED. The run ends with a verdict, and only FULL VERIFICATION exits 0:
+
+- FULL (exit 0): every required step is PASS or ATTESTED. Only ``unknown_select``
+  and ``live_telegram`` are optional.
+- FAILED (exit 1): any step failed.
+- INCOMPLETE or PARTIAL (exit 3): a required step was SKIP, MANUAL or not run, or
+  ``--only`` ran a subset. A skipped check is never a success.
 
     python smoke.py --config config.yaml                 # everything except live Telegram
-    python smoke.py --config config.yaml --live-telegram # also capture one real intake post
+    python smoke.py --config config.yaml --live-telegram --live-message-id 12345
+    python smoke.py --config config.yaml --fixture-message-id 900001 --attestations att.json
     python smoke.py --config config.yaml --only reactions,notion_access
 
 Secrets come from the environment (``.env``): TELEGRAM_BOT_TOKEN,
@@ -15,17 +22,33 @@ NOTION_API_KEY, DEEPSEEK_API_KEY, OPENROUTER_API_KEY.
 
 Side effects, by step:
 
-- ``pipeline`` creates one clearly marked Job Order (the integration cannot
+- ``pipeline`` and ``dry_run`` build the worker with the production wiring
+  (``jo_watchdog.app.wiring``: caches, Jev matcher, Deliverable source) on a
+  throwaway ledger, with a fixed classifier verdict and a recording Telegram.
+  The fixture is one explicit message (``--fixture-message-id``, printed). The
+  step verifies that message's classification, plan, Notion write and read-back,
+  delivered capture report and ``reaction_state = set``, not the last ledger row.
+  ``pipeline`` creates one clearly marked Job Order (the integration cannot
   archive it; the URL is printed so you can delete it by hand).
 - ``unknown_select`` (only with ``--probe-unknown-select``) creates a second
   marked Job Order with an unknown Department option, which Notion may add to
   the schema; delete the option by hand if it does.
-- ``live_telegram`` (only with ``--live-telegram``) waits for one real post in
-  the intake topic, captures it into the real ledger and Notion, reacts to it,
-  and posts one smoke line to the ops topic.
+- ``live_telegram`` (only with ``--live-telegram --live-message-id N``) waits for
+  the one intake post with that Telegram message id and ignores every other
+  update. Post a test JO in the intake topic first and note its message id. It
+  captures into a throwaway ledger (the service's ledger and offset are not
+  touched), writes a real Notion row, reacts to the post, posts the capture
+  report and one smoke line to the ops topic, then runs the same checks.
+  Stop the running watchdog first: two pollers cannot share one bot token.
+  Cleanup: delete the Notion row by hand (URL printed) and the smoke line.
+
+Steps the script cannot run report SKIP (or MANUAL). A person who checked one by
+hand records it in an ``--attestations`` JSON list of ``{step, actor, at, scope,
+evidence}`` (``at`` an ISO-8601 time); all five fields are required, and an
+attestation settles only a SKIP or MANUAL step, never a FAIL or PASS.
 
 Checks that are covered by CI but not yet automated against the real accounts
-report SKIP with their ticket number; verify those by hand.
+report SKIP with their ticket number; verify those by hand and attest them.
 """
 
 from __future__ import annotations
@@ -39,7 +62,6 @@ import sys
 import tempfile
 import time
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
@@ -54,7 +76,18 @@ from jo_watchdog.app.config import (
     placeholder_keys,
     require_live_keys,
 )
-from jo_watchdog.app.worker import Worker
+from jo_watchdog.app.smoke_gate import (
+    FAIL,
+    MANUAL,
+    PASS,
+    SKIP,
+    Result,
+    attest,
+    load_attestations,
+    verdict,
+    verify_capture,
+)
+from jo_watchdog.app.wiring import build_adapters, build_worker, missing_wiring
 from jo_watchdog.core.extraction import EXTRACTED_FIELDS, PROMPT_TAG, Extraction
 from jo_watchdog.core.masker import WITHHELD, outbound_text
 from jo_watchdog.core.report import DRY_RUN_HEADER
@@ -123,8 +156,7 @@ class AlwaysJoClassifier:
         )
 
 
-def synthetic_update(config: Config, text: str) -> IncomingUpdate:
-    message_id = int(time.time() * 1000) % 2_000_000_000
+def synthetic_update(config: Config, text: str, message_id: int) -> IncomingUpdate:
     return IncomingUpdate(
         update_id=1,
         chat_id=config.intake_chat_id,
@@ -138,26 +170,20 @@ def synthetic_update(config: Config, text: str) -> IncomingUpdate:
 # -- result plumbing ----------------------------------------------------------
 
 
-@dataclass
-class Result:
-    status: str  # PASS | FAIL | SKIP | MANUAL
-    detail: str = ""
-
-
 def ok(detail: str = "") -> Result:
-    return Result("PASS", detail)
+    return Result(PASS, detail)
 
 
 def fail(detail: str) -> Result:
-    return Result("FAIL", detail)
+    return Result(FAIL, detail)
 
 
 def skip(detail: str) -> Result:
-    return Result("SKIP", detail)
+    return Result(SKIP, detail)
 
 
 def manual(detail: str) -> Result:
-    return Result("MANUAL", detail)
+    return Result(MANUAL, detail)
 
 
 class Smoke:
@@ -171,6 +197,8 @@ class Smoke:
         self.schemas: dict[str, dict] = {}
         self.deliverable_ids: dict[str, str] = {}
         self.smoke_page_key: str | None = None
+        # One explicit identity for the synthetic fixture, printed so it can be traced.
+        self.fixture_message_id = args.fixture_message_id or int(time.time() * 1000) % 2_000_000_000
 
     async def open(self) -> None:
         if os.environ.get("NOTION_API_KEY"):
@@ -406,73 +434,90 @@ async def step_masker(s: Smoke) -> Result:
     return ok(f"{len(cases['positive'])} positive, {len(cases['negative'])} negative cases")
 
 
-async def step_pipeline(s: Smoke) -> Result:
-    """Synthetic in-scope message through ledger, plan, Notion write, read-back and ops."""
-    if not s.notion:
-        return skip("NOTION_API_KEY not set")
-    synthetic = synthetic_update(s.config, f"{SMOKE_MARK}\nPurpose: smoke check\npw: smoke-secret")
-    config = s.config.model_copy(update={"dry_run": False})
+class ReadOnlyNotion:
+    """Real Notion for cache refreshes and Deliverable lookups; page writes are forbidden."""
+
+    def __init__(self, notion):
+        self._notion = notion
+
+    def __getattr__(self, name):
+        return getattr(self._notion, name)
+
+    async def create_page(self, payload):
+        raise AssertionError("dry run called Notion create")
+
+    async def retrieve_page(self, page_id):
+        raise AssertionError("dry run called Notion retrieve")
+
+
+async def synthetic_capture(s: Smoke, text: str, *, dry_run: bool) -> tuple[Result, object]:
+    """Run one named fixture through the production-wired worker on an isolated ledger.
+
+    Real Notion, caches, Jev matcher and Deliverable source; only Telegram (a
+    recorder) and the classifier (a fixed verdict) are stood in, so the message's
+    own ledger, Notion and outbox facts can be checked.
+    """
+    if missing_secrets():
+        return skip(f"production wiring needs every secret; missing {missing_secrets()}"), None
+    synthetic = synthetic_update(s.config, text, s.fixture_message_id)
+    key = f"{synthetic.chat_id}:{synthetic.message_id}"
+    config = s.config.model_copy(update={"dry_run": dry_run})
+    telegram = RecordingTelegram([synthetic])
+    adapters = build_adapters(config)
+    notion = ReadOnlyNotion(adapters.notion) if dry_run else adapters.notion
+    adapters = adapters.with_(telegram=telegram, classifier=AlwaysJoClassifier(), notion=notion)
     with tempfile.TemporaryDirectory() as tmp:
         ledger = Ledger(Path(tmp) / "smoke.db")
-        telegram = RecordingTelegram([synthetic])
-        worker = Worker(
-            ledger=ledger,
-            telegram=telegram,
-            notion=s.notion,
-            classifier=AlwaysJoClassifier(),
-            config=config,
-        )
         try:
-            await worker.run_once()
-            key = f"{synthetic.chat_id}:{synthetic.message_id}"
+            worker = build_worker(config, ledger, adapters)
+            if absent := missing_wiring(worker):
+                return fail(f"smoke worker lacks production wiring: {absent}"), telegram
+            for _ in range(3):  # poll, drain, deliver; a later cycle only finishes the tail
+                await worker.run_once()
+                msg = ledger.get_message(key)
+                if msg and msg["state"] in ("done", "ignored", "exhausted"):
+                    break
+                if dry_run and msg and msg["state"] == "planned":
+                    break
+            result = await verify_capture(
+                ledger,
+                key,
+                notion=adapters.notion,
+                expect_dry_run=dry_run,
+                recorded_reactions=telegram.reactions,
+            )
             msg = ledger.get_message(key)
+            s.smoke_page_key = key if msg and msg["notion_page_id"] else None
+            if msg and msg["notion_page_id"]:
+                page = await adapters.notion.retrieve_page(msg["notion_page_id"])
+                print(f"    created {page.get('url')} — delete it by hand")
+                if "smoke-secret" in json.dumps(page):
+                    return fail("credential reached Notion properties"), telegram
         finally:
+            await adapters.close()
             ledger.close()
-    if msg["state"] != "done":
-        return fail(f"stopped at {msg['state']}")
-    if msg["readback_mismatch"]:
-        return fail(f"read-back mismatch: {msg['readback_mismatch']}")
-    page = await s.notion.retrieve_page(msg["notion_page_id"])
-    s.smoke_page_key = key
-    print(f"    created {page.get('url')} — delete it by hand")
-    if "smoke-secret" in json.dumps(page):
-        return fail("credential reached Notion properties")
-    return ok(
-        f"written, read back, reaction recorded, {len(telegram.sent)} ops post(s) rendered"
+    return result, telegram
+
+
+async def step_pipeline(s: Smoke) -> Result:
+    """Synthetic in-scope message: ledger, plan, Notion write, read-back, outbox, reaction."""
+    print(f"    fixture message {s.config.intake_chat_id}:{s.fixture_message_id}")
+    result, _ = await synthetic_capture(
+        s, f"{SMOKE_MARK}\nPurpose: smoke check\npw: smoke-secret", dry_run=False
     )
+    if result.status == PASS:
+        result.detail += " (Telegram recorded, not live)"
+    return result
 
 
 async def step_dry_run(s: Smoke) -> Result:
     """Dry-run stops at `planned`: one masked ops post, no Notion call, no reaction."""
-
-    class NoNotion:
-        async def create_page(self, payload):
-            raise AssertionError("dry run called Notion create")
-
-        async def retrieve_page(self, page_id):
-            raise AssertionError("dry run called Notion retrieve")
-
-    synthetic = synthetic_update(s.config, f"{SMOKE_MARK}\npw: smoke-secret")
-    config = s.config.model_copy(update={"dry_run": True})
-    with tempfile.TemporaryDirectory() as tmp:
-        ledger = Ledger(Path(tmp) / "smoke.db")
-        telegram = RecordingTelegram([synthetic])
-        worker = Worker(
-            ledger=ledger,
-            telegram=telegram,
-            notion=NoNotion(),
-            classifier=AlwaysJoClassifier(),
-            config=config,
-        )
-        try:
-            await worker.run_once()
-            msg = ledger.get_message(f"{synthetic.chat_id}:{synthetic.message_id}")
-        finally:
-            ledger.close()
+    result, telegram = await synthetic_capture(s, f"{SMOKE_MARK}\npw: smoke-secret", dry_run=True)
+    if result.status != PASS:
+        return result
     posts = [text for _, _, text in telegram.sent if DRY_RUN_HEADER in text]
-    if msg["state"] != "planned" or telegram.reactions or len(posts) != 1:
-        return fail(f"state {msg['state']}, {len(telegram.reactions)} reaction(s), "
-                    f"{len(posts)} dry-run post(s)")
+    if telegram.reactions or len(posts) != 1:
+        return fail(f"{len(telegram.reactions)} reaction(s), {len(posts)} dry-run post(s)")
     if "smoke-secret" in posts[0]:
         return fail("dry-run post leaked a credential")
     if s.bot and s.args.live_telegram:
@@ -481,7 +526,7 @@ async def step_dry_run(s: Smoke) -> Result:
             parse_mode="HTML",
         )
         return ok("held at planned; masked plan posted to the ops topic")
-    return ok("held at planned; one masked plan rendered, no Notion call, no reaction")
+    return ok("held at planned; one masked plan rendered, no Notion write, no reaction")
 
 
 async def step_query_visibility(s: Smoke) -> Result:
@@ -642,55 +687,64 @@ async def step_jev(s: Smoke) -> Result:
     return ok(f"{len(names)} regression pairs scored by {snapshot}")
 
 
+class OnlyMessage:
+    """Passes through only the named intake message so a live run cannot capture others."""
+
+    def __init__(self, telegram, chat_id: int, message_id: int):
+        self._telegram = telegram
+        self._identity = (chat_id, message_id)
+
+    def __getattr__(self, name):
+        return getattr(self._telegram, name)
+
+    async def get_updates(self, offset: int, timeout: int):
+        updates = await self._telegram.get_updates(offset, timeout)
+        return [u for u in updates if (u.chat_id, u.message_id) == self._identity]
+
+
 async def step_live_telegram(s: Smoke) -> Result:
     if not s.args.live_telegram:
-        return skip("pass --live-telegram, then post a test JO in the intake topic")
-    if not s.bot or not s.notion:
-        return skip("TELEGRAM_BOT_TOKEN and NOTION_API_KEY are both needed")
-    from jo_watchdog.adapters.deepseek import DeepSeekClassifier
-    from jo_watchdog.adapters.telegram import AiogramTelegramClient
-    from jo_watchdog.app.config import deepseek_token
-
-    ledger = Ledger(s.config.ledger_path)
-    classifier = DeepSeekClassifier(
-        deepseek_token(),
-        base_url=s.config.deepseek_base_url,
-        model=s.config.deepseek_model,
-        timeout_seconds=s.config.deepseek_timeout_seconds,
-    )
-    try:
-        before = ledger.last_committed_offset()
-        print(f"    waiting up to {s.config.poll_timeout}s for a post in the intake topic…")
-        worker = Worker(
-            ledger=ledger,
-            telegram=AiogramTelegramClient(s.bot),
-            notion=s.notion,
-            classifier=classifier,
-            config=s.config,
-        )
-        await worker.run_once()
-        rows = ledger._conn.execute(
-            "SELECT telegram_key, state, notion_page_id FROM messages"
-            " WHERE update_id > ? ORDER BY id",
-            (before,),
-        ).fetchall()
-    finally:
-        await classifier.close()
-        ledger.close()
-    if not rows:
-        return fail("no in-scope post arrived; check intake_chat_id/intake_topic_id")
-    last = dict(rows[-1])
-    expected = "planned" if s.config.dry_run else "done"
-    if last["state"] == "ignored":
-        return manual(f"{last['telegram_key']} was classified not-a-JO; post a real JO and re-run")
-    if last["state"] != expected:
-        return fail(f"{last['telegram_key']} stopped at {last['state']}, want {expected}")
+        return skip("pass --live-telegram --live-message-id <id> after posting a test JO")
+    if not s.args.live_message_id:
+        return skip("--live-message-id is required: the Telegram message id of the post to capture")
+    if missing_secrets():
+        return skip(f"production wiring needs every secret; missing {missing_secrets()}")
+    chat_id, message_id = s.config.intake_chat_id, s.args.live_message_id
+    key = f"{chat_id}:{message_id}"
+    adapters = build_adapters(s.config)
+    adapters = adapters.with_(telegram=OnlyMessage(adapters.telegram, chat_id, message_id))
+    with tempfile.TemporaryDirectory() as tmp:
+        # Isolated ledger: the service's real ledger and offset are never touched.
+        ledger = Ledger(Path(tmp) / "smoke-live.db")
+        try:
+            worker = build_worker(s.config, ledger, adapters)
+            if absent := missing_wiring(worker):
+                return fail(f"smoke worker lacks production wiring: {absent}")
+            print(f"    waiting up to {s.config.poll_timeout}s for {key} in the intake topic…")
+            for _ in range(3):
+                await worker.run_once()
+                msg = ledger.get_message(key)
+                if msg and msg["state"] in ("done", "planned", "ignored", "exhausted"):
+                    break
+            msg = ledger.get_message(key)
+            if msg is None:
+                return fail(f"{key} did not arrive; check the id and the intake chat/topic")
+            if msg["state"] == "ignored":
+                return manual(f"{key} was classified not-a-JO; post a real JO and re-run")
+            result = await verify_capture(
+                ledger, key, notion=adapters.notion, expect_dry_run=s.config.dry_run
+            )
+        finally:
+            await adapters.close()
+            ledger.close()
+    if result.status != PASS:
+        return result
     await s.bot.send_message(
         s.config.ops_chat_id,
-        f"🧪 Smoke test: captured {last['telegram_key']} ({last['state']}).",
+        f"🧪 Smoke test: captured {key}.",
         message_thread_id=s.config.ops_topic_id,
     )
-    return ok(f"{last['telegram_key']} {last['state']}; ops line posted")
+    return ok(f"{result.detail}; ops line posted")
 
 
 def pending(ticket: str, what: str) -> Callable[[Smoke], Awaitable[Result]]:
@@ -733,13 +787,21 @@ STEPS: list[tuple[str, Callable[[Smoke], Awaitable[Result]]]] = [
 async def run(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     only = set(args.only.split(",")) if args.only else None
-    unknown = (only or set()) - {name for name, _ in STEPS}
+    names = [name for name, _ in STEPS]
+    unknown = (only or set()) - set(names)
     if unknown:
         print(f"unknown steps: {', '.join(sorted(unknown))}")
         return 2
+    try:
+        attestations = (
+            load_attestations(args.attestations, set(names)) if args.attestations else {}
+        )
+    except (OSError, ValueError, TypeError) as exc:
+        print(f"bad attestations file: {exc}")
+        return 2
     s = Smoke(config, args)
     await s.open()
-    counts: dict[str, int] = {}
+    results: dict[str, Result] = {}
     try:
         for name, step in STEPS:
             if only and name not in only:
@@ -748,12 +810,18 @@ async def run(args: argparse.Namespace) -> int:
                 result = await step(s)
             except Exception as exc:  # one broken step must not hide the rest
                 result = fail(f"{type(exc).__name__}: {outbound_text(str(exc)).text}")
-            counts[result.status] = counts.get(result.status, 0) + 1
-            print(f"{result.status:<6} {name}: {result.detail}")
+            result = attest(result, attestations.get(name))
+            results[name] = result
+            print(f"{result.status:<8} {name}: {result.detail}")
     finally:
         await s.close()
+    counts: dict[str, int] = {}
+    for result in results.values():
+        counts[result.status] = counts.get(result.status, 0) + 1
     print("\n" + ", ".join(f"{n} {k}" for k, n in sorted(counts.items())))
-    return 1 if counts.get("FAIL") else 0
+    final = verdict(results, names, selected_only=bool(only))
+    print(f"\n{final.label} VERIFICATION" + "".join(f"\n  {r}" for r in final.reasons))
+    return final.exit_code
 
 
 def main() -> None:
@@ -763,6 +831,20 @@ def main() -> None:
     parser.add_argument("--config", default="config.yaml", help="path to config.yaml")
     parser.add_argument("--only", help="comma-separated step names to run")
     parser.add_argument("--live-telegram", action="store_true", help="capture one real post")
+    parser.add_argument(
+        "--live-message-id",
+        type=int,
+        help="with --live-telegram: the Telegram message id of the one post to capture",
+    )
+    parser.add_argument(
+        "--fixture-message-id",
+        type=int,
+        help="message id for the synthetic fixture (default: derived from the clock)",
+    )
+    parser.add_argument(
+        "--attestations",
+        help="JSON list of {step, actor, at, scope, evidence} settling SKIP/MANUAL steps by hand",
+    )
     parser.add_argument(
         "--probe-unknown-select",
         action="store_true",
