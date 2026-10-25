@@ -35,6 +35,8 @@ Add deterministic verification and durable private-ops reporting without gating 
 
 All findings for one capture go into one message:
 
+Display fields (reasons, Title, Names, finding payloads) are masked, then line breaks and runs of whitespace collapse to one space, so every labelled fact and every finding is exactly one physical line (D2). Stored and raw fields are never flattened.
+
 ```
 ⚠️ Flagged on capture
 `<Name or masked first line>`

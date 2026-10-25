@@ -245,3 +245,31 @@ class LinkTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SingleLineFactTests(unittest.TestCase):
+    def test_multiline_fields_render_one_labelled_fact_per_line(self):
+        findings = [
+            Finding(code="unsure", params={"reasons": "No header.\n\nTwo   topics\r\nhere"}),
+            Finding(code="deadline_unparsed", params={"raw": "tom\norrow"}),
+            Finding(code="number_reuse", params={"jo_number": "#074", "url": ROW, "days": 1}),
+        ]
+        text = render_capture_report(
+            name="MFG - TOC\nJO #074",
+            findings=findings,
+            page_url=ROW,
+            intake_url="https://t.me/c/1/2/3",
+        )
+        lines = text.split("\n")
+        self.assertEqual(lines[1], "<code>MFG - TOC JO #074</code>")
+        self.assertIn("Classifier unsure: No header. Two topics here", lines)
+        self.assertIn('Deadline "tom orrow" couldn\'t be turned into a date', lines)
+        self.assertEqual(sum(1 for x in lines if x.startswith("#074 already used on")), 1)
+
+    def test_multiline_credential_is_masked_before_flattening(self):
+        line = finding_line(
+            Finding(code="unsure", params={"reasons": "login\npassword:\nhunter2\nthanks"})
+        )
+        self.assertNotIn("hunter2", line)
+        self.assertNotIn("\n", line)
+        self.assertIn(WITHHELD, line)
