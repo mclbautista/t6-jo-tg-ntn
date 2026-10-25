@@ -42,6 +42,20 @@ Side effects, by step:
   Stop the running watchdog first: two pollers cannot share one bot token.
   Cleanup: delete the Notion row by hand (URL printed) and the smoke line.
 
+- ``readback_mismatch``, ``outbox_retry``, ``heartbeat_format``, ``matcher_failure``,
+  ``shadow_mode`` and ``dry_run_scenario`` (#62) are controlled scenarios. Each runs
+  the production worker (``build_worker``) on its own throwaway SQLite ledger with
+  scripted Telegram, Notion, classifier and Jev stand-ins and a fake clock, so they
+  need no secrets, make no network calls and write nothing to Notion or the real
+  ledger; there is nothing to clean up. They check read-back mismatch reporting,
+  Retry-After and five-total-attempt outbox retry, the 07:00 heartbeat window
+  (captures counted by immutable ``written_at``), that a Jev outage never blocks a
+  capture, that shadow mode keeps decisions but writes no Deliverable relation, and
+  that dry-run does no Notion write or reaction. With ``--live-telegram`` the
+  rendered ops posts are also sent to the real ops topic, each headed
+  "🧪 Smoke scenario <name>"; delete those posts by hand. Any other step that
+  needs a real account stays opt-in as described above.
+
 Steps the script cannot run report SKIP (or MANUAL). A person who checked one by
 hand records it in an ``--attestations`` JSON list of ``{step, actor, at, scope,
 evidence}`` (``at`` an ISO-8601 time); all five fields are required, and an
@@ -87,6 +101,7 @@ from jo_watchdog.app.smoke_gate import (
     verdict,
     verify_capture,
 )
+from jo_watchdog.app.smoke_scenarios import SCENARIOS
 from jo_watchdog.app.wiring import build_adapters, build_worker, missing_wiring
 from jo_watchdog.core.extraction import EXTRACTED_FIELDS, PROMPT_TAG, Extraction
 from jo_watchdog.core.masker import WITHHELD, outbound_text
@@ -747,12 +762,44 @@ async def step_live_telegram(s: Smoke) -> Result:
     return ok(f"{result.detail}; ops line posted")
 
 
+async def _relay_ops_posts(s: Smoke, name: str, posts: list[str]) -> None:
+    """With --live-telegram, post the scenario's rendered ops lines to the real ops topic."""
+    if not (s.bot and s.args.live_telegram):
+        return
+    for text in posts:
+        await s.bot.send_message(
+            s.config.ops_chat_id,
+            f"🧪 Smoke scenario {name} (controlled, not a real event)\n{text}",
+            message_thread_id=s.config.ops_topic_id,
+            parse_mode="HTML",
+        )
+
+
+def scenario_step(name: str) -> Callable[[Smoke], Awaitable[Result]]:
+    """A controlled operational scenario (#62): production wiring, scripted failures, no network."""
+
+    async def step(s: Smoke) -> Result:
+        run = await SCENARIOS[name](s.config)
+        if run.result.status == PASS:
+            await _relay_ops_posts(s, name, run.ops_posts)
+        return run.result
+
+    return step
+
+
 def pending(ticket: str, what: str) -> Callable[[Smoke], Awaitable[Result]]:
     async def step(_: Smoke) -> Result:
         return skip(f"{what} — not automated yet ({ticket}); check by hand")
 
     return step
 
+
+step_readback_mismatch = scenario_step("readback_mismatch")
+step_outbox_retry = scenario_step("outbox_retry")
+step_heartbeat_format = scenario_step("heartbeat_format")
+step_matcher_failure = scenario_step("matcher_failure")
+step_shadow_mode = scenario_step("shadow_mode")
+step_dry_run_scenario = scenario_step("dry_run_scenario")
 
 STEPS: list[tuple[str, Callable[[Smoke], Awaitable[Result]]]] = [
     ("config", step_config),
@@ -771,16 +818,17 @@ STEPS: list[tuple[str, Callable[[Smoke], Awaitable[Result]]]] = [
     ("deepseek", step_deepseek),
     ("jev", step_jev),
     ("dry_run", step_dry_run),
+    ("dry_run_scenario", step_dry_run_scenario),
     ("live_telegram", step_live_telegram),
     ("threshold_tuning", pending("#22/#26", "fuzzy and Deliverable thresholds against the corpus")),
-    ("readback_mismatch", pending("#23", "read-back mismatch reporting to ops")),
-    ("outbox_retry", pending("#23", "outbox retry after a failed ops post")),
+    ("readback_mismatch", step_readback_mismatch),
+    ("outbox_retry", step_outbox_retry),
     ("forward_origins", pending("#24", "user, hidden_user, chat and channel forward origins")),
     ("channel_link", pending("#24", "real channel-origin message link")),
     ("notion_retry_after", pending("#25", "Notion 429 Retry-After handling")),
-    ("heartbeat_format", pending("#25", "heartbeat formatting in the ops topic")),
-    ("matcher_failure", pending("#26", "Jev failure leaves Deliverable blank and posts one line")),
-    ("shadow_mode", pending("#26", "shadow mode writes no Deliverable relation")),
+    ("heartbeat_format", step_heartbeat_format),
+    ("matcher_failure", step_matcher_failure),
+    ("shadow_mode", step_shadow_mode),
 ]
 
 
