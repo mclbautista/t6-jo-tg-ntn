@@ -181,6 +181,17 @@ class VerifyCaptureTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, FAIL)
         self.assertIn("reaction_state", result.detail)
 
+    async def test_a_stuck_write_reports_the_masked_provider_error(self):
+        _, ledger, _, notion = await self._run([update(7, message_id=42)])
+        ledger._conn.execute(
+            "UPDATE messages SET state = 'writing', last_error = ? WHERE telegram_key = ?",
+            ("notion_write: NotionError: Notion 400 validation_error: time zone offsets", KEY),
+        )
+        result = await verify_capture(ledger, KEY, notion=notion)
+        self.assertEqual(result.status, FAIL)
+        self.assertIn("stopped at writing", result.detail)
+        self.assertIn("400 validation_error", result.detail)
+
     async def test_an_undelivered_outbox_is_not_a_pass(self):
         _, ledger, _, notion = await self._run([update(7, message_id=42)], fail_send=99)
         result = await verify_capture(ledger, KEY, notion=notion)

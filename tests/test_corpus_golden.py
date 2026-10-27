@@ -7,13 +7,19 @@ posting time and extraction stand-in.
 
 import json
 import unittest
+from datetime import datetime
 
 from jo_watchdog.core.header import parse_header
-from jo_watchdog.core.job_order import plan_job_order
+from jo_watchdog.core.job_order import manila_iso, plan_job_order
 from tests.corpus import FIXTURES, extraction_for, load_corpus, posted_at_for
 
 ALIASES = {"TO": "TOC"}
 SHIFTS = [("Assignee", "7:00 PM")]
+
+
+def manila_local(date_start: str) -> str:
+    """The golden files hold Manila local time; the payload sends the same instant in UTC."""
+    return manila_iso(datetime.fromisoformat(date_start))
 
 
 def load_scenarios() -> list[dict]:
@@ -65,8 +71,8 @@ class CorpusPlanGoldenTests(unittest.TestCase):
                     else None,
                     "jo_number_int": plan.jo_number_int,
                     "deadline_raw": ext.deadline_raw,
-                    "posted_at": plan.properties["Date"]["date"]["start"],
-                    "deadline": deadline["date"]["start"] if deadline else None,
+                    "posted_at": manila_local(plan.properties["Date"]["date"]["start"]),
+                    "deadline": manila_local(deadline["date"]["start"]) if deadline else None,
                     "deadline_source": plan.deadline_source,
                     "findings": [f.code for f in plan.findings],
                 }
@@ -89,7 +95,7 @@ class CorpusPlanGoldenTests(unittest.TestCase):
                     continue
                 # Every corpus shift row resolves to 19:00 on its stated/posting day.
                 day = expected["deadline"][:10]
-                self.assertEqual(deadline["date"]["start"], f"{day}T23:59:00+08:00")
+                self.assertEqual(manila_local(deadline["date"]["start"]), f"{day}T23:59:00+08:00")
                 self.assertEqual(plan.deadline_source, "fallback")
                 self.assertIn("shift_fallback", [f.code for f in plan.findings])
 
@@ -112,7 +118,7 @@ class CorpusPlanGoldenTests(unittest.TestCase):
                 deadline = plan.properties.get("Deadline")
                 self.assertEqual(
                     {
-                        "deadline": deadline["date"]["start"] if deadline else None,
+                        "deadline": manila_local(deadline["date"]["start"]) if deadline else None,
                         "source": plan.deadline_source,
                         "findings": [f.code for f in plan.findings],
                     },

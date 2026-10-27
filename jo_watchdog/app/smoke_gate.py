@@ -70,7 +70,10 @@ async def verify_capture(
         return Result(PASS, f"{key} planned and held; dry-run plan delivered")
 
     if msg["state"] != "done":
-        return Result(FAIL, f"{key} stopped at {msg['state']}")
+        detail = f"{key} stopped at {msg['state']}"
+        if msg.get("last_error"):
+            detail += f"; last error (masked): {msg['last_error']}"
+        return Result(FAIL, detail)
     if msg["readback_mismatch"]:
         return Result(FAIL, f"{key} read-back mismatch: {msg['readback_mismatch']}")
     if not msg["notion_page_id"]:
