@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from jo_watchdog.adapters.protocols import ClassifyResult, IncomingUpdate, PageRef
 from jo_watchdog.core.extraction import EXTRACTED_FIELDS, PROMPT_TAG, Extraction
 
@@ -110,6 +113,21 @@ class FakeTelegram:
         return 9000 + len(self.sent)
 
 
+def live_date(date: dict | None) -> dict | None:
+    """A Date as the live Notion API returned it in the #85 trial.
+
+    With ``time_zone`` Notion takes the wall clock of ``start`` in that zone and drops
+    the offset; seconds are dropped either way and ``time_zone`` reads back null.
+    """
+    if not date:
+        return None
+    start = datetime.fromisoformat(date["start"])
+    if date.get("time_zone"):
+        start = start.replace(tzinfo=ZoneInfo(date["time_zone"]))
+    start = start.astimezone(ZoneInfo("Asia/Manila")).replace(second=0, microsecond=0)
+    return {"start": start.isoformat(), "end": None, "time_zone": None}
+
+
 class FakeNotion:
     """Echoes written properties back so read-back comparison can run."""
 
@@ -149,6 +167,11 @@ class FakeNotion:
             "properties": {
                 "Name": {"title": [{"plain_text": name}]},
                 "Telegram Key": {"rich_text": [{"plain_text": key}]},
+                **{
+                    field: {"type": "date", "date": live_date(payload["properties"][field]["date"])}
+                    for field in ("Date", "Deadline")
+                    if field in payload["properties"]
+                },
             },
         }
         self.created.append(payload)
