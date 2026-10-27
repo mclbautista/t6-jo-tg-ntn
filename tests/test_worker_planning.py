@@ -3,11 +3,15 @@
 import json
 import tempfile
 import unittest
+from datetime import datetime, timedelta
 from pathlib import Path
 
+from jo_watchdog.adapters.notion import NotionError
 from jo_watchdog.app.caches import CacheManager
 from jo_watchdog.app.config import Config
 from jo_watchdog.app.worker import Worker
+from jo_watchdog.core.deadline import MANILA
+from jo_watchdog.core.job_order import manila_iso
 from jo_watchdog.ledger.db import Ledger
 from tests.fakes import FakeClassifier, FakeNotion, FakeTelegram, ok_result, update
 
@@ -108,7 +112,7 @@ class PlannerWiringTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(props["Assigned"], {"relation": [{"id": "c-ben"}]})
         self.assertEqual(props["cc"], {"relation": [{"id": "c-ana"}, {"id": LEIZETTE}]})
         self.assertEqual(
-            props["Deadline"]["date"]["start"], "2026-09-30T22:00:00+08:00"
+            manila_iso(datetime.fromisoformat(props["Deadline"]["date"]["start"])), "2026-09-30T22:00:00+08:00"
         )  # Benjamin's End of Shift
         self.assertNotIn("🗂️ Coordinator", props)
         self.assertEqual(
@@ -240,7 +244,7 @@ class ExplicitDeadlineYearTests(unittest.IsolatedAsyncioTestCase):
         await h.run()
 
         props = h.notion.created[0]["properties"]
-        self.assertEqual(props["Deadline"]["date"]["start"], "2030-09-30T22:00:00+08:00")
+        self.assertEqual(manila_iso(datetime.fromisoformat(props["Deadline"]["date"]["start"])), "2030-09-30T22:00:00+08:00")
         notes = props["Notes"]["rich_text"][0]["text"]["content"]
         self.assertIn("Deadline as posted: Sep 30, 2030 end of shift", notes)
         self.assertTrue(notes.startswith("keep this"))
@@ -251,7 +255,7 @@ class ExplicitDeadlineYearTests(unittest.IsolatedAsyncioTestCase):
         await h.run()
 
         props = h.notion.created[0]["properties"]
-        self.assertEqual(props["Deadline"]["date"]["start"], "2020-09-16T17:00:00+08:00")
+        self.assertEqual(manila_iso(datetime.fromisoformat(props["Deadline"]["date"]["start"])), "2020-09-16T17:00:00+08:00")
         self.assertIn(
             "Deadline as posted: Sep 16, 2020 5PM",
             props["Notes"]["rich_text"][0]["text"]["content"],
@@ -309,3 +313,88 @@ class DryRunReportTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Department: TOC", text)
         self.assertIn("Assigned: c-ben", text)
         self.assertNotIn("'rich_text'", text)
+
+
+def _notion_date_error(payload: dict) -> NotionError | None:
+    """Notion's rule: a date with ``time_zone`` must carry a zero UTC offset."""
+    for prop in payload["properties"].values():
+        date = prop.get("date") if isinstance(prop, dict) else None
+        if not date or not date.get("time_zone"):
+            continue
+        for edge in ("start", "end"):
+            value = date.get(edge)
+            if value and datetime.fromisoformat(value).utcoffset() != timedelta(0):
+                return NotionError(
+                    400,
+                    "validation_error",
+                    "body failed validation: if time zone is explicitly provided, "
+                    "start and end can't have non-zero time offsets from UTC.",
+                )
+    return None
+
+
+class StrictDateNotion(FakeNotion):
+    async def create_page(self, payload: dict):
+        error = _notion_date_error(payload)
+        if error:
+            self.create_calls += 1
+            raise error
+        return await super().create_page(payload)
+
+
+class NotionDatePayloadTests(unittest.IsolatedAsyncioTestCase):
+    async def test_date_and_deadline_keep_the_instant_and_manila_zone_at_utc_offset(self):
+        h = Harness(self, task="Cut", deadline_raw="September 16, 2am")
+        h.notion = h.worker.notion = StrictDateNotion()
+        await h.run()
+        [payload] = h.notion.created
+        for name in ("Date", "Deadline"):
+            date = payload["properties"][name]["date"]
+            self.assertEqual(date["time_zone"], "Asia/Manila")
+            self.assertEqual(datetime.fromisoformat(date["start"]).utcoffset(), timedelta(0))
+        posted = datetime.fromisoformat(payload["properties"]["Date"]["date"]["start"])
+        self.assertEqual(posted.astimezone(MANILA).utcoffset(), timedelta(hours=8))
+        deadline = datetime.fromisoformat(payload["properties"]["Deadline"]["date"]["start"])
+        self.assertEqual(deadline.astimezone(MANILA).strftime("%m-%d %H:%M"), "09-16 02:00")
+
+    async def test_the_rejected_shape_is_recognised_by_the_strict_fake(self):
+        bad = {"date": {"start": "2026-09-15T10:00:00+08:00", "time_zone": "Asia/Manila"}}
+        self.assertIsNotNone(_notion_date_error({"properties": {"Date": bad}}))
+
+    async def test_stuck_row_with_a_plan_stored_in_the_rejected_shape_recovers_once(self):
+        h = Harness(self, task="Cut", deadline_raw="September 16, 2am")
+        h.notion = h.worker.notion = StrictDateNotion()
+        h.worker.config = h.config.model_copy(update={"dry_run": True})
+        await h.run()
+        # Store the plan as the pre-fix build did: +08:00 beside time_zone.
+        plan = h.plan()
+        for field in ("Date", "Deadline"):
+            date = plan["properties"][field]["date"]
+            date["start"] = (
+                datetime.fromisoformat(date["start"]).astimezone(MANILA).isoformat()
+            )
+            self.assertTrue(date["start"].endswith("+08:00"))
+        h.ledger._conn.execute(
+            "UPDATE messages SET plan_json = ? WHERE telegram_key = ?",
+            (json.dumps(plan), KEY),
+        )
+        h.worker.config = h.config.model_copy(update={"dry_run": False})
+        await h.worker.drain_once()
+
+        self.assertEqual(h.notion.create_calls, 1)
+        [payload] = h.notion.created
+        self.assertIsNone(_notion_date_error(payload))
+        self.assertEqual(h.ledger.get_message(KEY)["state"], "done")
+
+    async def test_rejected_write_keeps_the_provider_message_and_creates_no_page(self):
+        h = Harness(self, task="Cut")
+        h.notion = h.worker.notion = FakeNotion(
+            fail_create=True,
+            create_error=NotionError(400, "validation_error", "time zone offsets from UTC"),
+        )
+        await h.run()
+        row = h.ledger.get_message(KEY)
+        self.assertEqual(row["state"], "writing")
+        self.assertIn("validation_error", row["last_error"])
+        self.assertIn("time zone offsets from UTC", row["last_error"])
+        self.assertFalse(row["notion_page_id"])

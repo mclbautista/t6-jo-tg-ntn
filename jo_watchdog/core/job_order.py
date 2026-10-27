@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from datetime import datetime, time
+from datetime import UTC, datetime, time
 from typing import Any, Protocol
 
 from pydantic import BaseModel, Field
@@ -138,6 +138,49 @@ def manila_iso(value: datetime) -> str:
     return value.astimezone(MANILA).isoformat()
 
 
+def notion_date(value: datetime) -> dict[str, Any]:
+    """A Notion Date value for ``value``: the instant in UTC plus the Manila ``time_zone``.
+
+    Notion rejects a ``time_zone`` next to a non-zero UTC offset in ``start``, so the
+    instant is sent at offset zero and Notion displays it in Asia/Manila.
+    """
+    return {"date": {"start": value.astimezone(UTC).isoformat(), "time_zone": TIME_ZONE}}
+
+
+def _utc_date(date: dict[str, Any]) -> dict[str, Any]:
+    """Re-express a stored date at UTC offset zero when it carries a ``time_zone``."""
+    if not date.get("time_zone"):
+        return date
+    fixed = dict(date)
+    for edge in ("start", "end"):
+        value = date.get(edge)
+        if not isinstance(value, str):
+            continue
+        try:
+            parsed = datetime.fromisoformat(value)
+        except ValueError:
+            continue
+        if parsed.tzinfo is not None:
+            fixed[edge] = parsed.astimezone(UTC).isoformat()
+    return fixed
+
+
+def normalize_date_properties(properties: dict[str, Any]) -> dict[str, Any]:
+    """Make every Date property Notion-acceptable, including ones in plans stored earlier.
+
+    Plans stored before the fix carry ``+08:00`` beside ``time_zone``; the instant is
+    kept and only its offset is rewritten, so a stuck row is replanned by replay.
+    """
+    return {
+        name: (
+            {**prop, "date": _utc_date(prop["date"])}
+            if isinstance(prop, dict) and isinstance(prop.get("date"), dict)
+            else prop
+        )
+        for name, prop in properties.items()
+    }
+
+
 def rich_text(value: str) -> list[dict]:
     """Split a text value into Notion rich-text items of at most 2000 characters."""
     return [
@@ -225,16 +268,14 @@ def plan_job_order(
         "Name": {"title": rich_text(name)},
         "Telegram Key": {"rich_text": rich_text(telegram_key)},
         "Status": {"status": {"name": STATUS_NEEDS_INTAKE_REVIEW}},
-        "Date": {"date": {"start": manila_iso(posted_at), "time_zone": TIME_ZONE}},
+        "Date": notion_date(posted_at),
     }
     if digits is not None:
         properties["JO Number"] = {"rich_text": rich_text(f"#{digits}")}
     if department:
         properties["Department"] = {"select": {"name": department}}
     if deadline.deadline is not None:
-        properties["Deadline"] = {
-            "date": {"start": manila_iso(deadline.deadline), "time_zone": TIME_ZONE}
-        }
+        properties["Deadline"] = notion_date(deadline.deadline)
     for field, prop in TEXT_PROPERTIES.items():
         raw_value = getattr(extraction, field)
         value = _verbatim(raw_value) if field == "title" else _clean(raw_value)
@@ -301,6 +342,6 @@ def build_job_order_payload(plan: JobOrderPlan, *, data_source_id: str) -> dict:
     ]
     return {
         "parent": {"data_source_id": data_source_id},
-        "properties": plan.properties,
+        "properties": normalize_date_properties(plan.properties),
         "children": children,
     }
