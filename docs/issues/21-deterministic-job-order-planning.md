@@ -43,7 +43,7 @@ Turn a validated extraction into a deterministic, exact Notion plan for the Job 
 
 ### Dates and years
 
-- Deadline and Date go to Notion as the same instant at UTC offset zero with `time_zone: "Asia/Manila"` (Notion rejects `time_zone` beside a non-zero offset, #83); local-time reasoning stays in Asia/Manila.
+- All datetimes are ISO-8601 with `+08:00` and Notion `time_zone: "Asia/Manila"`.
 - Date = intake posting (or forwarding) time.
 - A month-and-day without a year takes the year that puts it closest to the posting date (so a late-December JO posted on 2 January resolves to the previous year).
 - Weekday names next to a date (`/ Monday`, `Tues`) are ignored for computation.
