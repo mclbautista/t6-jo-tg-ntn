@@ -3,7 +3,7 @@
 import json
 import tempfile
 import unittest
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from jo_watchdog.adapters.notion import NotionError
@@ -13,7 +13,7 @@ from jo_watchdog.app.worker import Worker
 from jo_watchdog.core.deadline import MANILA
 from jo_watchdog.core.job_order import manila_iso
 from jo_watchdog.ledger.db import Ledger
-from tests.fakes import FakeClassifier, FakeNotion, FakeTelegram, ok_result, update
+from tests.fakes import FakeClassifier, FakeNotion, FakeTelegram, live_date, ok_result, update
 
 KEY = "-100123:42"
 LEIZETTE = "c-leizette"
@@ -316,7 +316,7 @@ class DryRunReportTests(unittest.IsolatedAsyncioTestCase):
 
 
 def _notion_date_error(payload: dict) -> NotionError | None:
-    """Notion's rule: a date with ``time_zone`` must carry a zero UTC offset."""
+    """Notion's rule (#83): ``time_zone`` beside a non-zero UTC offset is a 400."""
     for prop in payload["properties"].values():
         date = prop.get("date") if isinstance(prop, dict) else None
         if not date or not date.get("time_zone"):
@@ -342,49 +342,92 @@ class StrictDateNotion(FakeNotion):
         return await super().create_page(payload)
 
 
+def _stored_with_time_zone(plan: dict, *, utc: bool) -> None:
+    """Rewrite a stored plan's dates in the shape an earlier build stored them."""
+    for field in ("Date", "Deadline"):
+        date = plan["properties"][field]["date"]
+        moment = datetime.fromisoformat(date["start"])
+        date["start"] = (moment.astimezone(UTC) if utc else moment.astimezone(MANILA)).isoformat()
+        date["time_zone"] = "Asia/Manila"
+
+
 class NotionDatePayloadTests(unittest.IsolatedAsyncioTestCase):
-    async def test_date_and_deadline_keep_the_instant_and_manila_zone_at_utc_offset(self):
+    async def test_date_and_deadline_are_sent_as_manila_offset_instants_without_time_zone(self):
         h = Harness(self, task="Cut", deadline_raw="September 16, 2am")
         h.notion = h.worker.notion = StrictDateNotion()
         await h.run()
         [payload] = h.notion.created
         for name in ("Date", "Deadline"):
             date = payload["properties"][name]["date"]
-            self.assertEqual(date["time_zone"], "Asia/Manila")
-            self.assertEqual(datetime.fromisoformat(date["start"]).utcoffset(), timedelta(0))
-        posted = datetime.fromisoformat(payload["properties"]["Date"]["date"]["start"])
-        self.assertEqual(posted.astimezone(MANILA).utcoffset(), timedelta(hours=8))
+            self.assertNotIn("time_zone", date)
+            self.assertEqual(datetime.fromisoformat(date["start"]).utcoffset(), timedelta(hours=8))
         deadline = datetime.fromisoformat(payload["properties"]["Deadline"]["date"]["start"])
-        self.assertEqual(deadline.astimezone(MANILA).strftime("%m-%d %H:%M"), "09-16 02:00")
+        self.assertEqual(deadline.strftime("%m-%d %H:%M"), "09-16 02:00")
+
+    async def test_live_readback_of_both_dates_matches_the_planned_instants(self):
+        h = Harness(self, task="Cut", deadline_raw="September 16, 2am")
+        await h.run()
+        row = h.ledger.get_message(KEY)
+        self.assertEqual(row["state"], "done")
+        self.assertFalse(row["readback_mismatch"])
+        page = next(iter(h.notion.pages.values()))
+        deadline = page["properties"]["Deadline"]["date"]
+        self.assertEqual(deadline["start"], "2026-09-16T02:00:00+08:00")
+        self.assertIsNone(deadline["time_zone"])
+
+    async def test_an_eight_hour_shift_on_readback_is_detected_and_reported(self):
+        h = Harness(self, task="Cut", deadline_raw="September 16, 2am")
+        shifted = FakeNotion()
+        original = shifted.retrieve_page
+
+        async def retrieve(page_id: str) -> dict:
+            page = await original(page_id)
+            date = page["properties"]["Deadline"]["date"]
+            date["start"] = (datetime.fromisoformat(date["start"]) - timedelta(hours=8)).isoformat()
+            return page
+
+        shifted.retrieve_page = retrieve
+        h.notion = h.worker.notion = shifted
+        await h.run()
+        row = h.ledger.get_message(KEY)
+        self.assertIn("Deadline differs", row["readback_mismatch"])
+        self.assertNotIn("Date differs", row["readback_mismatch"])
+        self.assertEqual(shifted.create_calls, 1)
+
+    async def test_the_old_utc_shape_would_have_read_back_eight_hours_early(self):
+        # The #85 trial: a UTC start with time_zone came back at the wall clock in Manila.
+        read = live_date({"start": "2026-10-27T09:20:02+00:00", "time_zone": "Asia/Manila"})
+        self.assertEqual(read["start"], "2026-10-27T09:20:00+08:00")
 
     async def test_the_rejected_shape_is_recognised_by_the_strict_fake(self):
         bad = {"date": {"start": "2026-09-15T10:00:00+08:00", "time_zone": "Asia/Manila"}}
         self.assertIsNotNone(_notion_date_error({"properties": {"Date": bad}}))
 
-    async def test_stuck_row_with_a_plan_stored_in_the_rejected_shape_recovers_once(self):
-        h = Harness(self, task="Cut", deadline_raw="September 16, 2am")
-        h.notion = h.worker.notion = StrictDateNotion()
-        h.worker.config = h.config.model_copy(update={"dry_run": True})
-        await h.run()
-        # Store the plan as the pre-fix build did: +08:00 beside time_zone.
-        plan = h.plan()
-        for field in ("Date", "Deadline"):
-            date = plan["properties"][field]["date"]
-            date["start"] = (
-                datetime.fromisoformat(date["start"]).astimezone(MANILA).isoformat()
-            )
-            self.assertTrue(date["start"].endswith("+08:00"))
-        h.ledger._conn.execute(
-            "UPDATE messages SET plan_json = ? WHERE telegram_key = ?",
-            (json.dumps(plan), KEY),
-        )
-        h.worker.config = h.config.model_copy(update={"dry_run": False})
-        await h.worker.drain_once()
+    async def test_stuck_rows_with_either_earlier_stored_shape_recover_once(self):
+        for utc in (False, True):
+            with self.subTest(utc=utc):
+                h = Harness(self, task="Cut", deadline_raw="September 16, 2am")
+                h.notion = h.worker.notion = StrictDateNotion()
+                h.worker.config = h.config.model_copy(update={"dry_run": True})
+                await h.run()
+                plan = h.plan()
+                _stored_with_time_zone(plan, utc=utc)
+                h.ledger._conn.execute(
+                    "UPDATE messages SET plan_json = ? WHERE telegram_key = ?",
+                    (json.dumps(plan), KEY),
+                )
+                h.worker.config = h.config.model_copy(update={"dry_run": False})
+                await h.worker.drain_once()
 
-        self.assertEqual(h.notion.create_calls, 1)
-        [payload] = h.notion.created
-        self.assertIsNone(_notion_date_error(payload))
-        self.assertEqual(h.ledger.get_message(KEY)["state"], "done")
+                self.assertEqual(h.notion.create_calls, 1)
+                [payload] = h.notion.created
+                self.assertNotIn("time_zone", payload["properties"]["Date"]["date"])
+                self.assertEqual(
+                    payload["properties"]["Deadline"]["date"]["start"], "2026-09-16T02:00:00+08:00"
+                )
+                row = h.ledger.get_message(KEY)
+                self.assertEqual(row["state"], "done")
+                self.assertFalse(row["readback_mismatch"])
 
     async def test_rejected_write_keeps_the_provider_message_and_creates_no_page(self):
         h = Harness(self, task="Cut")

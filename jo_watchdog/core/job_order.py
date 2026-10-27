@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from datetime import UTC, datetime, time
+from datetime import datetime, time
 from typing import Any, Protocol
 
 from pydantic import BaseModel, Field
@@ -34,7 +34,6 @@ from jo_watchdog.core.resolve import (
     relation_properties,
 )
 
-TIME_ZONE = "Asia/Manila"
 WATCHDOG_MARKER = "— added by the watchdog —"
 ASAP_NOTE = "ASAP — deprioritize other JOs"
 
@@ -139,19 +138,21 @@ def manila_iso(value: datetime) -> str:
 
 
 def notion_date(value: datetime) -> dict[str, Any]:
-    """A Notion Date value for ``value``: the instant in UTC plus the Manila ``time_zone``.
+    """A Notion Date value for ``value``: the instant at its Manila UTC offset, no ``time_zone``.
 
-    Notion rejects a ``time_zone`` next to a non-zero UTC offset in ``start``, so the
-    instant is sent at offset zero and Notion displays it in Asia/Manila.
+    Notion rejects a ``time_zone`` next to a non-zero offset (#83), and with a
+    ``time_zone`` it reads the wall clock of ``start`` in that zone and ignores the
+    offset: a UTC start came back eight hours early (#85). A bare offset keeps the
+    exact instant, which is what the read-back compares.
     """
-    return {"date": {"start": value.astimezone(UTC).isoformat(), "time_zone": TIME_ZONE}}
+    return {"date": {"start": manila_iso(value)}}
 
 
-def _utc_date(date: dict[str, Any]) -> dict[str, Any]:
-    """Re-express a stored date at UTC offset zero when it carries a ``time_zone``."""
-    if not date.get("time_zone"):
+def _instant_date(date: dict[str, Any]) -> dict[str, Any]:
+    """Drop ``time_zone`` from a stored date, keeping each instant at its Manila offset."""
+    if "time_zone" not in date:
         return date
-    fixed = dict(date)
+    fixed = {k: v for k, v in date.items() if k != "time_zone"}
     for edge in ("start", "end"):
         value = date.get(edge)
         if not isinstance(value, str):
@@ -161,19 +162,20 @@ def _utc_date(date: dict[str, Any]) -> dict[str, Any]:
         except ValueError:
             continue
         if parsed.tzinfo is not None:
-            fixed[edge] = parsed.astimezone(UTC).isoformat()
+            fixed[edge] = manila_iso(parsed)
     return fixed
 
 
 def normalize_date_properties(properties: dict[str, Any]) -> dict[str, Any]:
-    """Make every Date property Notion-acceptable, including ones in plans stored earlier.
+    """Make every Date property Notion-safe, including ones in plans stored earlier.
 
-    Plans stored before the fix carry ``+08:00`` beside ``time_zone``; the instant is
-    kept and only its offset is rewritten, so a stuck row is replanned by replay.
+    Plans stored by earlier builds carry ``time_zone`` (with ``+08:00`` before #83, with
+    UTC after it). Each instant is kept and re-expressed at the Manila offset without
+    ``time_zone``, so a stuck row is replanned by replay and no second page is made.
     """
     return {
         name: (
-            {**prop, "date": _utc_date(prop["date"])}
+            {**prop, "date": _instant_date(prop["date"])}
             if isinstance(prop, dict) and isinstance(prop.get("date"), dict)
             else prop
         )

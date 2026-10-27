@@ -167,7 +167,7 @@ class FieldTests(unittest.TestCase):
         self.assertEqual(p.properties["Status"], {"status": {"name": "Needs Intake Review"}})
         self.assertEqual(
             p.properties["Date"],
-            {"date": {"start": "2026-09-15T02:00:00+00:00", "time_zone": "Asia/Manila"}},
+            {"date": {"start": "2026-09-15T10:00:00+08:00"}},
         )
         self.assertEqual(text_of(p.properties["Telegram Key"]), "-1001:42")
 
@@ -229,7 +229,7 @@ class FieldTests(unittest.TestCase):
         p = plan(extraction(header_raw="MFG - TOC - JO #74", deadline_raw="September 16, 2am"))
         self.assertEqual(
             p.properties["Deadline"],
-            {"date": {"start": "2026-09-15T18:00:00+00:00", "time_zone": "Asia/Manila"}},
+            {"date": {"start": "2026-09-16T02:00:00+08:00"}},
         )
         self.assertEqual(p.deadline_source, "stated")
 
@@ -238,7 +238,7 @@ class FieldTests(unittest.TestCase):
             extraction(header_raw="MFG - TOC - JO #74", deadline_raw="end of shift"),
             assignee_shifts=[("Paul", "5:00 AM")],
         )
-        self.assertEqual(p.properties["Deadline"]["date"]["start"], "2026-09-15T21:00:00+00:00")
+        self.assertEqual(p.properties["Deadline"]["date"]["start"], "2026-09-16T05:00:00+08:00")
         self.assertEqual(p.deadline_source, "shift")
 
     def test_body_is_source_block_then_masked_raw_text(self):

@@ -574,6 +574,7 @@ class Worker:
             plan,
             retrieved_name=fields["name"],
             retrieved_telegram_key=fields["telegram_key"],
+            retrieved_dates=fields["dates"],
         )
 
         # Verification annotates, never gates: findings and their report are
