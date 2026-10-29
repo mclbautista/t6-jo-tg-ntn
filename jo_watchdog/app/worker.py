@@ -887,7 +887,6 @@ class Worker:
         )
 
     async def run_once(self) -> None:
-        self._beat()
         try:
             await self.refresh_caches()
             await self.poll_once()

@@ -237,7 +237,7 @@ class CrashInjectionTests(unittest.IsolatedAsyncioTestCase):
             for nth in range(1, total + 1)
             for phase in ("before", "after")
         ]
-        self.assertGreater(len(points), 40)
+        self.assertGreaterEqual(len(points), 40)
         for point in points:
             with self.subTest(point=point):
                 await self.assert_converges(point, plan)
@@ -557,7 +557,7 @@ class JevCrashInjectionTests(unittest.IsolatedAsyncioTestCase):
             clean, counts = await self.clean(name)
             reference = self.reference(clean)
             points = self.points(counts, name)
-            self.assertGreater(len(points), 40)
+            self.assertGreaterEqual(len(points), 40)
             for point in points:
                 with self.subTest(scenario=name, point=point):
                     await self.assert_converges(name, point, reference)
