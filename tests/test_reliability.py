@@ -475,6 +475,22 @@ class LivenessTests(unittest.IsolatedAsyncioTestCase):
         ok, _ = healthcheck.check(p.path, now=p.clock() + timedelta(minutes=3))
         self.assertFalse(ok)
 
+    async def test_failing_poll_cycles_do_not_stamp_liveness(self):
+        class Broken(FakeTelegram):
+            async def get_updates(self, offset, timeout):
+                raise RuntimeError("cannot serialize update")
+
+        p = Pipeline(self, telegram=Broken())
+        p.worker._beat()
+        started = p.clock()
+        for _ in range(5):
+            p.clock.advance(seconds=40)
+            with self.assertRaises(RuntimeError):
+                await p.worker.run_once()
+        self.assertEqual(p.ledger.poller_alive_at(), started)
+        ok, _ = healthcheck.check(p.path, now=p.clock())
+        self.assertFalse(ok)
+
     async def test_deadman_fires_after_ten_stale_minutes_and_not_before(self):
         p = Pipeline(self)
         await p.worker.run_once()

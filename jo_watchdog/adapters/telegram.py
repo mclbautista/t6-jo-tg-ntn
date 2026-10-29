@@ -31,7 +31,10 @@ class AiogramTelegramClient:
             if message is None:
                 continue
             edited = update.message is None
-            raw = update.model_dump(mode="json")
+            # exclude_unset keeps exactly what Telegram sent: aiogram fills unsent
+            # fields of some types (LinkPreviewOptions, ...) with ``Default``
+            # sentinels that pydantic cannot serialize to JSON.
+            raw = update.model_dump(mode="json", exclude_unset=True)
             result.append(
                 IncomingUpdate(
                     update_id=update.update_id,
