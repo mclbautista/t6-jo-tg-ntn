@@ -10,6 +10,8 @@ source message. Every later ticket widens this model.
 
 from __future__ import annotations
 
+import re
+
 from pydantic import BaseModel, Field
 
 from jo_watchdog.core.masker import outbound_text
@@ -70,6 +72,21 @@ def first_line_of(text: str) -> str:
         if line.strip():
             return line.strip()
     return ""
+
+
+_TAG_LINE = re.compile(r"\\?\[[^\[\]]+\\?\]")
+
+
+def header_line_of(text: str) -> str:
+    """Return the first non-empty line that is not a bracketed tag (``[ADVANCED]``).
+
+    Tag lines may precede the header; the header is the first line after them.
+    Falls back to the first line when every line is a tag.
+    """
+    for line in text.split("\n"):
+        if line.strip() and not _TAG_LINE.fullmatch(line.strip()):
+            return line.strip()
+    return first_line_of(text)
 
 
 def build_plan(name: str, telegram_key: str, raw_text: str, *, source_block: str = "") -> Plan:

@@ -68,6 +68,16 @@ class NameTests(unittest.TestCase):
         )
         self.assertEqual(p.name, "ALTA - OE - JO #04")
 
+    def test_leading_tag_line_is_not_the_header(self):
+        raw = "[ADVANCED]\nMC7 - TOC - #0034\nbody"
+        p = plan(extraction(header_raw="MC7 - TOC - #0034", jo_number_raw="#0034"), raw_text=raw)
+        self.assertEqual(p.name, "MC7 - TOC - JO #0034")
+        self.assertEqual(text_of(p.properties["JO Number"]), "#0034")
+
+    def test_escaped_tag_line_is_skipped(self):
+        raw = "\\[ADVANCED\\]\nPTG - TOC - #047\nbody"
+        self.assertEqual(plan(extraction(), raw_text=raw).name, "PTG - TOC - JO #047")
+
     def test_unparsed_header_falls_back_to_first_line(self):
         p = plan(
             extraction(header_raw="TOC - Job Order", department_raw="TOC", jo_number_raw="#12"),

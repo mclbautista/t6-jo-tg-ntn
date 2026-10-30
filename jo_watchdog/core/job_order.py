@@ -26,7 +26,7 @@ from jo_watchdog.core.header import (
 )
 from jo_watchdog.core.masker import mask_text, outbound_text
 from jo_watchdog.core.payload import STATUS_NEEDS_INTAKE_REVIEW
-from jo_watchdog.core.plan import BLOCK_LIMIT, first_line_of, split_blocks
+from jo_watchdog.core.plan import BLOCK_LIMIT, header_line_of, split_blocks
 from jo_watchdog.core.resolve import (
     DepartmentResolution,
     PeopleResolution,
@@ -244,7 +244,7 @@ def plan_job_order(
     for Department and the canonical Name; ``None`` means validation has not run.
     """
     # The posted first line is authoritative; the extracted header is never trusted over it.
-    header_raw = first_line_of(raw_text)
+    header_raw = header_line_of(raw_text)
     header = parse_header(header_raw, department_aliases)
 
     department: str | None = None
