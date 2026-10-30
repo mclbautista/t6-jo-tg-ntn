@@ -1132,9 +1132,9 @@
   },
   {
    "index": 70,
-   "name": "[LATE JO]",
-   "jo_number": null,
-   "jo_number_int": null,
+   "name": "PTG - AE - JO #040",
+   "jo_number": "#040",
+   "jo_number_int": 40,
    "deadline_raw": "August 18, Tuesday, 8PM",
    "posted_at": "2026-08-18T10:00:00+08:00",
    "deadline": "2026-08-18T20:00:00+08:00",

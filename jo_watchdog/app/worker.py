@@ -51,7 +51,7 @@ from jo_watchdog.core.payload import (
     page_url_for,
     verify_readback,
 )
-from jo_watchdog.core.plan import first_line_of
+from jo_watchdog.core.plan import first_line_of, header_line_of
 from jo_watchdog.core.provenance import parse_forward_origin, source_block
 from jo_watchdog.core.report import (
     forward_origin_from_raw,
@@ -454,7 +454,7 @@ class Worker:
 
         people = project = department = None
         if caches is not None:
-            header = parse_header(first_line_of(msg["text"]), aliases)
+            header = parse_header(header_line_of(msg["text"]), aliases)
             if header is not None:
                 project_raw, department_token = header.project, header.department
             else:
