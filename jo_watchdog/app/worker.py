@@ -870,10 +870,17 @@ class Worker:
             # window is skipped and the first heartbeat follows at the next 07:00.
             self.ledger.skip_heartbeat(start, end)
             return False
+        last = self.ledger.previous_heartbeat(start)
         text = render_heartbeat(
             window_start=start,
             window_end=end,
             stats=self.ledger.heartbeat_stats(start, end),
+            previous=(
+                datetime.fromisoformat(last["window_end"]),
+                intake_link(last["chat_id"], last["topic_id"], last["telegram_message_id"]),
+            )
+            if last
+            else None,
         )
         return self.ledger.enqueue_heartbeat(
             start,

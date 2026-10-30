@@ -574,6 +574,21 @@ class Ledger:
     def has_heartbeats(self) -> bool:
         return self._conn.execute("SELECT 1 FROM heartbeats LIMIT 1").fetchone() is not None
 
+    def previous_heartbeat(self, window_start: datetime) -> dict | None:
+        """The newest heartbeat before ``window_start`` that Telegram actually accepted.
+
+        Skipped windows (no outbox row) and posts that never reached Telegram are
+        passed over, so the link always opens a real message.
+        """
+        row = self._conn.execute(
+            "SELECT h.window_end, o.chat_id, o.topic_id, o.telegram_message_id"
+            " FROM heartbeats h JOIN outbox o ON o.id = h.outbox_id"
+            " WHERE h.window_start < ? AND o.state = 'sent' AND o.telegram_message_id IS NOT NULL"
+            " ORDER BY h.window_start DESC LIMIT 1",
+            (fmt_utc(window_start),),
+        ).fetchone()
+        return dict(row) if row else None
+
     def skip_heartbeat(self, window_start: datetime, window_end: datetime) -> None:
         """Mark a window as handled without a post (a brand-new ledger's first window)."""
         self._conn.execute(
