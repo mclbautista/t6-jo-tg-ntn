@@ -301,11 +301,24 @@ def _stamp(when: datetime) -> str:
     return f"{local.strftime('%b')} {local.day} {local.strftime('%H:%M')}"
 
 
-def render_heartbeat(*, window_start: datetime, window_end: datetime, stats: dict) -> str:
-    """The daily heartbeat for ``[window_start, window_end)`` (#25), from ledger stats."""
+def render_heartbeat(
+    *,
+    window_start: datetime,
+    window_end: datetime,
+    stats: dict,
+    previous: tuple[datetime, str] | None = None,
+) -> str:
+    """The daily heartbeat for ``[window_start, window_end)`` (#25), from ledger stats.
+
+    ``previous`` is the (sent date, URL) of the last heartbeat that was posted.
+    """
     d = stats["deliverables"]
-    lines = [
-        f"📋 Daily heartbeat — {_stamp(window_start)} → {_stamp(window_end)}",
+    lines = [f"📋 Daily heartbeat — {_stamp(window_start)} → {_stamp(window_end)}"]
+    if previous:
+        sent, url = previous
+        local = sent.astimezone(MANILA)
+        lines.append("↩︎ " + _link(f"Previous heartbeat ({local.strftime('%b')} {local.day})", url))
+    lines += [
         "",
         f"Captured: {stats['captured']}",
         f"Flagged: {stats['flagged']}",

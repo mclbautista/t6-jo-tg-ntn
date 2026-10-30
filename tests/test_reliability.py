@@ -608,6 +608,42 @@ class HeartbeatTests(unittest.IsolatedAsyncioTestCase):
         await p.worker.run_once()
         self.assertEqual(len(p.outbox("heartbeat")), 2)
 
+    async def test_heartbeat_links_to_the_previous_sent_heartbeat(self):
+        p = Pipeline(self)
+        await p.worker.run_once()
+        p.clock.advance(hours=24)
+        await p.worker.run_once()
+        (first,) = p.outbox("heartbeat")
+        self.assertNotIn("Previous heartbeat", first["text"])  # nothing came before it
+        p.clock.advance(hours=24)
+        await p.worker.run_once()
+        second = p.outbox("heartbeat")[1]
+        link = (
+            f'<a href="https://t.me/c/999/7/{first["telegram_message_id"]}">'
+            "Previous heartbeat (Oct 23)</a>"
+        )
+        self.assertEqual(
+            second["text"].splitlines()[:2],
+            ["📋 Daily heartbeat — Oct 23 07:00 → Oct 24 07:00", "↩︎ " + link],
+        )
+
+    async def test_heartbeat_link_skips_windows_that_were_never_sent(self):
+        p = Pipeline(self)
+        await p.worker.run_once()
+        p.clock.advance(hours=24)
+        await p.worker.run_once()
+        (first,) = p.outbox("heartbeat")
+        p.clock.advance(hours=24)
+        p.ledger.skip_heartbeat(  # a window with no post (outbox_id NULL) must not break the lookup
+            *heartbeat_window(p.clock(), "07:00", ZoneInfo("Asia/Manila"))
+        )
+        p.clock.advance(hours=24)
+        await p.worker.run_once()
+        third = p.outbox("heartbeat")[1]
+        self.assertIn(
+            f"/7/{first['telegram_message_id']}\">Previous heartbeat (Oct 23)", third["text"]
+        )
+
     async def test_heartbeat_comes_from_ledger_rows_not_counters(self):
         updates, classifier = self.day_one()
         p = Pipeline(self, updates, classifier=classifier)
