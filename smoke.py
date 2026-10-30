@@ -66,9 +66,10 @@ Side effects, by step:
   message (or update, as stored in the ledger's ``raw_source``) of a real forward.
   Forward real posts to the bot to capture them. A missing origin is a gap (SKIP); the
   channel link must match the raw chat and message id; every other origin must have none.
-- ``reaction_apply`` (needs ``--reaction-message-id``) sets the configured reaction on
-  that real intake message with the production client; ``reactions`` rejects a
-  configured reaction missing from ``getChat``'s list (or non-standard when it is absent).
+- ``reaction_apply`` (needs ``--reaction-message-id``) sets the captured reaction, or the
+  flagged one with ``--reaction flagged``, on that real intake message with the production
+  client; ``reactions`` rejects either configured reaction missing from ``getChat``'s list
+  (or non-standard when it is absent).
 - ``owner_handle`` is MANUAL until an attestation whose scope or evidence names both
   configured handles settles it.
 
@@ -313,27 +314,34 @@ async def step_reactions(s: Smoke) -> Result:
     if not s.bot:
         return skip("TELEGRAM_BOT_TOKEN not set")
     chat = await s.bot.get_chat(s.config.intake_chat_id)
-    result, shown = evaluate_reactions(chat.available_reactions, s.config.captured_reaction)
+    verdicts = []
+    for name in ("captured_reaction", "flagged_reaction"):
+        result, shown = evaluate_reactions(chat.available_reactions, getattr(s.config, name))
+        verdicts.append((name, result))
     print(f"    available_reactions: {shown}")
-    return result
+    for name, result in verdicts:
+        if result.status != PASS:
+            return Result(result.status, f"{name}: {result.detail}")
+    return Result(PASS, f"{s.config.captured_reaction} and {s.config.flagged_reaction} are available")
 
 
 async def step_reaction_apply(s: Smoke) -> Result:
-    """Apply the configured reaction to one real intake message through the production client."""
+    """Apply a configured reaction (``--reaction`` picks which) to one real intake message."""
     if not s.args.reaction_message_id:
         return skip("--reaction-message-id <id> (a real message in the intake group) is required")
     if missing_secrets():
         return skip(f"production Telegram client needs every secret; missing {missing_secrets()}")
     chat_id, message_id = s.config.intake_chat_id, s.args.reaction_message_id
+    emoji = getattr(s.config, f"{s.args.reaction}_reaction")
     adapters = build_adapters(s.config)
     try:
-        await adapters.telegram.set_reaction(chat_id, message_id, s.config.captured_reaction)
+        await adapters.telegram.set_reaction(chat_id, message_id, emoji)
     except Exception as exc:
         return fail(f"{type(exc).__name__}: {outbound_text(str(exc)).text}")
     finally:
         await adapters.close()
     return ok(
-        f"Telegram accepted {s.config.captured_reaction} on {chat_id}:{message_id}; "
+        f"Telegram accepted {emoji} on {chat_id}:{message_id}; "
         "look at that message to see it"
     )
 
@@ -949,7 +957,13 @@ def main() -> None:
     parser.add_argument(
         "--reaction-message-id",
         type=int,
-        help="a real intake-group message to apply the configured captured reaction to",
+        help="a real intake-group message to apply the configured reaction to",
+    )
+    parser.add_argument(
+        "--reaction",
+        choices=("captured", "flagged"),
+        default="captured",
+        help="which configured reaction reaction_apply sets (default: captured)",
     )
     parser.add_argument(
         "--attestations",

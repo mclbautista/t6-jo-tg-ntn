@@ -50,7 +50,7 @@ class DryRunTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(msg["state"], "done")
         self.assertEqual(msg["plan_json"], stored)
         self.assertEqual(len(notion.created), 1)
-        self.assertEqual(telegram.reactions, [(-100123, 42, "✅")])
+        self.assertEqual(telegram.reactions, [(-100123, 42, "🤔")])
 
 
 if __name__ == "__main__":

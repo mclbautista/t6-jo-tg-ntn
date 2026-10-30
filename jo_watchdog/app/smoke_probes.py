@@ -132,7 +132,7 @@ def evaluate_reactions(available: list | None, configured: str) -> tuple[Result,
     emoji = [r.emoji for r in available if getattr(r, "type", "") == "emoji"]
     shown = " ".join(emoji) or "(none)"
     if _bare(configured) not in {_bare(e) for e in emoji}:
-        return Result(FAIL, f"captured_reaction {configured} is not in the list above"), shown
+        return Result(FAIL, f"{configured} is not in the list above"), shown
     return Result(PASS, f"{configured} is available"), shown
 
 

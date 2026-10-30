@@ -70,7 +70,7 @@ from jo_watchdog.ledger.states import State
 
 log = logging.getLogger("jo_watchdog.worker")
 
-# A failed captured reaction is retried inline after these delays, then counted.
+# A failed reaction is retried inline after these delays, then counted.
 REACTION_RETRY_SECONDS = (2, 5)
 DEADMAN_CHECK_SECONDS = 30.0
 
@@ -600,20 +600,25 @@ class Worker:
         await self._after_written(self.ledger.get_message(key))
 
     async def _after_written(self, msg: dict) -> None:
-        """The captured reaction, then `done`; both are independent of the outbox."""
+        """The capture reaction, then `done`; both are independent of the outbox."""
         key = msg["telegram_key"]
         # The reaction fires only after a confirmed write and read-back. Its
-        # failure never touches the outbox and never changes its meaning.
+        # failure never touches the outbox, and a failed flagged reaction is
+        # never downgraded to the captured one.
         if msg["reaction_state"] != "set":
+            # Chosen from the findings `mark_written` stored, so a resumed row
+            # gets the same emoji as an uninterrupted one.
+            flagged = json.loads(msg["findings_json"] or "[]") != []
+            emoji = self.config.flagged_reaction if flagged else self.config.captured_reaction
             for delay in (0, *REACTION_RETRY_SECONDS):
                 if delay:
                     await self.sleep(delay)
                 try:
                     await self.telegram.set_reaction(
-                        msg["chat_id"], msg["message_id"], self.config.captured_reaction
+                        msg["chat_id"], msg["message_id"], emoji
                     )
                 except Exception as exc:
-                    log.warning("captured reaction failed for %s: %s", key, type(exc).__name__)
+                    log.warning("reaction failed for %s: %s", key, type(exc).__name__)
                 else:
                     self.ledger.set_reaction_state(key, "set")
                     break

@@ -77,6 +77,7 @@ class ValidationTests(unittest.TestCase):
             {"cache_refresh_hours": 30, "cache_stale_alert_hours": 24},
             {"owner_telegram_handle": "has space"},
             {"captured_reaction": " "},
+            {"flagged_reaction": " "},
             {"department_aliases": {"TO": ""}},
             {"unknown_key": 1},
         ]

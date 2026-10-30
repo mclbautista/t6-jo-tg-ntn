@@ -168,7 +168,7 @@ class OwnerHandleTests(unittest.TestCase):
 class SmokeStepTests(unittest.IsolatedAsyncioTestCase):
     def _smoke(self, **kw):
         args = SimpleNamespace(
-            fixture_message_id=1, forward_fixtures=None, reaction_message_id=None, **kw
+            fixture_message_id=1, forward_fixtures=None, reaction_message_id=None, reaction="captured", **kw
         )
         return smoke.Smoke(make_config(), args)
 
@@ -192,6 +192,17 @@ class SmokeStepTests(unittest.IsolatedAsyncioTestCase):
         s.bot.get_chat.return_value = SimpleNamespace(available_reactions=emoji("👍"))
         s.config = make_config(captured_reaction="🔥")
         self.assertEqual((await smoke.step_reactions(s)).status, FAIL)
+
+    async def test_reactions_step_checks_the_flagged_reaction_too(self):
+        s = self._smoke()
+        s.bot = mock.AsyncMock()
+        s.config = make_config(captured_reaction="👍")
+        s.bot.get_chat.return_value = SimpleNamespace(available_reactions=emoji("👍"))
+        result = await smoke.step_reactions(s)  # default flagged_reaction 🤔 is missing
+        self.assertEqual(result.status, FAIL)
+        self.assertIn("flagged_reaction", result.detail)
+        s.bot.get_chat.return_value = SimpleNamespace(available_reactions=emoji("👍", "🤔"))
+        self.assertEqual((await smoke.step_reactions(s)).status, PASS)
 
     async def test_reaction_apply_needs_a_message_id_and_applies_via_production_client(self):
         s = self._smoke()

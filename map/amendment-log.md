@@ -69,3 +69,10 @@ Every statement below is superseded by `technical-design-and-architecture.md`. T
 
 - **Superseded** (`map.md` "Not yet specified": "possible future addition: an external uptime check on the container itself... not designed further").
 - **Now**: closed as a documented, accepted gap. Detection is the three human ops-topic members noticing a missing 07:00 heartbeat. No external uptime service, by owner's explicit preference against adding another account to maintain.
+
+## 12. The capture reaction now signals flagged captures (#91)
+
+- **Superseded** (`tickets/verification-and-ops-reporting.md` "Reaction semantics": "one reaction, fixed meaning: captured; problems never signalled by swapping the reaction").
+- **Now**: 👍 (`captured_reaction`) means "perfect, nothing for anyone to do"; 🤔 (`flagged_reaction`, default `🤔`) means "captured, but flagged". Flagged is any finding recorded at capture, the same set that triggers an ops report. The emoji is chosen from the findings `mark_written` stored, so a resumed row gets the right one. 🤔 carries no detail; the reasons stay in the ops topic. Findings still annotate and never gate the write.
+- **Unchanged**: one reaction on the original intake message only; reaction failure retries inline, then sets `reaction_state = failed` and is counted on the heartbeat (a failed 🤔 is never downgraded to 👍). No backfill, no flip-back when a flag is fixed in Notion, no change on edits. A repost is its own message and gets 🤔 if it trips the duplicate or reuse finding.
+- **Why**: owner's call. The earlier decision protected the wider intake topic from seeing "something's wrong"; the owner accepts that for a faster signal on which JOs need a look.

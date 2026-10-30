@@ -40,7 +40,7 @@ keys before commit, so tables that reference `messages(id)` stay valid.
 | notion_page_id     | TEXT    | Notion page id after a successful create           |
 | readback_mismatch  | TEXT    | mismatch detail from read-back comparison          |
 | findings_json      | TEXT    | v5: final findings (`[{code, params}]`), plan plus read-back |
-| reaction_state     | TEXT    | v5: captured reaction, `pending` \| `set` \| `failed` |
+| reaction_state     | TEXT    | v5: capture reaction (👍, or 🤔 when findings were stored), `pending` \| `set` \| `failed` |
 | created_at         | TEXT    | ISO-8601 UTC                                       |
 | updated_at         | TEXT    | ISO-8601 UTC                                       |
 | masked_text        | TEXT    | outbound-safe representation of `text` (v2)        |
