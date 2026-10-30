@@ -396,7 +396,7 @@ class ReactionIndependenceTests(unittest.IsolatedAsyncioTestCase):
         h = Harness(self, telegram=telegram)
         await h.worker.run_once()
         self.assertEqual(h.ledger.get_message(KEY)["reaction_state"], "set")
-        self.assertEqual(h.telegram.reactions, [(-100123, 42, "✅")])
+        self.assertEqual(h.telegram.reactions, [(-100123, 42, "🤔")])
 
 
 class SystemMessageQueueTests(unittest.IsolatedAsyncioTestCase):

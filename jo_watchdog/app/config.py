@@ -18,7 +18,14 @@ from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 from jo_watchdog.adapters.deepseek import DEFAULT_BASE_URL, DEFAULT_MODEL
 from jo_watchdog.adapters.jev import JEV_MODEL, JEV_URL
@@ -67,6 +74,7 @@ class Config(BaseModel):
     intake_chat_id: int
     intake_topic_id: int
     captured_reaction: str = "👍"
+    flagged_reaction: str = "🤔"
 
     # Ops topic (#23): where capture reports and system messages go
     ops_chat_id: int
@@ -122,11 +130,11 @@ class Config(BaseModel):
     # Rollback control (#27)
     dry_run: bool = False
 
-    @field_validator("captured_reaction")
+    @field_validator("captured_reaction", "flagged_reaction")
     @classmethod
-    def _non_empty_reaction(cls, value: str) -> str:
+    def _non_empty_reaction(cls, value: str, info: ValidationInfo) -> str:
         if not value.strip():
-            raise ValueError("captured_reaction must be an emoji")
+            raise ValueError(f"{info.field_name} must be an emoji")
         return value
 
     @field_validator("leizette_telegram_handle", "owner_telegram_handle")

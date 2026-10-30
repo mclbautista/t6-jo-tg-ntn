@@ -115,7 +115,7 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(msg["state"], "done")
         self.assertEqual(msg["notion_page_id"], "page-1")
         self.assertEqual(len(notion.created), 1)
-        self.assertEqual(telegram.reactions, [(-100123, 42, "✅")])
+        self.assertEqual(telegram.reactions, [(-100123, 42, "🤔")])
 
     async def test_plan_is_stored_before_create(self):
         worker, ledger, telegram, notion, cleanup = make_worker([update(7, message_id=42)])
@@ -170,8 +170,8 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Name", msg["readback_mismatch"])
         # The mismatch did not trigger a rewrite: still exactly one create.
         self.assertEqual(len(notion.created), 1)
-        # Reaction still applied (capture confirmed); meaning is always "captured".
-        self.assertEqual(telegram.reactions, [(-100123, 42, "✅")])
+        # Reaction still applied (capture confirmed); the mismatch is a finding, so 🤔.
+        self.assertEqual(telegram.reactions, [(-100123, 42, "🤔")])
 
 
 class RunLoopTests(unittest.IsolatedAsyncioTestCase):
