@@ -39,7 +39,7 @@ TABLE = [
      f'Exact re-post of <a href="{ROW}">an earlier row</a>, 3 days ago'),
     (Finding(code="number_reuse", params={"jo_number": "#0156", "url": ROW, "days": 3}),
      f'#0156 already used on <a href="{ROW}">an earlier row</a> for this'
-     " project+department, 3 days ago"),
+     " project, 3 days ago"),
     (Finding(code="forward_origin", params={"origin": "hidden_user", "name": "Che"}),
      "Forwarded from a hidden user: Che"),
     (Finding(code="forward_origin", params={"origin": "chat", "name": "Edit Team"}),

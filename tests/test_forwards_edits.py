@@ -117,10 +117,13 @@ class Harness:
             )
             self.caches._apply(
                 "projects",
-                [{"page_id": "proj-mfg", "name": "Manufacturing", "code": "MFG"}],
+                [
+                    {"page_id": "proj-mfg", "name": "Manufacturing", "code": "MFG"},
+                    {"page_id": "proj-som", "name": "Somsom", "code": "SOMSOM"},
+                ],
                 "2026-09-28T00:00:00Z",
             )
-            self.caches._apply("departments", ["TOC", "VID"], "2026-09-28T00:00:00Z")
+            self.caches._apply("departments", ["TOC", "VID", "OE"], "2026-09-28T00:00:00Z")
         self.worker = Worker(
             ledger=self.ledger,
             telegram=self.telegram,
@@ -211,6 +214,38 @@ class Migration6Tests(unittest.TestCase):
         self.assertIsNone(row["jo_key"])
 
 
+# -- migration 9 (#93) ---------------------------------------------------------
+
+
+class Migration9Tests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.path = Path(self.tmp.name) / "ledger.db"
+
+    def test_upgrade_drops_the_department_from_stored_keys(self):
+        before = {k: v for k, v in MIGRATIONS.items() if k < 9}
+        with mock.patch.dict(MIGRATIONS, before, clear=True):
+            old = Ledger(self.path)
+            for message_id, key in ((1, "proj-som|TOC|95"), (2, None), (3, "proj-mfg|VID|0")):
+                old._conn.execute(
+                    "INSERT INTO messages (chat_id, message_id, telegram_key, update_id,"
+                    " raw_source, text, first_line, masked_text, masker_version, masked_count,"
+                    " state, jo_key, notion_page_id, created_at, updated_at) VALUES (?, ?, ?, ?,"
+                    " '{}', 'a', 'a', 'a', 'v1', 0, 'written', ?, 'page', 't', 't')",
+                    (CHAT, message_id, f"{CHAT}:{message_id}", message_id, key),
+                )
+            old.close()
+        ledger = Ledger(self.path)
+        self.addCleanup(ledger.close)
+        self.assertEqual(ledger.get_message(f"{CHAT}:1")["jo_key"], "proj-som|95")
+        self.assertIsNone(ledger.get_message(f"{CHAT}:2")["jo_key"])
+        self.assertEqual(ledger.get_message(f"{CHAT}:3")["jo_key"], "proj-mfg|0")
+        # An earlier capture under the old key now matches a new key from another department.
+        found = ledger.earlier_captures(f"{CHAT}:9", text_sha="x", jo_key="proj-som|95")
+        self.assertEqual([r["telegram_key"] for r in found], [f"{CHAT}:1"])
+
+
 # -- one row per message, reposts, reuse ---------------------------------------
 
 
@@ -238,11 +273,35 @@ class RepostAndReuseTests(unittest.IsolatedAsyncioTestCase):
         await h.feed(message_update(2, 11, "MFG - TOC - JO #74\nTask: color pass"))
 
         self.assertEqual(len(h.notion.created), 2)
-        self.assertEqual(h.row(10)["jo_key"], "proj-mfg|TOC|74")
-        self.assertEqual(h.row(11)["jo_key"], "proj-mfg|TOC|74")
+        self.assertEqual(h.row(10)["jo_key"], "proj-mfg|74")
+        self.assertEqual(h.row(11)["jo_key"], "proj-mfg|74")
         self.assertTrue(h.notes(1).endswith("(possible number reuse)"))
         self.assertEqual(len(h.posts()), 1)
         self.assertIn("#74 already used on", h.posts()[0])
+
+    async def test_same_number_in_another_department_is_reuse(self):
+        # #93: one JO counter per project, shared by every department.
+        h = Harness(self, caches=True)
+        await h.feed(message_update(1, 10, "SOMSOM - TOC - JO #95\nTask: cut teaser"))
+        await h.feed(message_update(2, 11, "SOMSOM - OE - JO #95\nTask: online edit"))
+
+        self.assertEqual(len(h.notion.created), 2)
+        self.assertEqual(h.row(10)["jo_key"], "proj-som|95")
+        self.assertEqual(h.row(11)["jo_key"], "proj-som|95")
+        self.assertTrue(h.notes(1).endswith("(possible number reuse)"))
+        self.assertEqual(json.loads(h.row(11)["plan_json"])["duplicate"]["code"], "number_reuse")
+        self.assertIn("#95 already used on", h.posts()[0])
+
+    async def test_same_number_in_another_project_is_not_reuse(self):
+        h = Harness(self, caches=True)
+        await h.feed(message_update(1, 10, "SOMSOM - TOC - JO #95\nTask: cut teaser"))
+        await h.feed(message_update(2, 11, "MFG - TOC - JO #95\nTask: color pass"))
+
+        self.assertEqual(len(h.notion.created), 2)
+        self.assertEqual(h.row(11)["jo_key"], "proj-mfg|95")
+        self.assertIsNone(h.notes(1))
+        self.assertIsNone(json.loads(h.row(11)["plan_json"])["duplicate"])
+        self.assertFalse(any("already used" in p for p in h.posts()))
 
     async def test_padded_reuse_number_reads_the_display_number(self):
         for second in ("JO 074", "JO #074"):
@@ -250,7 +309,7 @@ class RepostAndReuseTests(unittest.IsolatedAsyncioTestCase):
                 h = Harness(self, caches=True)
                 await h.feed(message_update(1, 10, "MFG - TOC - JO #74\nTask: cut teaser"))
                 await h.feed(message_update(2, 11, f"MFG - TOC - {second}\nTask: color pass"))
-                self.assertEqual(h.row(11)["jo_key"], "proj-mfg|TOC|74")
+                self.assertEqual(h.row(11)["jo_key"], "proj-mfg|74")
                 self.assertIn("#074 already used on", h.posts()[0])
                 self.assertEqual(
                     json.loads(h.row(11)["plan_json"])["duplicate"]["jo_number"], "#074"
@@ -265,11 +324,10 @@ class RepostAndReuseTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(h.notes(2).endswith("https://www.notion.so/page2 (exact re-post)"))
 
     async def test_identical_text_without_a_complete_key_is_not_a_duplicate(self):
-        # D1: no content-duplicate lookup without Project + Department + number.
+        # D1: no content-duplicate lookup without a Project page and a number.
         texts = {
             "no caches (nothing resolves)": (False, "MFG - TOC - JO #33\nTask: same"),
             "unknown project": (True, "ZZZ - TOC - JO #33\nTask: same"),
-            "unknown department": (True, "MFG - NOPE - JO #33\nTask: same"),
             "no JO number": (True, "MFG - TOC\nTask: same"),
             "unstructured": (True, "frameio cleanup\nTask: same"),
         }
@@ -282,6 +340,15 @@ class RepostAndReuseTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIsNone(h.notes(1))
                 self.assertIsNone(json.loads(h.row(11)["plan_json"])["duplicate"])
                 self.assertFalse(any("re-post" in p for p in h.posts()))
+
+    async def test_unknown_department_still_gets_a_key(self):
+        # #93: the Department left the key, so an unknown one no longer skips detection.
+        h = Harness(self, caches=True)
+        text = "MFG - NOPE - JO #33\nTask: same"
+        await h.feed(message_update(1, 10, text))
+        await h.feed(message_update(2, 11, text))
+        self.assertEqual(h.row(11)["jo_key"], "proj-mfg|33")
+        self.assertTrue(h.notes(1).endswith("(exact re-post)"))
 
     async def test_incomplete_key_skips_reuse_detection(self):
         h = Harness(self, caches=True)

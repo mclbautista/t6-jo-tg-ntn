@@ -664,13 +664,14 @@ class Worker:
     def _jo_key(plan: JobOrderPlan) -> tuple[str | None, str | None]:
         """The content-duplicate key and the JO Number as posted, from the stored resolution.
 
-        The key needs a resolved Project page, a live Department option and a
-        parsed number; anything less returns no key, so reuse detection skips.
+        The key needs a resolved Project page and a parsed number; anything
+        less returns no key, so reuse detection skips. The Department is not
+        part of it: JO Numbers are one counter per project (#93).
         """
         if plan.resolution is None or plan.jo_number_int is None:
             return None, None
         resolved = plan.resolution
-        key = jo_key(resolved.project_page_id, resolved.department, plan.jo_number_int)
+        key = jo_key(resolved.project_page_id, plan.jo_number_int)
         shown = plan.properties.get("JO Number", {}).get("rich_text", [])
         display = "".join(item["text"]["content"] for item in shown)
         return key, display or f"#{plan.jo_number_int}"
