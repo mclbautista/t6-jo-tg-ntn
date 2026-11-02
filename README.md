@@ -165,7 +165,7 @@ unchanged.
 
 - In gateway mode the ledger's offset holds the gateway's `seq`, not a Telegram
   update id. `last_committed_offset` is the last `seq` committed and `next_offset`
-  is one more, so the poll asks `GET /updates?after=<last_committed_offset>`
+  is one more (0 on a ledger that has never committed), so the poll asks `GET /updates?after=<last_committed_offset>`
   (that is, `next_offset - 1`).
 - An ops post carries `idempotency_key = watchdog-outbox-<outbox row id>`. A
   retry of the same row reuses the key, so the gateway queues it once. The
