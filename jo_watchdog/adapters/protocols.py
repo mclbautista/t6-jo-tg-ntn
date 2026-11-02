@@ -65,7 +65,11 @@ class TelegramClient(Protocol):
     async def set_reaction(self, chat_id: int, message_id: int, emoji: str) -> None: ...
 
     async def send_message(self, chat_id: int, topic_id: int, text: str) -> int:
-        """Post Telegram-HTML ``text`` to a forum topic; return the new message id."""
+        """Post Telegram-HTML ``text`` to a forum topic; return the new message id.
+
+        A client that sets ``accepts_idempotency_key`` (the gateway client, #95) also
+        takes ``idempotency_key=`` and returns the gateway's ``message_ref`` instead.
+        """
         ...
 
 

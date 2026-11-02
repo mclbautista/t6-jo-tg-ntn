@@ -14,6 +14,7 @@ from jo_watchdog.app.caches import CacheManager
 from jo_watchdog.app.config import (
     Config,
     deepseek_token,
+    gateway_secret,
     notion_token,
     openrouter_token,
     telegram_token,
@@ -43,14 +44,10 @@ class Adapters:
 
 def build_adapters(config: Config) -> Adapters:
     """The real aiogram, httpx, DeepSeek and Jev adapters, from the environment's secrets."""
-    from aiogram import Bot
-
     from jo_watchdog.adapters.deepseek import DeepSeekClassifier
     from jo_watchdog.adapters.jev import JevMatcher
     from jo_watchdog.adapters.notion import NotionAdapter
-    from jo_watchdog.adapters.telegram import AiogramTelegramClient
 
-    bot = Bot(token=telegram_token())
     notion = NotionAdapter(notion_token())
     classifier = DeepSeekClassifier(
         deepseek_token(),
@@ -65,16 +62,34 @@ def build_adapters(config: Config) -> Adapters:
         timeout=config.jev_timeout_seconds,
     )
 
-    async def close_bot() -> None:
-        await bot.session.close()
-
+    telegram, close_telegram = _build_telegram(config)
     return Adapters(
-        telegram=AiogramTelegramClient(bot),
+        telegram=telegram,
         notion=notion,
         classifier=classifier,
         matcher=matcher,
-        closers=[notion.close, classifier.close, matcher.close, close_bot],
+        closers=[notion.close, classifier.close, matcher.close, close_telegram],
     )
+
+
+def _build_telegram(config: Config):
+    """The Telegram client for ``telegram_mode`` and the coroutine that closes it."""
+    if config.telegram_mode == "gateway":
+        from jo_watchdog.adapters.gateway import GatewayTelegramClient
+
+        client = GatewayTelegramClient(config.gateway_url, gateway_secret())
+        return client, client.close
+
+    from aiogram import Bot
+
+    from jo_watchdog.adapters.telegram import AiogramTelegramClient
+
+    bot = Bot(token=telegram_token())
+
+    async def close_bot() -> None:
+        await bot.session.close()
+
+    return AiogramTelegramClient(bot), close_bot
 
 
 def build_worker(config: Config, ledger: Ledger, adapters: Adapters, **worker_options) -> Worker:

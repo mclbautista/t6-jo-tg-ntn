@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
+from typing import Literal
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -64,6 +65,9 @@ SECRET_KEYS = (
     "OPENROUTER_API_KEY",
 )
 
+# Gateway mode (#95): the module secret replaces the Telegram token.
+GATEWAY_SECRET_KEY = "WATCHDOG_SECRET"
+
 
 class Config(BaseModel):
     """Validated runtime configuration."""
@@ -81,6 +85,11 @@ class Config(BaseModel):
     ops_topic_id: int
     leizette_telegram_handle: str | None = None
     header_date_tolerance_days: int = Field(default=1, ge=0)
+
+    # Telegram transport (#95): ``direct`` polls Telegram with the bot token; ``gateway``
+    # reads and posts through the Sixto gateway with ``WATCHDOG_SECRET`` instead.
+    telegram_mode: Literal["direct", "gateway"] = "direct"
+    gateway_url: str | None = None
 
     # Polling
     poll_timeout: int = Field(default=50, ge=1, le=50)  # Telegram long-poll seconds
@@ -190,6 +199,10 @@ class Config(BaseModel):
             raise ValueError("ops_chat_id and ops_topic_id must be set")
         if self.t_hint > self.t_link:
             raise ValueError("t_hint must not exceed t_link")
+        if self.telegram_mode == "gateway":
+            parts = urlsplit(self.gateway_url or "")
+            if parts.scheme not in ("http", "https") or not parts.netloc:
+                raise ValueError("gateway_url must be an http(s) URL when telegram_mode is gateway")
         if self.cache_stale_alert_hours < self.cache_refresh_hours:
             raise ValueError("cache_stale_alert_hours must be at least cache_refresh_hours")
         return self
@@ -277,13 +290,26 @@ def _secret(name: str) -> str:
     return value
 
 
-def missing_secrets() -> list[str]:
-    """Names of the secrets in ``SECRET_KEYS`` that are unset."""
-    return [name for name in SECRET_KEYS if not os.environ.get(name)]
+def required_secrets(telegram_mode: str = "direct") -> tuple[str, ...]:
+    """The secrets the given mode needs: gateway mode swaps the bot token for the module secret."""
+    if telegram_mode == "gateway":
+        return tuple(
+            GATEWAY_SECRET_KEY if name == "TELEGRAM_BOT_TOKEN" else name for name in SECRET_KEYS
+        )
+    return SECRET_KEYS
+
+
+def missing_secrets(telegram_mode: str = "direct") -> list[str]:
+    """Names of the secrets the mode needs (``SECRET_KEYS`` by default) that are unset."""
+    return [name for name in required_secrets(telegram_mode) if not os.environ.get(name)]
 
 
 def telegram_token() -> str:
     return _secret("TELEGRAM_BOT_TOKEN")
+
+
+def gateway_secret() -> str:
+    return _secret(GATEWAY_SECRET_KEY)
 
 
 def notion_token() -> str:

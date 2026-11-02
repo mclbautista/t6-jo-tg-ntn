@@ -2,11 +2,15 @@
 
 ``run`` (the default) builds the real adapters (aiogram Telegram, httpx Notion)
 and the ledger, then runs the worker loop. Secrets come from the environment
-(``TELEGRAM_BOT_TOKEN``, ``NOTION_API_KEY``, ``DEEPSEEK_API_KEY``,
-``OPENROUTER_API_KEY``); non-secrets come from the YAML config.
+(``TELEGRAM_BOT_TOKEN`` or, with ``telegram_mode: gateway``, ``WATCHDOG_SECRET``;
+``NOTION_API_KEY``, ``DEEPSEEK_API_KEY``, ``OPENROUTER_API_KEY``); non-secrets come from the
+YAML config.
 
 ``retry <telegram_key>`` (or ``retry --all-exhausted``) makes exhausted messages
 eligible again without touching their stored plan.
+
+``reset-offset --to N`` sets the polling offset; used once at the gateway cutover (#95),
+when the cursor moves from Telegram update ids to the gateway's sequence numbers.
 
 ``healthcheck`` exits 0 when the poller's liveness stamp is fresh and 1
 otherwise; the container's ``HEALTHCHECK`` runs it.
@@ -40,7 +44,7 @@ _TELEGRAM_KEY = re.compile(r"-?\d+:\d+")
 async def run(config_path: str) -> None:
     config = load_config(config_path)
     require_live_keys(config)
-    missing = missing_secrets()
+    missing = missing_secrets(config.telegram_mode)
     if missing:
         raise RuntimeError(f"missing secrets in the environment: {', '.join(missing)}")
     configure_logging(log_path=Path(config.ledger_path).with_name("jo-watchdog.jsonl"))
@@ -54,6 +58,22 @@ async def run(config_path: str) -> None:
     finally:
         await adapters.close()
         ledger.close()
+
+
+def run_reset_offset(config_path: str, to: int) -> int:
+    """Set the polling offset (once, at the gateway cutover); run with the watchdog stopped."""
+    config = load_config(config_path)
+    configure_logging(log_path=Path(config.ledger_path).with_name("jo-watchdog.jsonl"))
+    ledger = Ledger(config.ledger_path)
+    try:
+        previous = ledger.reset_offset(to)
+    finally:
+        ledger.close()
+    logging.getLogger("jo_watchdog.reset_offset").info(
+        "offset reset from %s to %s by %s", previous, to, getpass.getuser()
+    )
+    print(f"offset reset from {previous} to {to}")
+    return 0
 
 
 def run_healthcheck(config_path: str) -> int:
@@ -98,8 +118,12 @@ def main(argv: list[str] | None = None) -> int:
         "command",
         nargs="?",
         default="run",
-        choices=["run", "healthcheck", "retry"],
-        help="run the watchdog (default), check the poller's liveness, or retry exhausted messages",
+        choices=["run", "healthcheck", "retry", "reset-offset"],
+        help="run the watchdog (default), check the poller's liveness, retry exhausted "
+        "messages, or reset the polling offset",
+    )
+    parser.add_argument(
+        "--to", type=int, help="for reset-offset: the offset to set (0 at the gateway cutover)"
     )
     parser.add_argument("telegram_key", nargs="?", help="for retry: the message's Telegram Key")
     parser.add_argument(
@@ -116,6 +140,10 @@ def main(argv: list[str] | None = None) -> int:
         args.telegram_key = keys[0]
     if args.command == "healthcheck":
         return run_healthcheck(args.config)
+    if args.command == "reset-offset":
+        if args.to is None or args.to < 0:
+            parser.error("reset-offset needs --to N (N >= 0)")
+        return run_reset_offset(args.config, args.to)
     if args.command == "retry":
         return run_retry(args.config, args.telegram_key, args.all_exhausted)
     try:

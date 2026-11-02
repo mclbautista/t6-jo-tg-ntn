@@ -145,6 +145,53 @@ JO_WATCHDOG_TAG=previous docker compose up -d --no-build
 Ledger migrations are forward-only and stay backward-compatible for one
 release, so the previous image can read a ledger the current one migrated.
 
+### Gateway mode (Sixto gateway)
+
+With `telegram_mode: gateway` the watchdog no longer holds the bot token. The
+Sixto gateway (`t6-sixto-gateway`) is the only `getUpdates` caller; the watchdog
+reads its routed intake items from the gateway's `GET /updates`, posts ops
+messages with `POST /notify` and reactions with `POST /react`. The worker, ledger
+and core are unchanged, and the deadman, heartbeat and ops outbox stay here.
+
+```yaml
+telegram_mode: gateway
+gateway_url: "http://192.168.88.151:8780"
+```
+
+In `.env`, set `WATCHDOG_SECRET` (the same value as the gateway's
+`WATCHDOG_SECRET`); `TELEGRAM_BOT_TOKEN` is not required. Boot is refused if
+`gateway_url` or `WATCHDOG_SECRET` is missing. `direct` (the default) is
+unchanged.
+
+- The gateway's per-module `seq` is the update id, so the ledger's offset is the
+  gateway cursor (`GET /updates?after=<offset - 1>`).
+- An ops post carries `idempotency_key = watchdog-outbox-<outbox row id>`. A
+  retry of the same row reuses the key, so the gateway queues it once. The
+  outbox stores the returned `message_ref` where it stored the Telegram message
+  id.
+- `in_scope` still filters intake as a safety net.
+
+**Cutover (once).** The cursor moves from Telegram update ids to gateway
+sequence numbers, so reset it while the watchdog is stopped:
+
+```sh
+python -m jo_watchdog.app reset-offset --to 0 --config config.yaml
+# in the container: docker compose run --rm watchdog python -m jo_watchdog.app reset-offset --to 0
+```
+
+The gateway re-delivers its items from the start; the ledger's unique
+`telegram_key` and edit checks skip anything already captured. The full runbook
+(deploying the gateway, copying `data/`) is section 12 of the gateway spec,
+mclbautista/t6-sixto-gateway#1.
+
+**Switching back to direct mode.** Stop the watchdog, set `telegram_mode: direct`
+(clear `gateway_url`), put `TELEGRAM_BOT_TOKEN` back in `.env`, and start it.
+The offset still holds a gateway sequence number, which is lower than any
+Telegram update id, so Telegram re-delivers up to 24 hours of updates and the
+ledger skips what is already captured; to be explicit, run
+`reset-offset --to <last Telegram update id + 1>` first, or leave it. Stop the
+gateway first, so only one process polls Telegram.
+
 ### Dry-run (rollback control)
 
 `dry_run: false` is the default. Setting `dry_run: true` and restarting stops
