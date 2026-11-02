@@ -239,6 +239,25 @@ class Ledger:
         with self._transaction():
             self._advance_offset(update_id)
 
+    def reset_offset(self, to: int) -> int:
+        """Set the committed offset to ``to``, forwards or backwards; return the old one.
+
+        Only for the gateway cutover (#95), where the cursor moves from Telegram update
+        ids to gateway sequence numbers. Re-read items are skipped by the unique
+        ``telegram_key`` and ``edit_seen`` checks, so nothing is captured twice.
+        """
+        if to < 0:
+            raise ValueError("offset must not be negative")
+        with self._transaction():
+            previous = self.last_committed_offset()
+            self._conn.execute(
+                "INSERT INTO offsets (id, last_committed_offset) VALUES (1, ?)"
+                " ON CONFLICT(id) DO UPDATE SET"
+                " last_committed_offset = excluded.last_committed_offset",
+                (to,),
+            )
+        return previous
+
     # -- intake ------------------------------------------------------------
 
     def accept_message(

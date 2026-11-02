@@ -784,9 +784,15 @@ class Worker:
     async def deliver_outbox(self) -> None:
         """Post every due outbox row; a crash before ``outbox_sent`` re-posts it."""
         for row in self.ledger.due_outbox():
+            # A retried row reuses its key, so a gateway queues the post once (#95).
+            options = (
+                {"idempotency_key": f"watchdog-outbox-{row['id']}"}
+                if getattr(self.telegram, "accepts_idempotency_key", False)
+                else {}
+            )
             try:
                 sent_id = await self.telegram.send_message(
-                    row["chat_id"], row["topic_id"], row["text"]
+                    row["chat_id"], row["topic_id"], row["text"], **options
                 )
             except Exception as exc:
                 state = self.ledger.outbox_failed_attempt(

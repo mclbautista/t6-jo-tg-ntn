@@ -11,6 +11,11 @@ intake_topic_id: 1                  # FILL IN: the intake forum topic's message_
 captured_reaction: "👍"             # pick from the list smoke.py prints
 flagged_reaction: "🤔"              # captured with any finding; also from that list
 
+# --- Telegram transport (#95) ---
+telegram_mode: direct               # direct = poll Telegram with TELEGRAM_BOT_TOKEN;
+                                    # gateway = read and post through the Sixto gateway
+gateway_url: null                   # gateway mode only, e.g. "http://192.168.88.151:8780"
+
 # --- Polling (#18) ---
 poll_timeout: 50                    # Telegram long-poll timeout (seconds, max 50)
 poll_interval: 1.0                  # pause between poll+drain cycles (seconds)
