@@ -20,11 +20,15 @@ from pydantic import BaseModel
 from jo_watchdog.core.job_order import WATCHDOG_MARKER, JobOrderPlan, rich_text
 
 
-def jo_key(project_page_id: str | None, department: str | None, number: int | None) -> str | None:
-    """``<Project page id>|<Department option>|<jo_number_int>``, only when all three resolve."""
-    if not project_page_id or not department or number is None:
+def jo_key(project_page_id: str | None, number: int | None) -> str | None:
+    """``<Project page id>|<jo_number_int>``, only when both resolve.
+
+    JO Numbers are one counter per project, shared by every department (#93),
+    so the Department stays on the JO but is not part of the key.
+    """
+    if not project_page_id or number is None:
         return None
-    return f"{project_page_id}|{department}|{number}"
+    return f"{project_page_id}|{number}"
 
 
 def normalize_whitespace(text: str) -> str:

@@ -16,7 +16,7 @@ from jo_watchdog.core.header import parse_header, parse_number
 from jo_watchdog.core.job_order import WATCHDOG_MARKER
 
 NOW = datetime(2026, 9, 20, 4, 0, tzinfo=UTC)
-KEY = "proj-page|TOC|74"
+KEY = "proj-page|74"
 
 
 def row(tg, text, key=KEY, url="https://notion.so/a", days=2):
@@ -50,12 +50,12 @@ class KeyTests(unittest.TestCase):
         self.assertEqual(numbers, {74})
         self.assertEqual(parse_header(headers[0], {}).jo_number, "#074")
 
-    def test_jo_key_needs_all_three(self):
-        self.assertEqual(jo_key("p", "TOC", 74), "p|TOC|74")
-        self.assertEqual(jo_key("p", "TOC", 0), "p|TOC|0")
-        self.assertIsNone(jo_key(None, "TOC", 74))
-        self.assertIsNone(jo_key("p", None, 74))
-        self.assertIsNone(jo_key("p", "TOC", None))
+    def test_jo_key_is_project_and_number(self):
+        # #93: one JO counter per project; the Department is not in the key.
+        self.assertEqual(jo_key("p", 74), "p|74")
+        self.assertEqual(jo_key("p", 0), "p|0")
+        self.assertIsNone(jo_key(None, 74))
+        self.assertIsNone(jo_key("p", None))
 
     def test_text_hash_ignores_whitespace_differences(self):
         self.assertEqual(text_sha256("a  b\n c "), text_sha256("a b c"))

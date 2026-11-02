@@ -54,7 +54,7 @@ keys before commit, so tables that reference `messages(id)` stay valid.
 | ignore_reason      | TEXT    | `not_jo` or `no_text` for `ignored` rows (v3)      |
 | exhausted_at       | TEXT    | v7: ISO-8601 UTC when the retry schedule ran out; NULL otherwise. An exhausted row keeps its state and plan, is never picked up again, and is made eligible by `retry` |
 | written_at         | TEXT    | v8 (#54): ISO-8601 UTC, set once in the `mark_written` transaction and never updated; NULL for rows written before v8 |
-| jo_key             | TEXT    | v6: `<Project page id>\|<Department option>\|<jo_number_int>`, set at planning only when all three resolve; NULL otherwise |
+| jo_key             | TEXT    | v6, reshaped in v9 (#93): `<Project page id>\|<jo_number_int>`, set at planning only when both resolve; NULL otherwise. JO Numbers are one counter per project, so the Department is not part of it |
 | text_sha256        | TEXT    | v6: SHA-256 of the whitespace-normalized original `text`; set on intake (backfilled) |
 | forward_origin_type| TEXT    | v6: `user`, `hidden_user`, `chat` or `channel`; NULL for a non-forward (backfilled from `raw_source`) |
 
@@ -62,6 +62,13 @@ Indexes `messages_jo_key` on `jo_key` and `messages_text_sha256` on
 `text_sha256` (v6). An exact re-post is an earlier row with the same
 `text_sha256` and a `notion_page_id`; number reuse is an earlier row with the
 same `jo_key` and different text. Neither ever merges or suppresses a row.
+
+Migration 9 (#93) rewrites v6 keys stored as
+`<Project page id>|<Department option>|<jo_number_int>` to the two-part form
+by keeping the parts before the first `|` and after the last, so captures
+made before it still match. It changes data only, so the previous release
+still opens the ledger; keys that release writes keep the old form and are
+not rewritten again.
 
 ### `stage_results` (v3)
 

@@ -310,6 +310,29 @@ MIGRATION_8 = [
     "ALTER TABLE messages ADD COLUMN written_at TEXT",
 ]
 
+
+
+def _migration_9(conn: sqlite3.Connection) -> None:
+    """Rewrite stored ``jo_key`` values to ``<Project page id>|<jo_number_int>`` (#93).
+
+    JO Numbers are one counter per project, so the Department leaves the key.
+    A v6 key is ``<project>|<department>|<number>``: keep the part before the
+    first ``|`` and after the last, so earlier captures still match new keys.
+    Keys already in the two-part form and NULLs are left alone. Data only, so
+    the prior release still opens the ledger.
+    """
+    rows = conn.execute("SELECT id, jo_key FROM messages WHERE jo_key IS NOT NULL").fetchall()
+    for row_id, key in rows:
+        parts = key.split("|")
+        if len(parts) < 3:
+            continue
+        conn.execute(
+            "UPDATE messages SET jo_key = ? WHERE id = ?", (f"{parts[0]}|{parts[-1]}", row_id)
+        )
+
+
+MIGRATION_9 = _migration_9
+
 Migration = list[str] | Callable[[sqlite3.Connection], None]
 
 # Keyed by number and applied in ascending order of the numbers not yet recorded.
@@ -322,6 +345,7 @@ MIGRATIONS: dict[int, Migration] = {
     6: MIGRATION_6,
     7: MIGRATION_7,
     8: MIGRATION_8,
+    9: MIGRATION_9,
 }
 
 # Migrations that rebuild a referenced table run with foreign-key enforcement off.

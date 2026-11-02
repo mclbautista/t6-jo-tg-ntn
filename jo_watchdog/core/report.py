@@ -78,7 +78,7 @@ def finding_line(f: Finding) -> str:
         case "number_reuse":
             return (
                 f"{_field(p['jo_number'])} already used on {_link('an earlier row', p['url'])}"
-                f" for this project+department, {_days(p['days'])}"
+                f" for this project, {_days(p['days'])}"
             )
         case "forward_origin":
             word = _ORIGIN_WORDS.get(p["origin"], p["origin"])

@@ -125,7 +125,7 @@ class PlannerWiringTests(unittest.IsolatedAsyncioTestCase):
                 "unresolved": [],
             },
         )
-        self.assertEqual(h.ledger.get_message(KEY)["jo_key"], "proj-mfg|TOC|74")
+        self.assertEqual(h.ledger.get_message(KEY)["jo_key"], "proj-mfg|74")
 
     async def test_posted_fields_survive_extraction_plan_and_notion_payload(self):
         notes = "  keep\u00a0this\n" + "n" * 2100
