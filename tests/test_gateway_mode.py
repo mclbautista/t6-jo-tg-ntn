@@ -122,6 +122,15 @@ class WorkerOverGatewayTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rig.ledger.last_committed_offset(), 1)  # the gateway seq
         self.assertEqual(rig.gateway.reactions[0]["message_id"], 42)
 
+    async def test_a_command_item_does_not_stall_the_cursor(self):
+        rig = Rig(self)
+        rig.gateway.post(111, None, 1, "/jo")  # a private-chat command, not intake
+        rig.gateway.items[0]["kind"] = "command"
+        rig.gateway.post(-100123, 5, 42, "first line")
+        await rig.worker.poll_once()
+        self.assertEqual(rig.ledger.last_committed_offset(), 2)
+        self.assertTrue(rig.ledger.has_message("-100123:42"))
+
     async def test_out_of_scope_items_are_still_filtered(self):
         rig = Rig(self)
         rig.gateway.post(-100777, 5, 1, "elsewhere")

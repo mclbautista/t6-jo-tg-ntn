@@ -64,11 +64,12 @@ class GetUpdatesTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(u.edited)
         self.assertEqual(u.edit_date, 1790565000)
 
-    async def test_command_items_are_skipped(self):
+    async def test_command_items_are_passed_on_so_the_cursor_can_pass_them(self):
         gateway = FakeGateway()
         gateway.post(-100123, 5, 1, "x")
         gateway.items[0]["kind"] = "command"
-        self.assertEqual(await client(gateway).get_updates(offset=1, timeout=0), [])
+        (u,) = await client(gateway).get_updates(offset=1, timeout=0)
+        self.assertEqual(u.update_id, 1)
 
     async def test_wrong_secret_raises(self):
         gateway = FakeGateway()

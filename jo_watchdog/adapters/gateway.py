@@ -52,8 +52,9 @@ class GatewayTelegramClient:
         response.raise_for_status()
         result: list[IncomingUpdate] = []
         for item in response.json()["items"]:
-            if item.get("kind") != "update":
-                continue  # commands are not the watchdog's; phase 1 registers none
+            # Every kind is passed on, commands included: the cursor is the gateway seq, so
+            # an item the worker never sees would be re-read forever. The worker's scope
+            # filter ignores (and moves the offset past) anything that is not intake.
             result.append(
                 IncomingUpdate(
                     update_id=item["seq"],
