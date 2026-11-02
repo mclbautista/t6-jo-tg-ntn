@@ -22,7 +22,7 @@ from jo_watchdog.app.config import (
 from jo_watchdog.app.worker import Worker
 from jo_watchdog.ledger.db import Ledger, OutboxMessage
 from tests.fake_gateway import SECRET, FakeGateway
-from tests.fakes import FakeClassifier, FakeNotion
+from tests.fakes import FakeClassifier, FakeNotion, FakeTelegram, update
 from tests.test_worker import make_config, no_sleep
 
 URL = "http://gateway.test:8780"
@@ -217,6 +217,57 @@ class ResetOffsetTests(unittest.IsolatedAsyncioTestCase):
                     ledger.reset_offset(-1)
             finally:
                 ledger.close()
+
+
+class RollbackToDirectTests(unittest.IsolatedAsyncioTestCase):
+    """The rollback runbook (gateway README): drain, then ``reset-offset --to T``.
+
+    ``T`` is the gateway's ``poll_state``: the last Telegram update id it fetched. Gateway
+    ``seq`` and Telegram update ids are separate counters with no ordering between them.
+    """
+
+    LAST_FETCHED = 1002  # the gateway's poll_state (T)
+
+    def _gateway_has_fetched(self, rig: Rig) -> None:
+        for update_id, message_id in ((1000, 40), (1001, 41), (1002, 42)):
+            item = rig.gateway.post(-100123, 5, message_id, f"JO {message_id}")
+            item["update_id"] = item["raw"]["update_id"] = update_id
+
+    def _direct_worker(self, rig: Rig, telegram: FakeTelegram) -> Worker:
+        return Worker(
+            ledger=rig.ledger,
+            telegram=telegram,
+            notion=rig.notion,
+            classifier=FakeClassifier(),
+            config=make_config(),
+            sleep=no_sleep,
+        )
+
+    async def test_the_first_pending_telegram_update_is_captured_after_rollback(self):
+        rig = Rig(self)
+        self._gateway_has_fetched(rig)
+        await rig.worker.run_once()  # drained: the watchdog has every gateway item
+        self.assertEqual(rig.ledger.last_committed_offset(), len(rig.gateway.items))
+
+        rig.ledger.reset_offset(self.LAST_FETCHED)  # T, not T + 1
+        self.assertEqual(rig.ledger.next_offset(), self.LAST_FETCHED + 1)
+
+        pending = update(1003, message_id=43, text="JO 43")  # posted during the switch
+        telegram = FakeTelegram([update(1002, message_id=42, text="JO 42"), pending])
+        await self._direct_worker(rig, telegram).run_once()
+
+        self.assertEqual(telegram.get_updates_calls[0], 1003)
+        self.assertTrue(rig.ledger.has_message("-100123:43"))
+        self.assertEqual(rig.ledger.last_committed_offset(), 1003)
+        self.assertEqual(len(rig.notion.created), 4)  # 40-42 once each, then 43
+
+    async def test_keeping_the_gateway_seq_as_the_direct_cursor_can_skip_updates(self):
+        """Why the runbook always resets: a seq can be higher than the next Telegram id."""
+        rig = Rig(self)
+        rig.ledger.reset_offset(2000)  # gateway seq 2000
+        telegram = FakeTelegram([update(1001, message_id=41, text="JO 41")])
+        await self._direct_worker(rig, telegram).run_once()
+        self.assertFalse(rig.ledger.has_message("-100123:41"))
 
 
 class ResetOffsetCommandTests(unittest.TestCase):

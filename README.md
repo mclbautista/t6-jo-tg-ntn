@@ -163,8 +163,8 @@ In `.env`, set `WATCHDOG_SECRET` (the same value as the gateway's
 `gateway_url` or `WATCHDOG_SECRET` is missing. `direct` (the default) is
 unchanged.
 
-- The gateway's per-module `seq` is the update id, so the ledger's offset is the
-  gateway cursor (`GET /updates?after=<offset - 1>`).
+- In gateway mode the ledger's offset holds the gateway's `seq`, not a Telegram
+  update id: it is the gateway cursor (`GET /updates?after=<offset - 1>`).
 - An ops post carries `idempotency_key = watchdog-outbox-<outbox row id>`. A
   retry of the same row reuses the key, so the gateway queues it once. The
   outbox stores the returned `message_ref` where it stored the Telegram message
@@ -184,13 +184,20 @@ The gateway re-delivers its items from the start; the ledger's unique
 (deploying the gateway, copying `data/`) is section 12 of the gateway spec,
 mclbautista/t6-sixto-gateway#1.
 
-**Switching back to direct mode.** Stop the watchdog, set `telegram_mode: direct`
-(clear `gateway_url`), put `TELEGRAM_BOT_TOKEN` back in `.env`, and start it.
-The offset still holds a gateway sequence number, which is lower than any
-Telegram update id, so Telegram re-delivers up to 24 hours of updates and the
-ledger skips what is already captured; to be explicit, run
-`reset-offset --to <last Telegram update id + 1>` first, or leave it. Stop the
-gateway first, so only one process polls Telegram.
+**Switching back to direct mode.** Follow "Rollback after cutover" in the gateway
+README; do not improvise it. In short: turn gateway polling off, let the watchdog drain
+the gateway (`GET /updates?after=<last committed offset>&timeout=0` returns no items),
+read the gateway's `poll_state` as `T`, stop the watchdog and run
+`reset-offset --to T`, stop the gateway, then start in `direct` mode with
+`TELEGRAM_BOT_TOKEN` back in `.env`.
+
+- The offset must be reset. Gateway `seq` numbers and Telegram update ids are separate
+  counters with no order between them, so a leftover `seq` can be higher than the next
+  Telegram id and skip it.
+- Reset to `T`, not `T + 1`: the ledger stores the last committed id and `next_offset`
+  adds one, so `--to T` makes the next poll ask for `T + 1`.
+- Do not count on Telegram re-delivering what the gateway fetched: it has acknowledged
+  those updates. Anything the watchdog could not drain must be entered by hand.
 
 ### Dry-run (rollback control)
 
