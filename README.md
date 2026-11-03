@@ -6,10 +6,9 @@ to a SQLite ledger before advancing the polling offset, plans the exact Notion
 payload, writes it once, reads it back, and acknowledges with a fixed-meaning
 "captured" reaction.
 
-This repository is being built ticket-by-ticket. The walking skeleton (this
-slice) proves the ledger, the commit-before-offset ordering, and the Notion
-adapter's shape; DeepSeek classification and credential masking are in. Resolution,
-verification, reliability, and Deliverable matching arrive in later tickets.
+The watchdog is live. Its PRD tickets (#20 to #28 and #39) are closed. Since Nov 2
+it runs in gateway mode (#95), so the Sixto gateway holds the bot token. Deliverable
+matching (Jev) runs in shadow mode.
 
 ## Layout
 
@@ -264,3 +263,7 @@ See `docs/ledger-schema.md` for the versioned ledger contract and
 `docs/adr/` (once added) for decision records. Design sources live in `map/`
 (mirrors of the closed design issues #1–#17). The PRD and open build tickets
 are mirrored in `docs/issues/` (issues #20–#28).
+
+## Workflow
+
+Work moves through five separate stages: grill, spec, tickets, implement, code review. Finish one before starting the next. Work is tracked in GitHub Issues and sub-issues (spec as one issue, tickets as its sub-issues). Agent instructions: see `AGENTS.md`.
