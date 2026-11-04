@@ -1,3 +1,4 @@
+from jo_watchdog.core.plan import NOTES_PROPERTY
 """The deterministic Job Order plan: Name, JO Number, fields, Notes, and replay."""
 
 import json
@@ -209,22 +210,22 @@ class FieldTests(unittest.TestCase):
             )
         )
         self.assertEqual(text_of(p.properties["Title"]), "  keep\u00a0this\n")
-        self.assertEqual(text_of(p.properties["Notes"]), "  a\u00a0b\n")
+        self.assertEqual(text_of(p.properties[NOTES_PROPERTY]), "  a\u00a0b\n")
 
     def test_whitespace_only_title_and_notes_are_blank(self):
         p = plan(extraction(header_raw="MFG - TOC - JO #74", title="\u00a0 ", notes=" \n"))
         self.assertNotIn("Title", p.properties)
-        self.assertNotIn("Notes", p.properties)
+        self.assertNotIn(NOTES_PROPERTY, p.properties)
 
     def test_poster_notes_and_watchdog_notes_go_to_separate_columns(self):
         poster = " " + "x" * 2500 + "\n"
         p = plan(
             extraction(header_raw="MFG - TOC - JO #74", notes=poster, deadline_raw="ASAP"),
         )
-        for column in ("Notes", "Watchdog Notes"):
+        for column in (NOTES_PROPERTY, "Watchdog Notes"):
             items = p.properties[column]["rich_text"]
             self.assertTrue(all(len(i["text"]["content"]) <= 2000 for i in items), column)
-        self.assertEqual(text_of(p.properties["Notes"]), poster)
+        self.assertEqual(text_of(p.properties[NOTES_PROPERTY]), poster)
         self.assertEqual(
             text_of(p.properties["Watchdog Notes"]),
             f"Deadline as posted: ASAP\n{ASAP_NOTE}",
@@ -232,7 +233,7 @@ class FieldTests(unittest.TestCase):
 
     def test_notes_column_never_carries_watchdog_text(self):
         p = plan(extraction(header_raw="MFG - TOC - JO #74", deadline_raw="ASAP"))
-        self.assertNotIn("Notes", p.properties)
+        self.assertNotIn(NOTES_PROPERTY, p.properties)
         self.assertEqual(
             text_of(p.properties["Watchdog Notes"]),
             f"Deadline as posted: ASAP\n{ASAP_NOTE}",
@@ -240,7 +241,7 @@ class FieldTests(unittest.TestCase):
 
     def test_watchdog_notes_absent_when_watchdog_adds_nothing(self):
         p = plan(extraction(header_raw="MFG - TOC - JO #74", notes="poster only"))
-        self.assertEqual(text_of(p.properties["Notes"]), "poster only")
+        self.assertEqual(text_of(p.properties[NOTES_PROPERTY]), "poster only")
         self.assertNotIn("Watchdog Notes", p.properties)
 
     def test_stored_plan_with_legacy_marker_block_is_split_on_load(self):
@@ -257,7 +258,7 @@ class FieldTests(unittest.TestCase):
             },
         )
         loaded = load_plan(legacy.model_dump_json())
-        self.assertEqual(text_of(loaded.properties["Notes"]), "poster note")
+        self.assertEqual(text_of(loaded.properties[NOTES_PROPERTY]), "poster note")
         self.assertEqual(
             text_of(loaded.properties["Watchdog Notes"]), "Deadline as posted: 1pm"
         )
@@ -280,12 +281,12 @@ class FieldTests(unittest.TestCase):
             telegram_key="-1001:42",
             name="n",
             properties={
-                "Notes": {"rich_text": rich_text(quoted)},
+                NOTES_PROPERTY: {"rich_text": rich_text(quoted)},
                 "Watchdog Notes": {"rich_text": rich_text("Deadline as posted: 1pm")},
             },
         )
         loaded = load_plan(stored.model_dump_json())
-        self.assertEqual(text_of(loaded.properties["Notes"]), quoted)
+        self.assertEqual(text_of(loaded.properties[NOTES_PROPERTY]), quoted)
         self.assertEqual(
             text_of(loaded.properties["Watchdog Notes"]), "Deadline as posted: 1pm"
         )
@@ -385,7 +386,7 @@ class NotesTests(unittest.TestCase):
                 notes="pls prioritize",
             )
         )
-        self.assertEqual(text_of(p.properties["Notes"]), "pls prioritize")
+        self.assertEqual(text_of(p.properties[NOTES_PROPERTY]), "pls prioritize")
         self.assertEqual(
             text_of(p.properties["Watchdog Notes"]),
             "Deadline as posted: September 10, asap\nASAP — deprioritize other JOs",
@@ -403,7 +404,7 @@ class NotesTests(unittest.TestCase):
 
     def test_long_notes_split_into_2000_character_items(self):
         p = plan(extraction(notes="n" * 4100))
-        items = p.properties["Notes"]["rich_text"]
+        items = p.properties[NOTES_PROPERTY]["rich_text"]
         self.assertEqual([len(i["text"]["content"]) for i in items], [2000, 2000, 100])
 
 
@@ -456,7 +457,7 @@ class LoadPlanTests(unittest.TestCase):
             payload["properties"]["Status"], {"status": {"name": "Needs Intake Review"}}
         )
         self.assertEqual(payload["properties"]["Name"]["title"][0]["text"]["content"], "First line")
-        self.assertNotIn("Notes", payload["properties"])
+        self.assertNotIn(NOTES_PROPERTY, payload["properties"])
         self.assertEqual(
             payload["properties"]["Watchdog Notes"]["rich_text"][0]["text"]["content"],
             "Earlier row: x",

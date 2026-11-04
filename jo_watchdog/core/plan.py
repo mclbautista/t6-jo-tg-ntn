@@ -20,7 +20,7 @@ from jo_watchdog.core.masker import outbound_text
 BLOCK_LIMIT = 2000
 
 # Poster notes go to ``Notes``; everything the watchdog adds goes to ``Watchdog Notes`` (#99).
-NOTES_PROPERTY = "Notes"
+NOTES_PROPERTY = "JO Notes"
 WATCHDOG_NOTES_PROPERTY = "Watchdog Notes"
 
 

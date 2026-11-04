@@ -147,11 +147,16 @@ def split_legacy_notes(properties: dict[str, Any]) -> dict[str, Any]:
     """
     if WATCHDOG_NOTES_PROPERTY in properties:
         return properties
-    legacy = _split_legacy_block(plain_text(properties.get(NOTES_PROPERTY)))
+    legacy_notes = properties.get(NOTES_PROPERTY) or properties.get("Notes")
+    legacy = _split_legacy_block(plain_text(legacy_notes))
     if legacy is None:
+        if "Notes" in properties and NOTES_PROPERTY != "Notes":
+            split = {k: v for k, v in properties.items() if k != "Notes"}
+            split[NOTES_PROPERTY] = properties["Notes"]
+            return split
         return properties
     poster, block = legacy
-    split = {k: v for k, v in properties.items() if k != NOTES_PROPERTY}
+    split = {k: v for k, v in properties.items() if k not in (NOTES_PROPERTY, "Notes")}
     if poster:
         split[NOTES_PROPERTY] = {"rich_text": rich_text(poster)}
     if block:

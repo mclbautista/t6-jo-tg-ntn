@@ -1,3 +1,4 @@
+from jo_watchdog.core.plan import NOTES_PROPERTY
 """The worker plans with the #21 planner and the #22 resolvers, and replays the stored plan."""
 
 import json
@@ -147,10 +148,10 @@ class PlannerWiringTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(props["Name"]["title"][0]["text"]["content"], "MFG - TOC - JO #74")
         self.assertEqual(text("Title"), "  Teaser\u00a0cut\n")
-        self.assertEqual(text("Notes"), notes)
+        self.assertEqual(text(NOTES_PROPERTY), notes)
         self.assertEqual(text("Subtitle"), "N/A")
-        self.assertTrue(all(len(i["text"]["content"]) <= 2000 for i in props["Notes"]["rich_text"]))
-        self.assertEqual(h.plan()["properties"]["Notes"], props["Notes"])
+        self.assertTrue(all(len(i["text"]["content"]) <= 2000 for i in props[NOTES_PROPERTY]["rich_text"]))
+        self.assertEqual(h.plan()["properties"][NOTES_PROPERTY], props[NOTES_PROPERTY])
 
     async def test_unresolved_project_and_unknown_department_stay_blank(self):
         h = Harness(self, text="ZZZ - XYZ - JO #74\nTask: cut", task="Cut")
@@ -245,7 +246,7 @@ class ExplicitDeadlineYearTests(unittest.IsolatedAsyncioTestCase):
 
         props = h.notion.created[0]["properties"]
         self.assertEqual(manila_iso(datetime.fromisoformat(props["Deadline"]["date"]["start"])), "2030-09-30T22:00:00+08:00")
-        self.assertEqual(props["Notes"]["rich_text"][0]["text"]["content"], "keep this")
+        self.assertEqual(props[NOTES_PROPERTY]["rich_text"][0]["text"]["content"], "keep this")
         self.assertEqual(
             props["Watchdog Notes"]["rich_text"][0]["text"]["content"],
             "Deadline as posted: Sep 30, 2030 end of shift",
@@ -262,7 +263,7 @@ class ExplicitDeadlineYearTests(unittest.IsolatedAsyncioTestCase):
             "Deadline as posted: Sep 16, 2020 5PM",
             props["Watchdog Notes"]["rich_text"][0]["text"]["content"],
         )
-        self.assertNotIn("Notes", props)
+        self.assertNotIn(NOTES_PROPERTY, props)
         self.assertIn("deadline_past", h.codes())
         self.assertIn("Deadline is before the message was posted", h.telegram.sent[-1][2])
 

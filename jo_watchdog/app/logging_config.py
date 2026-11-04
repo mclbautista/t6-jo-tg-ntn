@@ -54,7 +54,10 @@ class OwnerOnlyRotatingFileHandler(RotatingFileHandler):
             stream = super()._open()
         finally:
             os.umask(previous_umask)
-        Path(self.baseFilename).chmod(0o600)
+        try:
+            Path(self.baseFilename).chmod(0o600)
+        except OSError:
+            pass
         return stream
 
 
@@ -68,7 +71,10 @@ def configure_logging(
     """Install masked JSON stdout and rotated persistent-file handlers."""
     path = Path(log_path)
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    path.parent.chmod(0o700)
+    try:
+        path.parent.chmod(0o700)
+    except OSError:
+        pass
 
     formatter = JsonFormatter()
     masking_filter = MaskingFilter()

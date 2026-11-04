@@ -1,3 +1,4 @@
+from jo_watchdog.core.plan import NOTES_PROPERTY
 """Notion schema and relation smoke probes (#59): assertions and honest results, offline.
 
 The recorded schemas below stand in for the live Notion responses; the live run
@@ -44,7 +45,7 @@ def good_schemas():
         for n in (
             "JO Number", "Title", "Subtitle", "Task", "Purpose", "Source / Source Drive",
             "Platform", "Link Settings", "Watermark", "Mode of Transfer", "Blocker ", "Pending",
-            "Notes", "Watchdog Notes", "Telegram Key",
+            NOTES_PROPERTY, "Watchdog Notes", "Telegram Key",
         )
     }
     jo.update(

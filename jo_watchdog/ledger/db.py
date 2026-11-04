@@ -95,7 +95,10 @@ class Ledger:
     def __init__(self, path: str | Path, *, apply_migrations: bool = True):
         db_path = Path(path)
         db_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        db_path.parent.chmod(0o700)
+        try:
+            db_path.parent.chmod(0o700)
+        except OSError:
+            pass
         self._path = str(db_path)
         previous_umask = os.umask(0o077)
         try:
@@ -115,7 +118,10 @@ class Ledger:
         """Keep the database and SQLite companion files readable by the owner only."""
         for path in (Path(self._path), Path(f"{self._path}-wal"), Path(f"{self._path}-shm")):
             if path.exists():
-                path.chmod(0o600)
+                try:
+                    path.chmod(0o600)
+                except OSError:
+                    pass
 
     # -- schema ------------------------------------------------------------
 
