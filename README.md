@@ -159,8 +159,8 @@ docker compose exec watchdog python -m jo_watchdog.app ingest --text "JO-TOC #12
 `--text` rebuilds the message in the intake topic; `--date` without an offset is
 Manila time and, when left out, the capture time stands in for the posting time.
 Only messages in the intake chat and topic are accepted, and a message already in
-the ledger is never queued twice. `--wait N` waits up to N seconds and prints the
-final state and Notion URL.
+the ledger is never queued twice. `--wait N` waits up to N seconds, prints the
+final state and Notion URL, and exits 3 if the capture has not finished by then.
 
 ### Rollback
 

@@ -57,8 +57,8 @@ from jo_watchdog.ledger.db import Ledger, fmt_utc
 from jo_watchdog.ledger.states import State
 
 _TELEGRAM_KEY = re.compile(r"-?\d+:\d+")
-_MANILA = ZoneInfo("Asia/Manila")
 INGEST_POLL_SECONDS = 2.0
+_FINISHED = (State.DONE.value, State.IGNORED.value)
 
 
 async def run(config_path: str) -> None:
@@ -132,13 +132,13 @@ def run_retry(config_path: str, telegram_key: str | None, all_exhausted: bool) -
     return 0 if count or all_exhausted else 1
 
 
-def _unix_date(value: str) -> int:
-    """``--date``: unix seconds or ISO-8601; a time without an offset is Manila time."""
+def _unix_date(value: str, zone: ZoneInfo) -> int:
+    """``--date``: unix seconds or ISO-8601; a time without an offset is in ``zone``."""
     if value.lstrip("-").isdigit():
         return int(value)
     when = datetime.fromisoformat(value)
     if when.tzinfo is None:
-        when = when.replace(tzinfo=_MANILA)
+        when = when.replace(tzinfo=zone)
     return int(when.timestamp())
 
 
@@ -153,10 +153,10 @@ def _read_backfill(args, config, *, by: str, at: str) -> Backfill:
     return from_text(
         args.text,
         message_id=args.message_id,
-        chat_id=config.intake_chat_id if args.chat_id is None else args.chat_id,
+        chat_id=config.intake_chat_id,
         topic_id=config.intake_topic_id,
         from_user=args.from_user,
-        date=None if args.date is None else _unix_date(args.date),
+        date=None if args.date is None else _unix_date(args.date, ZoneInfo(config.timezone)),
         by=by,
         at=at,
     )
@@ -167,7 +167,7 @@ def _wait_for_capture(ledger: Ledger, key: str, wait: float) -> dict:
     deadline = time.monotonic() + wait
     while True:
         row = ledger.get_message(key) or {}
-        finished = row.get("state") in (State.DONE.value, State.IGNORED.value)
+        finished = row.get("state") in _FINISHED
         if finished or row.get("exhausted_at") or time.monotonic() >= deadline:
             return row
         time.sleep(INGEST_POLL_SECONDS)
@@ -217,12 +217,14 @@ def run_ingest(config_path: str, args) -> int:
                 line += f" {page_url_for(row['notion_page_id'])}"
             if row.get("exhausted_at"):
                 line += f" (retries exhausted: {row.get('last_error')})"
-            elif row.get("state") not in (State.DONE.value, State.IGNORED.value):
+            elif row.get("state") not in _FINISHED:
                 line = (
                     f"{key}: still {row.get('state')} after {args.wait:g}s;"
                     " is the watchdog running?"
                 )
             print(line)
+            if row.get("exhausted_at") or row.get("state") not in _FINISHED:
+                return 3  # queued, but not captured within --wait
     finally:
         ledger.close()
     return 0
@@ -251,13 +253,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     ingest.add_argument("--text", help="the message text, when the original JSON is not at hand")
     ingest.add_argument("--message-id", type=int, help="with --text: the Telegram message id")
-    ingest.add_argument("--chat-id", type=int, help="with --text: defaults to intake_chat_id")
     ingest.add_argument("--from-user", help="with --text: the sender's @username or user id")
     ingest.add_argument(
         "--date", help="with --text: when it was posted (ISO-8601, Manila if no offset)"
     )
     ingest.add_argument(
-        "--wait", type=float, default=0, help="seconds to wait for the capture to finish"
+        "--wait",
+        type=float,
+        default=0,
+        help="seconds to wait for the capture; exit 3 if it is not finished by then",
     )
     parser.add_argument("--config", default="config.yaml", help="path to config.yaml")
     args, extra = parser.parse_known_args(argv)

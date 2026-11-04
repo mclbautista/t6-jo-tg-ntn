@@ -52,6 +52,11 @@ OUTBOX_KINDS = frozenset(
 )
 
 
+def _check_kind(report: OutboxMessage) -> None:
+    if report.kind not in OUTBOX_KINDS:
+        raise ValueError(f"unknown outbox kind {report.kind!r}")
+
+
 class OutboxMessage(NamedTuple):
     """One rendered, masked ops post waiting to be inserted into ``outbox``."""
 
@@ -282,12 +287,14 @@ class Ledger:
         same transaction. Returns the telegram key. Raises ``sqlite3.IntegrityError``
         on a duplicate key, in which case nothing was committed.
         """
+        if alert is not None:
+            _check_kind(alert)
         with self._transaction():
             key, row_id = self._insert_message(
                 chat_id, message_id, update_id, raw_source, text, first_line, posted_at
             )
             if alert is not None:
-                self._insert_alert(alert, message_row_id=row_id)
+                self._insert_outbox(alert, message_row_id=row_id, now=_now())
             self._advance_offset(update_id)
         self._protect_files()
         return key
@@ -354,11 +361,6 @@ class Ledger:
             ),
         )
         return key, cur.lastrowid
-
-    def _insert_alert(self, alert: OutboxMessage, *, message_row_id: int | None) -> None:
-        if alert.kind not in OUTBOX_KINDS:
-            raise ValueError(f"unknown outbox kind {alert.kind!r}")
-        self._insert_outbox(alert, message_row_id=message_row_id, now=_now())
 
     def last_seen_message_id(self, chat_id: int) -> int | None:
         """The highest message id the ledger holds for ``chat_id``, captured or ignored."""
@@ -577,8 +579,7 @@ class Ledger:
             )
             if exhausted and on_exhausted is not None:
                 alert = on_exhausted(masked, attempts)
-                if alert.kind not in OUTBOX_KINDS:
-                    raise ValueError(f"unknown outbox kind {alert.kind!r}")
+                _check_kind(alert)
                 self._insert_outbox(alert, message_row_id=row["id"], now=stamp)
         self._protect_files()
         return FailureResult(attempts, exhausted, next_at)
@@ -801,6 +802,8 @@ class Ledger:
         ``alert`` (a message id gap this update revealed, #101) is queued in the
         same transaction.
         """
+        if alert is not None:
+            _check_kind(alert)
         safe_first_line = outbound_text(first_line).text
         with self._transaction():
             self._conn.execute(
@@ -810,7 +813,7 @@ class Ledger:
                 (chat_id, message_id, update_id, reason, safe_first_line, _now()),
             )
             if alert is not None:
-                self._insert_alert(alert, message_row_id=None)
+                self._insert_outbox(alert, message_row_id=None, now=_now())
             self._advance_offset(update_id)
         self._protect_files()
 
@@ -915,8 +918,7 @@ class Ledger:
         if not can_transition(State.WRITING, State.WRITTEN):
             return False
         for report in reports:
-            if report.kind not in OUTBOX_KINDS:
-                raise ValueError(f"unknown outbox kind {report.kind!r}")
+            _check_kind(report)
         now = _now()
         with self._transaction():
             cur = self._conn.execute(
@@ -1004,8 +1006,8 @@ class Ledger:
         """
         if outcome not in ("reported", "pending_capture", "ignored_message"):
             raise ValueError(f"unknown edit outcome {outcome!r}")
-        if report is not None and report.kind not in OUTBOX_KINDS:
-            raise ValueError(f"unknown outbox kind {report.kind!r}")
+        if report is not None:
+            _check_kind(report)
         now = _now()
         with self._transaction():
             self._conn.execute(
@@ -1036,8 +1038,7 @@ class Ledger:
 
         ``key`` links it to a ledger message when there is one.
         """
-        if report.kind not in OUTBOX_KINDS:
-            raise ValueError(f"unknown outbox kind {report.kind!r}")
+        _check_kind(report)
         with self._transaction():
             row_id = None
             if key is not None:

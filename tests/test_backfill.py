@@ -251,8 +251,9 @@ class IngestCommandTests(unittest.TestCase):
             mock.patch.object(entry.time, "monotonic", side_effect=[0, 0, 100]),
         ):
             code, out, _ = self._run("--json", path, "--wait", "30")
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 3)
         self.assertIn("still received", out)
+        self.assertEqual(self._row()["state"], "received")
 
 
 if __name__ == "__main__":
