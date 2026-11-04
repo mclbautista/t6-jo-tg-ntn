@@ -31,7 +31,7 @@ keys before commit, so tables that reference `messages(id)` stay valid.
 | chat_id            | INTEGER | Telegram chat id                                   |
 | message_id         | INTEGER | Telegram message id                                |
 | telegram_key       | TEXT    | UNIQUE; `chat_id:message_id`                       |
-| update_id          | INTEGER | Telegram update id (offset tracking)               |
+| update_id          | INTEGER | Telegram update id (offset tracking); 0 when backfilled by `ingest` (#101) |
 | raw_source         | TEXT    | the raw update JSON, kept unmasked (local only)    |
 | text               | TEXT    | message text/caption (source of body blocks)       |
 | first_line         | TEXT    | first non-empty line (Name fallback)               |
@@ -168,7 +168,7 @@ Telegram accepts a post but before the row is marked `sent` re-posts it.
 |---------------------|---------|--------------------------------------------------------|
 | id                  | INTEGER | PK (autoinc); logged with every send, for tracing      |
 | message_id          | INTEGER | `messages(id)`; null for system messages               |
-| kind                | TEXT    | `capture_report`, `edit_after_capture`, `stale_cache`, `outage_alert`, `heartbeat`, `dry_run_plan` |
+| kind                | TEXT    | `capture_report`, `edit_after_capture`, `stale_cache`, `outage_alert`, `heartbeat`, `dry_run_plan`, `message_gap` |
 | chat_id             | INTEGER | ops chat id                                            |
 | topic_id            | INTEGER | ops forum topic id                                     |
 | text                | TEXT    | rendered Telegram HTML; every source field masked      |

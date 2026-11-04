@@ -85,6 +85,8 @@ class Config(BaseModel):
     ops_topic_id: int
     leizette_telegram_handle: str | None = None
     header_date_tolerance_days: int = Field(default=1, ge=0)
+    # #101: alert ops when intake chat message ids jump (messages that never arrived)
+    message_gap_alerts: bool = True
 
     # Telegram transport (#95): ``direct`` polls Telegram with the bot token; ``gateway``
     # reads and posts through the Sixto gateway with ``WATCHDOG_SECRET`` instead.

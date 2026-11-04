@@ -36,6 +36,9 @@ CACHE_SNAPSHOTS_KEPT = 10
 # attempts are 30s, 2m, 5m, 10m, so there are five attempts in total.
 OUTBOX_RETRY_SECONDS = (30, 120, 300, 600)
 
+# ``messages.update_id`` of a row entered by ``ingest`` rather than polled (#101).
+BACKFILL_UPDATE_ID = 0
+
 OUTBOX_KINDS = frozenset(
     {
         "capture_report",
@@ -44,6 +47,7 @@ OUTBOX_KINDS = frozenset(
         "outage_alert",
         "heartbeat",
         "dry_run_plan",
+        "message_gap",
     }
 )
 
@@ -269,44 +273,102 @@ class Ledger:
         text: str,
         first_line: str,
         posted_at: str | None = None,
+        *,
+        alert: OutboxMessage | None = None,
     ) -> str:
         """Durably queue an in-scope update and advance the offset atomically.
 
-        Returns the telegram key. Raises ``sqlite3.IntegrityError`` on a
-        duplicate key, in which case nothing was committed.
+        ``alert`` (a message id gap this update revealed, #101) is queued in the
+        same transaction. Returns the telegram key. Raises ``sqlite3.IntegrityError``
+        on a duplicate key, in which case nothing was committed.
         """
-        key = telegram_key(chat_id, message_id)
-        now = _now()
-        masked = outbound_text(text)
         with self._transaction():
-            self._conn.execute(
-                "INSERT INTO messages"
-                " (chat_id, message_id, telegram_key, update_id, raw_source, text,"
-                "  first_line, masked_text, masker_version, masked_count, state,"
-                "  posted_at, text_sha256, forward_origin_type, created_at, updated_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    chat_id,
-                    message_id,
-                    key,
-                    update_id,
-                    raw_source,
-                    text,
-                    first_line,
-                    masked.text,
-                    masked.masker_version,
-                    masked.withheld_count,
-                    State.RECEIVED.value,
-                    posted_at,
-                    text_sha256(text),
-                    _forward_origin_type(raw_source),
-                    now,
-                    now,
-                ),
+            key, row_id = self._insert_message(
+                chat_id, message_id, update_id, raw_source, text, first_line, posted_at
             )
+            if alert is not None:
+                self._insert_alert(alert, message_row_id=row_id)
             self._advance_offset(update_id)
         self._protect_files()
         return key
+
+    def ingest_message(
+        self,
+        chat_id: int,
+        message_id: int,
+        raw_source: str,
+        text: str,
+        first_line: str,
+        posted_at: str | None = None,
+    ) -> str:
+        """Queue a backfilled intake message (#101) as ``received``; the offset is untouched.
+
+        The message never came through the poll, so it has no update id of its own
+        (stored as 0) and nothing to move the cursor past. The running worker captures
+        it like any polled message. Raises ``sqlite3.IntegrityError`` when the key is
+        already in the ledger.
+        """
+        with self._transaction():
+            key, _ = self._insert_message(
+                chat_id, message_id, BACKFILL_UPDATE_ID, raw_source, text, first_line, posted_at
+            )
+        self._protect_files()
+        return key
+
+    def _insert_message(
+        self,
+        chat_id: int,
+        message_id: int,
+        update_id: int,
+        raw_source: str,
+        text: str,
+        first_line: str,
+        posted_at: str | None,
+    ) -> tuple[str, int | None]:
+        key = telegram_key(chat_id, message_id)
+        now = _now()
+        masked = outbound_text(text)
+        cur = self._conn.execute(
+            "INSERT INTO messages"
+            " (chat_id, message_id, telegram_key, update_id, raw_source, text,"
+            "  first_line, masked_text, masker_version, masked_count, state,"
+            "  posted_at, text_sha256, forward_origin_type, created_at, updated_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                chat_id,
+                message_id,
+                key,
+                update_id,
+                raw_source,
+                text,
+                first_line,
+                masked.text,
+                masked.masker_version,
+                masked.withheld_count,
+                State.RECEIVED.value,
+                posted_at,
+                text_sha256(text),
+                _forward_origin_type(raw_source),
+                now,
+                now,
+            ),
+        )
+        return key, cur.lastrowid
+
+    def _insert_alert(self, alert: OutboxMessage, *, message_row_id: int | None) -> None:
+        if alert.kind not in OUTBOX_KINDS:
+            raise ValueError(f"unknown outbox kind {alert.kind!r}")
+        self._insert_outbox(alert, message_row_id=message_row_id, now=_now())
+
+    def last_seen_message_id(self, chat_id: int) -> int | None:
+        """The highest message id the ledger holds for ``chat_id``, captured or ignored."""
+        row = self._conn.execute(
+            "SELECT MAX(message_id) AS last FROM ("
+            " SELECT message_id FROM messages WHERE chat_id = ?"
+            " UNION ALL SELECT message_id FROM ignore_log WHERE chat_id = ?)",
+            (chat_id, chat_id),
+        ).fetchone()
+        return row["last"]
 
     def has_message(self, key: str) -> bool:
         return self.get_message(key) is not None
@@ -731,8 +793,14 @@ class Ledger:
         update_id: int,
         reason: str,
         first_line: str,
+        *,
+        alert: OutboxMessage | None = None,
     ) -> None:
-        """Record out-of-scope traffic and advance the offset past it."""
+        """Record out-of-scope traffic and advance the offset past it.
+
+        ``alert`` (a message id gap this update revealed, #101) is queued in the
+        same transaction.
+        """
         safe_first_line = outbound_text(first_line).text
         with self._transaction():
             self._conn.execute(
@@ -741,6 +809,8 @@ class Ledger:
                 " VALUES (?, ?, ?, ?, ?, ?)",
                 (chat_id, message_id, update_id, reason, safe_first_line, _now()),
             )
+            if alert is not None:
+                self._insert_alert(alert, message_row_id=None)
             self._advance_offset(update_id)
         self._protect_files()
 

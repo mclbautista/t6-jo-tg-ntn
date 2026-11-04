@@ -341,3 +341,35 @@ def render_heartbeat(
         lines += ["", "Ignored, first lines:"]
         lines += [f'"{_field(line)}"' for line in stats["ignored_first_lines"]]
     return "\n".join(lines)
+
+
+GAP_HEADER = "⚠️ Possibly missed intake messages"
+# A long gap lists only the first few message links; the range covers the rest.
+GAP_LINK_LIMIT = 5
+
+
+def render_message_gap(*, chat_id: int, topic_id: int, last_seen: int, message_id: int) -> str:
+    """The ops alert when intake chat message ids jump from ``last_seen`` to ``message_id`` (#101).
+
+    Ids are one counter for the whole chat, so the missing ones may also be posts in
+    other topics the watchdog is never sent; the alert only says they might be lost.
+    """
+    first, last = last_seen + 1, message_id - 1
+    count = last - first + 1
+    span = f"{first}" if count == 1 else f"{first}–{last}"
+    links = " · ".join(
+        _link(str(missing), intake_link(chat_id, topic_id, missing))
+        for missing in range(first, min(last, first + GAP_LINK_LIMIT - 1) + 1)
+    )
+    if count > GAP_LINK_LIMIT:
+        links += " · …"
+    noun = "message" if count == 1 else "messages"
+    return "\n".join(
+        [
+            GAP_HEADER,
+            f"{count} {noun} never reached the watchdog: id {span}"
+            f" (last seen {last_seen}, now {message_id})",
+            f"Open: {links}",
+            "If one is a Job Order, backfill it with <code>ingest</code> (see the README).",
+        ]
+    )

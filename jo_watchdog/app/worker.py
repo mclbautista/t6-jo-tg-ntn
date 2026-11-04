@@ -60,6 +60,7 @@ from jo_watchdog.core.report import (
     render_dry_run_plan,
     render_edit_after_capture,
     render_heartbeat,
+    render_message_gap,
     render_outage_alert,
     render_stale_cache,
 )
@@ -195,6 +196,7 @@ class Worker:
                     u.update_id,
                     self._scope_reason(u),
                     first_line_of(u.text),
+                    alert=None if u.edited else self._gap_alert(u),
                 )
                 continue
             if u.edited:
@@ -214,7 +216,39 @@ class Worker:
                 u.text,
                 first_line_of(u.text),
                 posted_at=posted_at_from_raw(u.raw),
+                alert=self._gap_alert(u),
             )
+
+    def _gap_alert(self, u) -> OutboxMessage | None:
+        """The ops alert when this intake chat message skips ids the ledger never saw (#101).
+
+        Message ids are one counter per chat, so every topic counts as seen. Messages
+        that never reached the watchdog (the gateway dropped two on 2026-11-04) would
+        otherwise be lost silently. Must run before the update itself is recorded.
+        """
+        if not self.config.message_gap_alerts or u.chat_id != self.config.intake_chat_id:
+            return None
+        last_seen = self.ledger.last_seen_message_id(u.chat_id)
+        if last_seen is None or u.message_id <= last_seen + 1:
+            return None
+        log.warning(
+            "message id gap in the intake chat: %d to %d missing (last seen %d, now %d)",
+            last_seen + 1,
+            u.message_id - 1,
+            last_seen,
+            u.message_id,
+        )
+        return OutboxMessage(
+            kind="message_gap",
+            chat_id=self.config.ops_chat_id,
+            topic_id=self.config.ops_topic_id,
+            text=render_message_gap(
+                chat_id=u.chat_id,
+                topic_id=self.config.intake_topic_id,
+                last_seen=last_seen,
+                message_id=u.message_id,
+            ),
+        )
 
     # -- edits (#24) -------------------------------------------------------
 
