@@ -7,7 +7,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from jo_watchdog.core.masker import mask_text
-from jo_watchdog.core.plan import BLOCK_LIMIT, Plan
+from jo_watchdog.core.plan import BLOCK_LIMIT, WATCHDOG_NOTES_PROPERTY, Plan
 
 # The only Status the walking skeleton ever writes (job-order field mapping).
 STATUS_NEEDS_INTAKE_REVIEW = "Needs Intake Review"
@@ -43,7 +43,7 @@ def build_notion_payload(
         "Status": {"status": {"name": status}},
     }
     if plan.notes:
-        properties["Notes"] = {
+        properties[WATCHDOG_NOTES_PROPERTY] = {
             "rich_text": [
                 _text(plan.notes[i : i + BLOCK_LIMIT])
                 for i in range(0, len(plan.notes), BLOCK_LIMIT)

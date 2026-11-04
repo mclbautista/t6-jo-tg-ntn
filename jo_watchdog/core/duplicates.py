@@ -17,7 +17,8 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from jo_watchdog.core.job_order import WATCHDOG_MARKER, JobOrderPlan, rich_text
+from jo_watchdog.core.job_order import JobOrderPlan, plain_text, rich_text
+from jo_watchdog.core.plan import WATCHDOG_NOTES_PROPERTY
 
 
 def jo_key(project_page_id: str | None, number: int | None) -> str | None:
@@ -101,16 +102,14 @@ def notes_line(match: DuplicateMatch) -> str:
     return f"Earlier row: {match.earlier.page_url} ({label})"
 
 
-def append_watchdog_line(notes: str, line: str) -> str:
-    """Add ``line`` to the watchdog block of a Notes value, opening it if needed."""
-    if WATCHDOG_MARKER in notes:
-        return f"{notes}\n{line}"
-    block = f"{WATCHDOG_MARKER}\n{line}"
-    return f"{notes}\n\n{block}" if notes else block
+def append_watchdog_line(watchdog_notes: str, line: str) -> str:
+    """Add ``line`` to a Watchdog Notes value, one line per item."""
+    return f"{watchdog_notes}\n{line}" if watchdog_notes else line
 
 
 def add_earlier_row_line(plan: JobOrderPlan, line: str) -> None:
-    """Append ``line`` to the plan's Notes property, inside the watchdog block."""
-    items = plan.properties.get("Notes", {}).get("rich_text", [])
-    notes = "".join(item["text"]["content"] for item in items)
-    plan.properties["Notes"] = {"rich_text": rich_text(append_watchdog_line(notes, line))}
+    """Append ``line`` to the plan's Watchdog Notes property (never to Notes)."""
+    notes = plain_text(plan.properties.get(WATCHDOG_NOTES_PROPERTY))
+    plan.properties[WATCHDOG_NOTES_PROPERTY] = {
+        "rich_text": rich_text(append_watchdog_line(notes, line))
+    }

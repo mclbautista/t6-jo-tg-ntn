@@ -26,7 +26,13 @@ from jo_watchdog.core.header import (
 )
 from jo_watchdog.core.masker import mask_text, outbound_text
 from jo_watchdog.core.payload import STATUS_NEEDS_INTAKE_REVIEW
-from jo_watchdog.core.plan import BLOCK_LIMIT, header_line_of, split_blocks
+from jo_watchdog.core.plan import (
+    BLOCK_LIMIT,
+    NOTES_PROPERTY,
+    WATCHDOG_NOTES_PROPERTY,
+    header_line_of,
+    split_blocks,
+)
 from jo_watchdog.core.resolve import (
     DepartmentResolution,
     PeopleResolution,
@@ -34,7 +40,8 @@ from jo_watchdog.core.resolve import (
     relation_properties,
 )
 
-WATCHDOG_MARKER = "— added by the watchdog —"
+# Plans stored before #99 carried the watchdog block inside ``Notes`` behind this marker.
+LEGACY_WATCHDOG_MARKER = "— added by the watchdog —"
 ASAP_NOTE = "ASAP — deprioritize other JOs"
 
 # Exact live property names, including the trailing space on `Blocker `.
@@ -111,18 +118,66 @@ class JobOrderPlan(BaseModel):
     match: dict | None = None
 
 
+def plain_text(prop: dict[str, Any] | None) -> str:
+    """The text of a stored rich-text property, items joined; empty when absent."""
+    return "".join(item["text"]["content"] for item in (prop or {}).get("rich_text") or [])
+
+
+def _split_legacy_block(notes: str) -> tuple[str, str] | None:
+    """Split pre-#99 ``<poster>\\n\\n<marker>\\n<lines>`` text into (poster, watchdog lines).
+
+    The block is always last, so only the final marker line counts: a marker quoted
+    inside the poster's own text is left alone. ``None`` when there is no block.
+    """
+    token = f"{LEGACY_WATCHDOG_MARKER}\n"
+    if notes.startswith(token):
+        return "", notes[len(token) :]
+    at = notes.rfind(f"\n\n{token}")
+    if at == -1:
+        return None
+    return notes[:at], notes[at + 2 + len(token) :]
+
+
+def split_legacy_notes(properties: dict[str, Any]) -> dict[str, Any]:
+    """Move a pre-#99 watchdog block out of ``Notes`` into ``Watchdog Notes``.
+
+    A plan stored before the split holds ``<poster notes>\\n\\n<marker>\\n<lines>`` in
+    ``Notes``. Replaying it must not write watchdog text to the coordinator's column.
+    A plan that already has ``Watchdog Notes`` is new-format and is returned unchanged.
+    """
+    if WATCHDOG_NOTES_PROPERTY in properties:
+        return properties
+    legacy = _split_legacy_block(plain_text(properties.get(NOTES_PROPERTY)))
+    if legacy is None:
+        return properties
+    poster, block = legacy
+    split = {k: v for k, v in properties.items() if k != NOTES_PROPERTY}
+    if poster:
+        split[NOTES_PROPERTY] = {"rich_text": rich_text(poster)}
+    if block:
+        split[WATCHDOG_NOTES_PROPERTY] = {"rich_text": rich_text(block)}
+    return split
+
+
 def load_plan(stored: str | dict) -> JobOrderPlan:
     """Read a stored plan; a pre-#39 skeleton plan (no ``properties``) is upgraded in place."""
     data = json.loads(stored) if isinstance(stored, str) else dict(stored)
     if "properties" in data:
-        return JobOrderPlan.model_validate(data)
+        plan = JobOrderPlan.model_validate(data)
+        plan.properties = split_legacy_notes(plan.properties)
+        return plan
     properties: dict[str, Any] = {
         "Name": {"title": rich_text(data["name"])},
         "Telegram Key": {"rich_text": rich_text(data["telegram_key"])},
         "Status": {"status": {"name": STATUS_NEEDS_INTAKE_REVIEW}},
     }
-    if data.get("notes"):
-        properties["Notes"] = {"rich_text": rich_text(data["notes"])}
+    # A skeleton plan's notes were watchdog-only (the earlier-row reference).
+    skeleton_notes = data.get("notes") or ""
+    legacy = _split_legacy_block(skeleton_notes)
+    if legacy is not None:
+        skeleton_notes = "\n\n".join(part for part in legacy if part)
+    if skeleton_notes:
+        properties[WATCHDOG_NOTES_PROPERTY] = {"rich_text": rich_text(skeleton_notes)}
     return JobOrderPlan(
         telegram_key=data["telegram_key"],
         name=data["name"],
@@ -205,22 +260,23 @@ def _verbatim(value: str | None) -> str:
     return outbound_text(value).text
 
 
-def build_notes(poster_notes: str | None, deadline_raw: str | None, asap: bool) -> str:
-    """Poster notes verbatim, then the watchdog block when it has anything to add.
+def build_notes(poster_notes: str | None) -> str:
+    """The coordinator's own notes, verbatim (masked), for the ``Notes`` column."""
+    return _verbatim(poster_notes)
 
-    ``Earlier row:`` lines are appended by #24 after this block.
+
+def build_watchdog_notes(deadline_raw: str | None, asap: bool) -> str:
+    """What the watchdog adds, one line per item, for the ``Watchdog Notes`` column.
+
+    ``Earlier row:`` lines are appended by #24 after these lines.
     """
-    notes = _verbatim(poster_notes)
     added: list[str] = []
     deadline = _clean(deadline_raw)
     if deadline:
         added.append(f"Deadline as posted: {deadline}")
     if asap:
         added.append(ASAP_NOTE)
-    if not added:
-        return notes
-    block = "\n".join([WATCHDOG_MARKER, *added])
-    return f"{notes}\n\n{block}" if notes else block
+    return "\n".join(added)
 
 
 def plan_job_order(
@@ -286,9 +342,12 @@ def plan_job_order(
     subtitle = _clean(extraction.subtitle)
     if subtitle and is_subtitle_value(subtitle):
         properties["Subtitle"] = {"rich_text": rich_text(subtitle)}
-    notes = build_notes(extraction.notes, extraction.deadline_raw, asap)
+    notes = build_notes(extraction.notes)
     if notes:
-        properties["Notes"] = {"rich_text": rich_text(notes)}
+        properties[NOTES_PROPERTY] = {"rich_text": rich_text(notes)}
+    watchdog_notes = build_watchdog_notes(extraction.deadline_raw, asap)
+    if watchdog_notes:
+        properties[WATCHDOG_NOTES_PROPERTY] = {"rich_text": rich_text(watchdog_notes)}
 
     body = [
         *split_blocks(outbound_text(source_block).text),

@@ -682,7 +682,7 @@ class Worker:
         Without a complete key (D1) no content-duplicate lookup runs at all.
 
         A match never blocks or merges: the new row is still written, with an
-        ``Earlier row:`` Notes line and a finding stored in the plan.
+        ``Earlier row:`` Watchdog Notes line and a finding stored in the plan.
         """
         key = msg["telegram_key"]
         dup_key, jo_number = self._jo_key(plan)

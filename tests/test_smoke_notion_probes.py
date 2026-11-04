@@ -44,7 +44,7 @@ def good_schemas():
         for n in (
             "JO Number", "Title", "Subtitle", "Task", "Purpose", "Source / Source Drive",
             "Platform", "Link Settings", "Watermark", "Mode of Transfer", "Blocker ", "Pending",
-            "Notes", "Telegram Key",
+            "Notes", "Watchdog Notes", "Telegram Key",
         )
     }
     jo.update(

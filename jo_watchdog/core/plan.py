@@ -19,6 +19,10 @@ from jo_watchdog.core.masker import outbound_text
 # Notion text items cap at 2000 characters (write-path research, §2).
 BLOCK_LIMIT = 2000
 
+# Poster notes go to ``Notes``; everything the watchdog adds goes to ``Watchdog Notes`` (#99).
+NOTES_PROPERTY = "Notes"
+WATCHDOG_NOTES_PROPERTY = "Watchdog Notes"
+
 
 class Plan(BaseModel):
     """The exact payload to store locally before the external Notion create call."""
@@ -26,7 +30,8 @@ class Plan(BaseModel):
     name: str
     telegram_key: str
     body_blocks: list[str] = Field(default_factory=list)
-    # Watchdog-only Notes (the earlier-row reference, #24); empty writes no Notes.
+    # Watchdog-only text (the earlier-row reference, #24), written to Watchdog Notes (#99);
+    # empty writes no Watchdog Notes.
     notes: str = ""
     # The duplicate decision made at plan time (#24), replayed unchanged:
     # ``{"code": "exact_repost" | "number_reuse", "url", "days", "jo_number"}``.

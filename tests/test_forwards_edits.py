@@ -147,7 +147,7 @@ class Harness:
         return self.notion.created[n]
 
     def notes(self, n) -> str | None:
-        notes = self.payload(n)["properties"].get("Notes")
+        notes = self.payload(n)["properties"].get("Watchdog Notes")
         return "".join(i["text"]["content"] for i in notes["rich_text"]) if notes else None
 
     def body(self, n) -> str:
@@ -260,7 +260,7 @@ class RepostAndReuseTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(h.notes(0))
         self.assertEqual(
             h.notes(1),
-            "— added by the watchdog —\nEarlier row: https://www.notion.so/page1 (exact re-post)",
+            "Earlier row: https://www.notion.so/page1 (exact re-post)",
         )
         self.assertEqual(len(h.posts()), 1)
         self.assertIn("Exact re-post of", h.posts()[0])
