@@ -51,6 +51,7 @@ ops_chat_id: -1000000000001         # FILL IN: the ops supergroup's chat id
 ops_topic_id: 1                     # FILL IN: the ops forum topic's message_thread_id
 leizette_telegram_handle: "@leizette_handle"  # FILL IN
 header_date_tolerance_days: 1
+message_gap_alerts: true           # alert when intake chat message ids skip (#101)
 
 # --- Reliability and heartbeat (#25) ---
 owner_telegram_handle: "@owner_handle"        # FILL IN

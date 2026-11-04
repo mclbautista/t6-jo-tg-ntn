@@ -134,6 +134,34 @@ process exits non-zero so the restart policy brings it back. At `heartbeat_time`
 (07:00 `Asia/Manila`) the ops topic gets a heartbeat for the preceding 24 hours,
 computed from the ledger. A brand-new ledger skips its first window.
 
+### Missed messages: gap alerts and backfill (#101)
+
+Telegram message ids in a supergroup are one counter for the whole chat. When an
+intake chat message arrives whose id skips ids the ledger has never seen (any
+topic counts as seen), the ops topic gets a "Possibly missed intake messages"
+alert with links to the missing ids. A skip can be harmless, for example posts in
+a topic the gateway does not send to the watchdog, so open the links and check.
+Set `message_gap_alerts: false` to turn the alert off.
+
+To capture a missed Job Order without asking the coordinator to re-post it, queue
+it with `ingest`. The running watchdog captures it on its next cycle through the
+normal pipeline (classification, resolution, duplicate check, Notion write,
+read-back, reaction and capture report); the polling offset is not touched.
+Prefer the original update JSON (for example the row in the gateway's `updates`
+table), which keeps mentions, forward origin and the posting time:
+
+```sh
+docker compose exec -T watchdog python -m jo_watchdog.app ingest --json - --wait 120 --config /app/config.yaml < update.json
+docker compose exec watchdog python -m jo_watchdog.app ingest --text "JO-TOC #12 ..." --message-id 3121 --from-user @hmmkayy --date 2026-11-04T11:39 --config /app/config.yaml
+```
+
+`--json` takes a Telegram update, a bare Telegram message or a gateway item.
+`--text` rebuilds the message in the intake topic; `--date` without an offset is
+Manila time and, when left out, the capture time stands in for the posting time.
+Only messages in the intake chat and topic are accepted, and a message already in
+the ledger is never queued twice. `--wait N` waits up to N seconds, prints the
+final state and Notion URL, and exits 3 if the capture has not finished by then.
+
 ### Rollback
 
 Start the previous image against the same ledger:
