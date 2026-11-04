@@ -14,6 +14,7 @@ Each file here is a copy of an open GitHub issue, so the plan can be read, diffe
 | [25-crash-safe-reliability-and-heartbeat.md](25-crash-safe-reliability-and-heartbeat.md) | [#25](https://github.com/mclbautista/t6-jo-tg-ntn/issues/25) |
 | [26-jev-deliverable-matching-in-shadow-mode.md](26-jev-deliverable-matching-in-shadow-mode.md) | [#26](https://github.com/mclbautista/t6-jo-tg-ntn/issues/26) |
 | [27-deployment-dry-run-and-smoke-verification.md](27-deployment-dry-run-and-smoke-verification.md) | [#27](https://github.com/mclbautista/t6-jo-tg-ntn/issues/27) |
+| [99-split-notes-and-watchdog-notes.md](99-split-notes-and-watchdog-notes.md) | [#99](https://github.com/mclbautista/t6-jo-tg-ntn/issues/99) |
 
 ## Keeping them in sync
 

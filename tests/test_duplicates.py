@@ -13,7 +13,6 @@ from jo_watchdog.core.duplicates import (
 )
 from jo_watchdog.core.edits import EditAction, decide_edit
 from jo_watchdog.core.header import parse_header, parse_number
-from jo_watchdog.core.job_order import WATCHDOG_MARKER
 
 NOW = datetime(2026, 9, 20, 4, 0, tzinfo=UTC)
 KEY = "proj-page|74"
@@ -114,13 +113,10 @@ class OutputTests(unittest.TestCase):
             "Earlier row: https://notion.so/a (possible number reuse)",
         )
 
-    def test_watchdog_line_opens_or_extends_the_block(self):
+    def test_watchdog_line_starts_or_extends_watchdog_notes(self):
         line = "Earlier row: https://notion.so/a (exact re-post)"
-        self.assertEqual(append_watchdog_line("", line), f"{WATCHDOG_MARKER}\n{line}")
-        self.assertEqual(
-            append_watchdog_line("poster note", line), f"poster note\n\n{WATCHDOG_MARKER}\n{line}"
-        )
-        existing = f"poster note\n\n{WATCHDOG_MARKER}\nDeadline as posted: 1pm"
+        self.assertEqual(append_watchdog_line("", line), line)
+        existing = "Deadline as posted: 1pm"
         self.assertEqual(append_watchdog_line(existing, line), f"{existing}\n{line}")
 
 

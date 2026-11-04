@@ -245,9 +245,11 @@ class ExplicitDeadlineYearTests(unittest.IsolatedAsyncioTestCase):
 
         props = h.notion.created[0]["properties"]
         self.assertEqual(manila_iso(datetime.fromisoformat(props["Deadline"]["date"]["start"])), "2030-09-30T22:00:00+08:00")
-        notes = props["Notes"]["rich_text"][0]["text"]["content"]
-        self.assertIn("Deadline as posted: Sep 30, 2030 end of shift", notes)
-        self.assertTrue(notes.startswith("keep this"))
+        self.assertEqual(props["Notes"]["rich_text"][0]["text"]["content"], "keep this")
+        self.assertEqual(
+            props["Watchdog Notes"]["rich_text"][0]["text"]["content"],
+            "Deadline as posted: Sep 30, 2030 end of shift",
+        )
         self.assertNotIn("deadline_past", h.codes())
 
     async def test_explicit_past_year_is_stored_and_reported_not_rolled_forward(self):
@@ -258,8 +260,9 @@ class ExplicitDeadlineYearTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(manila_iso(datetime.fromisoformat(props["Deadline"]["date"]["start"])), "2020-09-16T17:00:00+08:00")
         self.assertIn(
             "Deadline as posted: Sep 16, 2020 5PM",
-            props["Notes"]["rich_text"][0]["text"]["content"],
+            props["Watchdog Notes"]["rich_text"][0]["text"]["content"],
         )
+        self.assertNotIn("Notes", props)
         self.assertIn("deadline_past", h.codes())
         self.assertIn("Deadline is before the message was posted", h.telegram.sent[-1][2])
 

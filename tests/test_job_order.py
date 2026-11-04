@@ -9,11 +9,14 @@ from jo_watchdog.core.deadline import MANILA
 from jo_watchdog.core.header import canonical_name, parse_header
 from jo_watchdog.core.job_order import (
     ASAP_NOTE,
-    WATCHDOG_MARKER,
+    LEGACY_WATCHDOG_MARKER,
     JobOrderPlan,
     build_job_order_payload,
     build_notes,
+    build_watchdog_notes,
+    load_plan,
     plan_job_order,
+    rich_text,
 )
 from jo_watchdog.core.resolve import resolve_department
 
@@ -169,7 +172,9 @@ class FieldTests(unittest.TestCase):
 
     def test_absent_values_stay_blank(self):
         p = plan(extraction(header_raw="MFG - TOC - JO #74", watermark="  "))
-        for prop in ["Title", "Watermark", "Blocker ", "Subtitle", "Notes", "Deadline"]:
+        for prop in [
+            "Title", "Watermark", "Blocker ", "Subtitle", "Notes", "Watchdog Notes", "Deadline",
+        ]:  # fmt: skip
             self.assertNotIn(prop, p.properties)
 
     def test_status_date_and_telegram_key(self):
@@ -211,16 +216,99 @@ class FieldTests(unittest.TestCase):
         self.assertNotIn("Title", p.properties)
         self.assertNotIn("Notes", p.properties)
 
-    def test_notes_poster_text_separator_items_and_chunking(self):
+    def test_poster_notes_and_watchdog_notes_go_to_separate_columns(self):
         poster = " " + "x" * 2500 + "\n"
         p = plan(
             extraction(header_raw="MFG - TOC - JO #74", notes=poster, deadline_raw="ASAP"),
         )
-        notes = p.properties["Notes"]["rich_text"]
-        self.assertTrue(all(len(i["text"]["content"]) <= 2000 for i in notes))
+        for column in ("Notes", "Watchdog Notes"):
+            items = p.properties[column]["rich_text"]
+            self.assertTrue(all(len(i["text"]["content"]) <= 2000 for i in items), column)
+        self.assertEqual(text_of(p.properties["Notes"]), poster)
         self.assertEqual(
-            text_of(p.properties["Notes"]),
-            f"{poster}\n\n{WATCHDOG_MARKER}\nDeadline as posted: ASAP\n{ASAP_NOTE}",
+            text_of(p.properties["Watchdog Notes"]),
+            f"Deadline as posted: ASAP\n{ASAP_NOTE}",
+        )
+
+    def test_notes_column_never_carries_watchdog_text(self):
+        p = plan(extraction(header_raw="MFG - TOC - JO #74", deadline_raw="ASAP"))
+        self.assertNotIn("Notes", p.properties)
+        self.assertEqual(
+            text_of(p.properties["Watchdog Notes"]),
+            f"Deadline as posted: ASAP\n{ASAP_NOTE}",
+        )
+
+    def test_watchdog_notes_absent_when_watchdog_adds_nothing(self):
+        p = plan(extraction(header_raw="MFG - TOC - JO #74", notes="poster only"))
+        self.assertEqual(text_of(p.properties["Notes"]), "poster only")
+        self.assertNotIn("Watchdog Notes", p.properties)
+
+    def test_stored_plan_with_legacy_marker_block_is_split_on_load(self):
+        legacy = JobOrderPlan(
+            telegram_key="-1001:42",
+            name="MFG - TOC - JO #74",
+            properties={
+                "Name": {"title": rich_text("MFG - TOC - JO #74")},
+                "Notes": {
+                    "rich_text": rich_text(
+                        f"poster note\n\n{LEGACY_WATCHDOG_MARKER}\nDeadline as posted: 1pm"
+                    )
+                },
+            },
+        )
+        loaded = load_plan(legacy.model_dump_json())
+        self.assertEqual(text_of(loaded.properties["Notes"]), "poster note")
+        self.assertEqual(
+            text_of(loaded.properties["Watchdog Notes"]), "Deadline as posted: 1pm"
+        )
+
+    def test_stored_plan_with_only_legacy_block_drops_notes(self):
+        legacy = JobOrderPlan(
+            telegram_key="-1001:42",
+            name="n",
+            properties={
+                "Notes": {"rich_text": rich_text(f"{LEGACY_WATCHDOG_MARKER}\nEarlier row: u")},
+            },
+        )
+        loaded = load_plan(legacy.model_dump_json())
+        self.assertNotIn("Notes", loaded.properties)
+        self.assertEqual(text_of(loaded.properties["Watchdog Notes"]), "Earlier row: u")
+
+    def test_marker_quoted_in_new_format_poster_notes_is_left_alone(self):
+        quoted = f"see earlier JO\n\n{LEGACY_WATCHDOG_MARKER}\nsomething posted by hand"
+        stored = JobOrderPlan(
+            telegram_key="-1001:42",
+            name="n",
+            properties={
+                "Notes": {"rich_text": rich_text(quoted)},
+                "Watchdog Notes": {"rich_text": rich_text("Deadline as posted: 1pm")},
+            },
+        )
+        loaded = load_plan(stored.model_dump_json())
+        self.assertEqual(text_of(loaded.properties["Notes"]), quoted)
+        self.assertEqual(
+            text_of(loaded.properties["Watchdog Notes"]), "Deadline as posted: 1pm"
+        )
+
+    def test_skeleton_plan_with_marker_block_drops_the_marker_line(self):
+        loaded = load_plan(
+            {
+                "telegram_key": "-1001:1",
+                "name": "n",
+                "notes": f"{LEGACY_WATCHDOG_MARKER}\nEarlier row: u (exact re-post)",
+            }
+        )
+        self.assertEqual(
+            text_of(loaded.properties["Watchdog Notes"]), "Earlier row: u (exact re-post)"
+        )
+
+    def test_skeleton_plan_notes_are_watchdog_notes(self):
+        loaded = load_plan(
+            {"telegram_key": "-1001:1", "name": "n", "notes": "Earlier row: u (exact re-post)"}
+        )
+        self.assertNotIn("Notes", loaded.properties)
+        self.assertEqual(
+            text_of(loaded.properties["Watchdog Notes"]), "Earlier row: u (exact re-post)"
         )
 
     def test_name_ignores_inconsistent_extracted_header(self):
@@ -265,30 +353,29 @@ class FieldTests(unittest.TestCase):
 
 
 class NotesTests(unittest.TestCase):
-    def test_poster_notes_only(self):
-        self.assertEqual(build_notes("waiting for waiver", None, False), "waiting for waiver")
+    def test_poster_notes_verbatim(self):
+        self.assertEqual(build_notes("waiting for waiver"), "waiting for waiver")
 
-    def test_poster_notes_then_watchdog_block(self):
+    def test_watchdog_notes_items_in_order(self):
         self.assertEqual(
-            build_notes("waiting for waiver", "September 10, asap", True),
-            "waiting for waiver\n\n"
-            "— added by the watchdog —\n"
-            "Deadline as posted: September 10, asap\n"
-            "ASAP — deprioritize other JOs",
+            build_watchdog_notes("September 10, asap", True),
+            "Deadline as posted: September 10, asap\nASAP — deprioritize other JOs",
         )
 
-    def test_watchdog_block_alone(self):
+    def test_watchdog_notes_deadline_alone(self):
         self.assertEqual(
-            build_notes(None, "Tonight if keri or tom", False),
-            "— added by the watchdog —\nDeadline as posted: Tonight if keri or tom",
+            build_watchdog_notes("Tonight if keri or tom", False),
+            "Deadline as posted: Tonight if keri or tom",
         )
 
     def test_nothing_to_add(self):
-        self.assertEqual(build_notes(None, None, False), "")
-        self.assertEqual(build_notes("", "  ", False), "")
+        self.assertEqual(build_notes(None), "")
+        self.assertEqual(build_notes(""), "")
+        self.assertEqual(build_watchdog_notes(None, False), "")
+        self.assertEqual(build_watchdog_notes("  ", False), "")
 
     def test_notes_are_masked(self):
-        self.assertEqual(build_notes("pw: abc", None, False), f"pw: {WITHHELD}")
+        self.assertEqual(build_notes("pw: abc"), f"pw: {WITHHELD}")
 
     def test_plan_notes_keep_hedges_and_asap(self):
         p = plan(
@@ -298,18 +385,19 @@ class NotesTests(unittest.TestCase):
                 notes="pls prioritize",
             )
         )
+        self.assertEqual(text_of(p.properties["Notes"]), "pls prioritize")
         self.assertEqual(
-            text_of(p.properties["Notes"]),
-            "pls prioritize\n\n— added by the watchdog —\n"
+            text_of(p.properties["Watchdog Notes"]),
             "Deadline as posted: September 10, asap\nASAP — deprioritize other JOs",
         )
         self.assertEqual([f.code for f in p.findings], ["asap", "shift_fallback", "deadline_past"])
 
-    def test_unparsed_deadline_is_kept_in_notes(self):
+    def test_unparsed_deadline_is_kept_in_watchdog_notes(self):
         p = plan(extraction(deadline_raw="kung kelan matapos yung render"))
         self.assertNotIn("Deadline", p.properties)
         self.assertIn(
-            "Deadline as posted: kung kelan matapos yung render", text_of(p.properties["Notes"])
+            "Deadline as posted: kung kelan matapos yung render",
+            text_of(p.properties["Watchdog Notes"]),
         )
         self.assertEqual([f.code for f in p.findings], ["deadline_unparsed"])
 
@@ -359,7 +447,7 @@ class LoadPlanTests(unittest.TestCase):
             "name": "First line",
             "telegram_key": "-100:1",
             "body_blocks": ["body"],
-            "notes": "— added by the watchdog —\nEarlier row: x",
+            "notes": "Earlier row: x",
             "duplicate": {"code": "exact_repost"},
         }
         plan = load_plan(legacy)
@@ -368,7 +456,9 @@ class LoadPlanTests(unittest.TestCase):
             payload["properties"]["Status"], {"status": {"name": "Needs Intake Review"}}
         )
         self.assertEqual(payload["properties"]["Name"]["title"][0]["text"]["content"], "First line")
-        self.assertIn(
-            "Earlier row: x", payload["properties"]["Notes"]["rich_text"][0]["text"]["content"]
+        self.assertNotIn("Notes", payload["properties"])
+        self.assertEqual(
+            payload["properties"]["Watchdog Notes"]["rich_text"][0]["text"]["content"],
+            "Earlier row: x",
         )
         self.assertEqual(plan.duplicate, {"code": "exact_repost"})

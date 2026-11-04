@@ -12,6 +12,7 @@ from collections.abc import Awaitable, Callable, Mapping
 
 from jo_watchdog.adapters.notion import NotionError, QueryRequest
 from jo_watchdog.app.smoke_gate import FAIL, MANUAL, PASS, Result
+from jo_watchdog.core.plan import NOTES_PROPERTY, WATCHDOG_NOTES_PROPERTY
 
 STATUS_OPTION = "Needs Intake Review"
 MAX_RETRY_AFTER_REQUESTS = 100
@@ -27,7 +28,7 @@ EXPECTED_PROPERTIES: dict[str, dict[str, set[str] | None]] = {
         "JO Number": _TEXT, "Title": _TEXT, "Subtitle": _TEXT, "Task": _TEXT, "Purpose": _TEXT,
         "Source / Source Drive": _TEXT, "Platform": _TEXT, "Link Settings": _TEXT,
         "Watermark": _TEXT, "Mode of Transfer": _TEXT, "Blocker ": _TEXT, "Pending": _TEXT,
-        "Notes": _TEXT, "Telegram Key": _TEXT,
+        NOTES_PROPERTY: _TEXT, WATCHDOG_NOTES_PROPERTY: _TEXT, "Telegram Key": _TEXT,
         "Date": {"date"}, "Deadline": {"date"},
         "Department": {"select"},
         "Status": {"status", "select"},
