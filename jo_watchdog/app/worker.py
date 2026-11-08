@@ -196,6 +196,7 @@ class Worker:
                     u.update_id,
                     self._scope_reason(u),
                     first_line_of(u.text),
+                    alert=None if u.edited else self._gap_alert(u),
                 )
                 continue
             if u.edited:
@@ -219,13 +220,13 @@ class Worker:
             )
 
     def _gap_alert(self, u) -> OutboxMessage | None:
-        """Warn when an intake-topic message skips ids the ledger never saw (#101).
+        """Warn when an intake-chat message skips ids the ledger never saw (#101).
 
         Message ids are one counter per chat, so observed posts in every topic count
         as seen. Unseen ids can belong to other topics or indicate possible loss.
         Must run before the update itself is recorded.
         """
-        if not self.config.message_gap_alerts or not self.in_scope(u):
+        if not self.config.message_gap_alerts or u.chat_id != self.config.intake_chat_id:
             return None
         last_seen = self.ledger.last_seen_message_id(u.chat_id)
         if last_seen is None or u.message_id <= last_seen + 1:

@@ -1,4 +1,4 @@
-"""Intake-topic message gaps indicate possible loss, not confirmed dropped posts (#101)."""
+"""Intake-chat message gaps indicate possible loss, not confirmed dropped posts (#101)."""
 
 import logging
 import unittest
@@ -63,14 +63,34 @@ class GapDetectionTests(unittest.IsolatedAsyncioTestCase):
         await worker.poll_once()
         self.assertEqual(gap_alerts(ledger), [])
 
-    async def test_a_gap_revealed_only_by_an_out_of_scope_topic_does_not_alert(self):
+    async def test_a_gap_revealed_by_an_out_of_scope_topic_still_alerts(self):
         worker, ledger, *_, cleanup = make_worker(
             [update(1, message_id=3120), update(2, message_id=3125, topic_id=99)]
         )
         self.addCleanup(cleanup)
         await worker.poll_once()
         alerts = gap_alerts(ledger)
-        self.assertEqual(alerts, [])
+        self.assertEqual(len(alerts), 1)
+        self.assertIsNone(alerts[0]["message_id"])
+        self.assertIn("3121", alerts[0]["text"])
+        self.assertIn("3124", alerts[0]["text"])
+
+    async def test_an_observed_other_topic_cannot_hide_a_possible_lost_intake_message(self):
+        worker, ledger, *_, cleanup = make_worker(
+            [
+                update(1, message_id=3120),
+                update(2, message_id=3122, topic_id=99),
+                update(3, message_id=3123),
+            ]
+        )
+        self.addCleanup(cleanup)
+        await worker.poll_once()
+
+        alerts = gap_alerts(ledger)
+        self.assertEqual(len(alerts), 1)
+        self.assertIn("1 message may not have reached", alerts[0]["text"])
+        self.assertIn("https://t.me/c/123/5/3121", alerts[0]["text"])
+        self.assertNotIn("https://t.me/c/123/5/3122", alerts[0]["text"])
 
     async def test_first_message_ever_raises_no_alert(self):
         worker, ledger, *_, cleanup = make_worker([update(1, message_id=3123)])
