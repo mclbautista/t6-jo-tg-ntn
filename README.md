@@ -137,7 +137,7 @@ computed from the ledger. A brand-new ledger skips its first window.
 ### Missed messages: gap alerts and backfill (#101)
 
 Telegram message ids in a supergroup are one counter for the whole chat. When an
-intake chat message arrives whose id skips ids the ledger has never seen (any
+intake topic message arrives whose id skips ids the ledger has never seen (any
 topic counts as seen), the ops topic gets a "Possibly missed intake messages"
 alert with links to the missing ids. A skip can be harmless, for example posts in
 a topic the gateway does not send to the watchdog, so open the links and check.

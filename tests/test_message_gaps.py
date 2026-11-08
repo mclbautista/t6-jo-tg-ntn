@@ -1,10 +1,4 @@
-"""Message id gap detection in the intake chat (#101).
-
-Telegram message ids in a supergroup are one counter for the whole chat, so a
-jump between two ids the watchdog saw means messages it never received. The
-gateway dropped two intake posts this way on 2026-11-04; the alert makes that
-visible instead of silent.
-"""
+"""Intake-topic message gaps indicate possible loss, not confirmed dropped posts (#101)."""
 
 import logging
 import unittest
@@ -45,10 +39,14 @@ class GapDetectionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("3122", alert["text"])
         self.assertIn("https://t.me/c/123/5/3121", alert["text"])
         self.assertIn("ingest", alert["text"])
+        self.assertIn("may not have reached", alert["text"])
+        self.assertIn("other topics", alert["text"])
+        self.assertNotIn("never reached", alert["text"])
         # The alert belongs to the message that revealed the gap.
         row = ledger.get_message("-100123:3123")
         self.assertEqual(alert["message_id"], row["id"])
         self.assertTrue(any("3121" in line and "3122" in line for line in logs.output))
+        self.assertTrue(any("possible" in line for line in logs.output))
 
         await worker.deliver_outbox()
         self.assertEqual(len(telegram.sent), 1)
@@ -65,17 +63,14 @@ class GapDetectionTests(unittest.IsolatedAsyncioTestCase):
         await worker.poll_once()
         self.assertEqual(gap_alerts(ledger), [])
 
-    async def test_a_gap_revealed_by_an_out_of_scope_topic_still_alerts(self):
+    async def test_a_gap_revealed_only_by_an_out_of_scope_topic_does_not_alert(self):
         worker, ledger, *_, cleanup = make_worker(
             [update(1, message_id=3120), update(2, message_id=3125, topic_id=99)]
         )
         self.addCleanup(cleanup)
         await worker.poll_once()
         alerts = gap_alerts(ledger)
-        self.assertEqual(len(alerts), 1)
-        self.assertIsNone(alerts[0]["message_id"])
-        self.assertIn("3121", alerts[0]["text"])
-        self.assertIn("3124", alerts[0]["text"])
+        self.assertEqual(alerts, [])
 
     async def test_first_message_ever_raises_no_alert(self):
         worker, ledger, *_, cleanup = make_worker([update(1, message_id=3123)])
