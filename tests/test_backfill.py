@@ -5,6 +5,7 @@ moving the polling offset, so the running worker captures it through the normal
 pipeline (classify, plan, resolve, duplicate check, Notion write, read-back).
 """
 
+import asyncio
 import io
 import json
 import tempfile
@@ -18,7 +19,7 @@ import yaml
 from jo_watchdog.app import __main__ as entry
 from jo_watchdog.core.backfill import BackfillError, from_payload, from_text
 from jo_watchdog.ledger.db import Ledger
-from tests.fakes import POSTED_AT_UNIX, update
+from tests.fakes import POSTED_AT_UNIX, FakeClassifier, FakeNotion, FakeTelegram, update
 from tests.test_worker import make_worker
 
 KEY = "-100123:3121"
@@ -224,17 +225,24 @@ class IngestCommandTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self._run("--json", "-", "--text", "x", "--message-id", "1")
 
-    def test_wait_reports_the_capture_once_the_worker_is_done(self):
+    def test_cli_wait_captures_through_the_normal_worker_pipeline_once(self):
         path = self._json_file(telegram_update())
+        notion = FakeNotion()
+        telegram = FakeTelegram()
 
         def capture_meanwhile(_seconds):
+            from jo_watchdog.app.worker import Worker
+
             ledger = Ledger(self.dir / "ledger.db")
             try:
-                ledger._conn.execute(
-                    "UPDATE messages SET state = 'done', notion_page_id = 'abc123'"
-                    " WHERE telegram_key = ?",
-                    (KEY,),
+                worker = Worker(
+                    ledger=ledger,
+                    telegram=telegram,
+                    notion=notion,
+                    classifier=FakeClassifier(),
+                    config=entry.load_config(self.config),
                 )
+                asyncio.run(worker.drain_once())
             finally:
                 ledger.close()
 
@@ -242,7 +250,15 @@ class IngestCommandTests(unittest.TestCase):
             code, out, _ = self._run("--json", path, "--wait", "30")
         self.assertEqual(code, 0)
         self.assertIn("done", out)
-        self.assertIn("abc123", out)
+        self.assertIn("https://www.notion.so/page1", out)
+        self.assertEqual(self._row()["state"], "done")
+        self.assertEqual(self._row()["notion_page_id"], "page-1")
+        self.assertEqual(len(notion.created), 1)
+        self.assertEqual(telegram.reactions[0][:2], (-100123, 3121))
+
+        self.assertEqual(self._run("--json", path)[0], 1)
+        capture_meanwhile(0)
+        self.assertEqual(len(notion.created), 1)
 
     def test_wait_times_out_with_the_row_still_queued(self):
         path = self._json_file(telegram_update())

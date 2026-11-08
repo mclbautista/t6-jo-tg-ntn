@@ -220,11 +220,11 @@ class Worker:
             )
 
     def _gap_alert(self, u) -> OutboxMessage | None:
-        """The ops alert when this intake chat message skips ids the ledger never saw (#101).
+        """Warn when an intake-chat message skips ids the ledger never saw (#101).
 
-        Message ids are one counter per chat, so every topic counts as seen. Messages
-        that never reached the watchdog (the gateway dropped two on 2026-11-04) would
-        otherwise be lost silently. Must run before the update itself is recorded.
+        Message ids are one counter per chat, so observed posts in every topic count
+        as seen. Unseen ids can belong to other topics or indicate possible loss.
+        Must run before the update itself is recorded.
         """
         if not self.config.message_gap_alerts or u.chat_id != self.config.intake_chat_id:
             return None
@@ -232,7 +232,8 @@ class Worker:
         if last_seen is None or u.message_id <= last_seen + 1:
             return None
         log.warning(
-            "message id gap in the intake chat: %d to %d missing (last seen %d, now %d)",
+            "possible message loss in the intake chat: unseen ids %d to %d"
+            " (last seen %d, now %d); gaps may be posts in other topics",
             last_seen + 1,
             u.message_id - 1,
             last_seen,

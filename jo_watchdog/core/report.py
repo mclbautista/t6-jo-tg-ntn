@@ -367,8 +367,10 @@ def render_message_gap(*, chat_id: int, topic_id: int, last_seen: int, message_i
     return "\n".join(
         [
             GAP_HEADER,
-            f"{count} {noun} never reached the watchdog: id {span}"
+            f"{count} {noun} may not have reached the watchdog: id {span}"
             f" (last seen {last_seen}, now {message_id})",
+            "Ids are shared across the chat; these may be posts in other topics."
+            " A gap alone does not confirm lost intake messages.",
             f"Open: {links}",
             "If one is a Job Order, backfill it with <code>ingest</code> (see the README).",
         ]
