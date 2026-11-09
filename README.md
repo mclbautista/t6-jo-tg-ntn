@@ -197,8 +197,8 @@ unchanged.
   (that is, `next_offset - 1`).
 - An ops post carries `idempotency_key = watchdog-outbox-<outbox row id>`. A
   retry of the same row reuses the key, so the gateway queues it once. The
-  outbox stores the returned `message_ref` where it stored the Telegram message
-  id.
+  outbox keeps the returned `message_ref` in `gateway_ref`, apart from the real
+  Telegram message id (#109).
 - `in_scope` still filters intake as a safety net.
 
 **Cutover (once).** The cursor moves from Telegram update ids to gateway
@@ -213,6 +213,24 @@ The gateway re-delivers its items from the start; the ledger's unique
 `telegram_key` and edit checks skip anything already captured. The full runbook
 (deploying the gateway, copying `data/`) is section 12 of the gateway spec,
 mclbautista/t6-sixto-gateway#1.
+
+**Backfilling refs stored before #109 (once).** Rows written in gateway mode before
+#109 stored the gateway ref as the Telegram message id; migration 10 moved the ref to
+`gateway_ref` and left those rows with no id, so they never produce a backlink. This
+command asks the gateway what each ref became. It needs `telegram_mode: gateway` and
+`WATCHDOG_SECRET`, and it is a dry run unless `--apply` is given:
+
+```sh
+python -m jo_watchdog.app backfill-gateway-refs --config config.yaml          # dry run
+python -m jo_watchdog.app backfill-gateway-refs --config config.yaml --apply  # writes
+```
+
+It prints a table of ref, real Telegram id and outcome (never message text or links).
+With `--apply`, `sent` refs get their real id; `failed` and unknown (404) refs have their
+id cleared and the row marked `failed` (no alert, no re-send); `queued` refs are left as
+they are. Rows from direct mode, and rows the worker already resolved, are never touched.
+A second run changes nothing. Exit code 1 means some lookups errored: run it again.
+Running it against production needs the owner's approval (#108).
 
 **Switching back to direct mode.** Follow "Rollback after cutover" in the gateway
 README; do not improvise it. In short: turn gateway polling off, let the watchdog drain

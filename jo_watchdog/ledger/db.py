@@ -1112,6 +1112,39 @@ class Ledger:
             (telegram_message_id, _now(), outbox_id),
         )
 
+    # A row stored by a pre-#109 gateway-mode watchdog: migration 10 kept its ref in
+    # ``gateway_ref`` and dropped the wrong "Telegram ID", so it is ``sent`` with no ID.
+    _UNRECONCILED = "state = 'sent' AND gateway_ref IS NOT NULL AND telegram_message_id IS NULL"
+
+    def unreconciled_gateway_rows(self) -> list[dict]:
+        """Pre-#109 gateway rows the backfill (#114) still has to resolve, oldest first."""
+        rows = self._conn.execute(
+            f"SELECT id, kind, gateway_ref FROM outbox WHERE {self._UNRECONCILED} ORDER BY id"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def backfill_resolved(self, outbox_id: int, telegram_message_id: int) -> bool:
+        """Store the real Telegram ID the gateway reported for a pre-#109 row."""
+        cur = self._conn.execute(
+            f"UPDATE outbox SET telegram_message_id = ? WHERE id = ? AND {self._UNRECONCILED}",
+            (telegram_message_id, outbox_id),
+        )
+        return cur.rowcount == 1
+
+    def backfill_unreachable(self, outbox_id: int, error: str) -> bool:
+        """The gateway never delivered (or forgot) a pre-#109 row: clear its ID, mark it failed.
+
+        No alert and no re-send: the post is historical, and a ``failed`` row never matches
+        the backfill again, which keeps a second run a no-op.
+        """
+        cur = self._conn.execute(
+            "UPDATE outbox SET state = 'failed', telegram_message_id = NULL,"
+            " next_attempt_at = NULL, last_error = ?"
+            f" WHERE id = ? AND {self._UNRECONCILED}",
+            (outbound_text(error).text, outbox_id),
+        )
+        return cur.rowcount == 1
+
     def outbox_gateway_failed(
         self, outbox_id: int, error: str, *, alert: OutboxMessage | None = None
     ) -> bool:

@@ -16,6 +16,11 @@ and the running watchdog captures it through the normal pipeline.
 ``reset-offset --to N`` sets the polling offset; used once at the gateway cutover (#95),
 when the cursor moves from Telegram update ids to the gateway's sequence numbers.
 
+``backfill-gateway-refs [--apply]`` reconciles outbox rows written in gateway mode before
+#109, which stored the gateway ref as the Telegram message ID (#108, #114). It asks the
+gateway what each ref became; a dry run (the default) prints a redacted table and writes
+nothing, ``--apply`` stores real IDs and clears the ones the gateway failed or forgot.
+
 ``healthcheck`` exits 0 when the poller's liveness stamp is fresh and 1
 otherwise; the container's ``HEALTHCHECK`` runs it.
 """
@@ -33,10 +38,13 @@ import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import NamedTuple
 from zoneinfo import ZoneInfo
 
+from jo_watchdog.adapters.gateway import GatewayTelegramClient
 from jo_watchdog.app import healthcheck
 from jo_watchdog.app.config import (
+    gateway_secret,
     load_config,
     missing_secrets,
     require_live_keys,
@@ -56,6 +64,7 @@ from jo_watchdog.core.plan import first_line_of
 from jo_watchdog.ledger.db import Ledger, fmt_utc
 from jo_watchdog.ledger.states import State
 
+log = logging.getLogger("jo_watchdog.backfill_gateway_refs")
 _TELEGRAM_KEY = re.compile(r"-?\d+:\d+")
 INGEST_POLL_SECONDS = 2.0
 _FINISHED = (State.DONE.value, State.IGNORED.value)
@@ -94,6 +103,94 @@ def run_reset_offset(config_path: str, to: int) -> int:
     )
     print(f"offset reset from {previous} to {to}")
     return 0
+
+
+class RefLookup(NamedTuple):
+    row: dict
+    outcome: str  # the gateway's state, or "error" when the lookup failed or made no sense
+    telegram_id: int | None
+    error: str | None
+
+
+_FIXABLE = ("sent", "failed", "unknown")
+
+
+async def _look_up_refs(client: GatewayTelegramClient, rows: list[dict]) -> list[RefLookup]:
+    """One lookup per row; a lookup that errors is outcome ``error``."""
+    results = []
+    try:
+        for row in rows:
+            try:
+                status = await client.notify_status(row["gateway_ref"])
+            except Exception as exc:
+                ref, name = row["gateway_ref"], type(exc).__name__
+                log.warning("could not look up gateway ref %s (%s)", ref, name)
+                results.append(RefLookup(row, "error", None, None))
+                continue
+            if status.state == "sent" and status.telegram_message_id is None:
+                results.append(RefLookup(row, "error", None, None))
+            else:
+                results.append(
+                    RefLookup(row, status.state, status.telegram_message_id, status.error)
+                )
+    finally:
+        await client.close()
+    return results
+
+
+def run_backfill_gateway_refs(config_path: str, apply: bool) -> int:
+    """Resolve pre-#109 gateway refs to real Telegram IDs; dry run unless ``apply``."""
+    config = load_config(config_path)
+    configure_logging(log_path=Path(config.ledger_path).with_name("jo-watchdog.jsonl"))
+    if config.telegram_mode != "gateway":
+        print("backfill-gateway-refs: only for telegram_mode: gateway", file=sys.stderr)
+        return 2
+    try:
+        secret = gateway_secret()
+    except RuntimeError:
+        print("backfill-gateway-refs: WATCHDOG_SECRET is not set", file=sys.stderr)
+        return 2
+    ledger = Ledger(config.ledger_path, gateway_mode=True)
+    client = GatewayTelegramClient(config.gateway_url, secret)
+    try:
+        rows = ledger.unreconciled_gateway_rows()
+        results = asyncio.run(_look_up_refs(client, rows))
+        # Refs, IDs and outcomes only: never message text, chat ids or links.
+        if results:
+            print(f"{'ref':>8}  {'telegram id':>11}  outcome")
+            for found in results:
+                shown = "-" if found.telegram_id is None else str(found.telegram_id)
+                print(f"{found.row['gateway_ref']:>8}  {shown:>11}  {found.outcome}")
+        resolved = cleared = 0
+        if apply:
+            for found in results:
+                if found.outcome == "sent":
+                    resolved += ledger.backfill_resolved(found.row["id"], found.telegram_id)
+                elif found.outcome in ("failed", "unknown"):
+                    reason = found.error or f"gateway reported {found.outcome}"
+                    cleared += ledger.backfill_unreachable(found.row["id"], reason)
+        fixable = sum(found.outcome in _FIXABLE for found in results)
+        left = len(results) - fixable
+        errors = sum(found.outcome == "error" for found in results)
+    finally:
+        ledger.close()
+    log.info(
+        "backfill-gateway-refs apply=%s by %s: %s rows, %s resolved, %s cleared, %s left",
+        apply,
+        getpass.getuser(),
+        len(results),
+        resolved,
+        cleared,
+        left,
+    )
+    if not fixable:
+        note = f" ({left} still waiting on the gateway)" if left else ""
+        print(f"nothing left to fix{note}")
+    elif apply:
+        print(f"applied: {resolved} resolved, {cleared} cleared, {left} left as they were")
+    else:
+        print(f"dry run, nothing written: {fixable} would change, {left} would stay; use --apply")
+    return 1 if errors else 0
 
 
 def run_healthcheck(config_path: str) -> int:
@@ -236,9 +333,10 @@ def main(argv: list[str] | None = None) -> int:
         "command",
         nargs="?",
         default="run",
-        choices=["run", "healthcheck", "retry", "reset-offset", "ingest"],
+        choices=["run", "healthcheck", "retry", "reset-offset", "ingest", "backfill-gateway-refs"],
         help="run the watchdog (default), check the poller's liveness, retry exhausted "
-        "messages, reset the polling offset, or backfill a missed intake message",
+        "messages, reset the polling offset, backfill a missed intake message, or "
+        "reconcile pre-#109 gateway refs (backfill-gateway-refs)",
     )
     parser.add_argument(
         "--to", type=int, help="for reset-offset: the offset to set (0 at the gateway cutover)"
@@ -263,6 +361,11 @@ def main(argv: list[str] | None = None) -> int:
         default=0,
         help="seconds to wait for the capture; exit 3 if it is not finished by then",
     )
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="for backfill-gateway-refs: write the changes (the default is a dry run)",
+    )
     parser.add_argument("--config", default="config.yaml", help="path to config.yaml")
     args, extra = parser.parse_known_args(argv)
     # Group chat ids are negative, so a Telegram Key like ``-100123:42`` looks like
@@ -278,6 +381,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.to is None or args.to < 0:
             parser.error("reset-offset needs --to N (N >= 0)")
         return run_reset_offset(args.config, args.to)
+    if args.command == "backfill-gateway-refs":
+        return run_backfill_gateway_refs(args.config, args.apply)
     if args.command == "retry":
         return run_retry(args.config, args.telegram_key, args.all_exhausted)
     if args.command == "ingest":
