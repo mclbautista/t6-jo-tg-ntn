@@ -172,7 +172,7 @@ Telegram accepts a post but before the row is marked `sent` re-posts it.
 | chat_id             | INTEGER | ops chat id                                            |
 | topic_id            | INTEGER | ops forum topic id                                     |
 | text                | TEXT    | rendered Telegram HTML; every source field masked      |
-| state               | TEXT    | `pending` \| `sent` \| `failed`                         |
+| state               | TEXT    | `pending` \| `accepted` \| `sent` \| `failed`          |
 | attempts            | INTEGER | send attempts so far (default 0)                       |
 | next_attempt_at     | TEXT    | ISO-8601 UTC; null = due now                           |
 | last_error          | TEXT    | masked error of the last failed attempt                |
@@ -182,6 +182,14 @@ Telegram accepts a post but before the row is marked `sent` re-posts it.
 
 Index `outbox_state_next_attempt` on `(state, next_attempt_at)`. A failed post
 retries after 30 s, 2 min, 5 min and 10 min; the fifth failure sets `failed`.
+
+In gateway mode a post the gateway queued is `accepted` and carries its `gateway_ref`.
+Each cycle asks `GET /notify/{ref}`: `sent` stores the real `telegram_message_id`;
+`failed`, or a 404 (the gateway forgot the ref), sets `failed` with the error and the
+watchdog never re-sends it. A failed heartbeat queues one `outage_alert`. An `accepted`
+row still unresolved after an hour (counted from `created_at`) logs a warning once per
+process; it stays `accepted`, out of backlinks, and still resolves if the gateway later
+answers.
 
 ### `edits` (v6, #24)
 

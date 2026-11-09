@@ -2,7 +2,8 @@
 
 Only the module API the watchdog uses: ``GET /updates``, ``POST /notify`` and
 ``POST /react`` and ``GET /notify/{ref}``, all behind a bearer secret. ``/notify`` is idempotent on
-``idempotency_key`` like the real gateway.
+``idempotency_key`` like the real gateway. A ref's status is ``queued``, ``sent``, ``failed``
+(with an error message) or ``unknown`` (404, as if the gateway had forgotten it).
 """
 
 from __future__ import annotations
@@ -31,7 +32,8 @@ class FakeGateway:
         self.requests: list[httpx.Request] = []
         self.fail_next = 0  # answer 503 to this many requests
         self.notify_state = "sent"  # what GET /notify/{ref} reports unless overridden
-        self.notify_states: dict[int, str] = {}  # per-ref override: queued | sent
+        self.notify_states: dict[int, str] = {}  # per-ref: queued|sent|failed|unknown
+        self.notify_error = "chat not found"  # the error a failed ref reports
         self._refs: dict[str, int] = {}
         self._issued: set[int] = set()
         self._next_ref = 5530
@@ -79,16 +81,16 @@ class FakeGateway:
             return httpx.Response(200, json={"items": items})
         if request.method == "GET" and path.startswith("/notify/"):
             ref = int(path.rsplit("/", 1)[1])
-            if ref not in self._issued:
-                return httpx.Response(404, json={"detail": "unknown message_ref"})
             state = self.notify_states.get(ref, self.notify_state)
+            if ref not in self._issued or state == "unknown":
+                return httpx.Response(404, json={"detail": "unknown message_ref"})
             sent = state == "sent"
             return httpx.Response(
                 200,
                 json={
                     "state": state,
                     "telegram_message_id": telegram_id_for(ref) if sent else None,
-                    "error": None,
+                    "error": self.notify_error if state == "failed" else None,
                 },
             )
         body = json.loads(request.content or b"{}")

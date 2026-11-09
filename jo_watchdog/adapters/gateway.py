@@ -88,5 +88,7 @@ class GatewayTelegramClient:
 
     async def notify_status(self, ref: int) -> NotifyStatus:
         response = await self._http.get(f"/notify/{ref}")
+        if response.status_code == 404:
+            return NotifyStatus(state="unknown", error=f"gateway does not know message_ref {ref}")
         response.raise_for_status()
         return NotifyStatus.model_validate(response.json())

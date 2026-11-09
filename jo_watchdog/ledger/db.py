@@ -1112,6 +1112,41 @@ class Ledger:
             (telegram_message_id, _now(), outbox_id),
         )
 
+    def outbox_gateway_failed(
+        self, outbox_id: int, error: str, *, alert: OutboxMessage | None = None
+    ) -> bool:
+        """The gateway gave up on (or forgot) a queued post: mark it ``failed``, never re-send.
+
+        Only an ``accepted`` row moves, so the optional ``alert`` is queued in the same
+        transaction exactly once, however many cycles follow. False if the row had moved on.
+        """
+        if alert is not None:
+            _check_kind(alert)
+        with self._transaction():
+            cur = self._conn.execute(
+                "UPDATE outbox SET state = 'failed', next_attempt_at = NULL, last_error = ?"
+                " WHERE id = ? AND state = 'accepted'",
+                (outbound_text(error).text, outbox_id),
+            )
+            if cur.rowcount == 0:
+                return False
+            if alert is not None:
+                self._insert_outbox(alert, message_row_id=None, now=_now())
+        self._protect_files()
+        return True
+
+    def heartbeat_window(self, outbox_id: int) -> tuple[datetime, datetime] | None:
+        """The window a heartbeat outbox row reports on, or None for any other row."""
+        row = self._conn.execute(
+            "SELECT window_start, window_end FROM heartbeats WHERE outbox_id = ?", (outbox_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        return (
+            datetime.fromisoformat(row["window_start"]),
+            datetime.fromisoformat(row["window_end"]),
+        )
+
     def outbox_failed_attempt(
         self,
         outbox_id: int,

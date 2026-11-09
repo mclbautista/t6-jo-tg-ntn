@@ -47,6 +47,7 @@ from jo_watchdog.core.job_order import (
     load_plan,
     plan_job_order,
 )
+from jo_watchdog.core.masker import outbound_text
 from jo_watchdog.core.payload import (
     extract_readback_fields,
     page_url_for,
@@ -61,6 +62,7 @@ from jo_watchdog.core.report import (
     render_dry_run_plan,
     render_edit_after_capture,
     render_heartbeat,
+    render_heartbeat_failed_alert,
     render_message_gap,
     render_outage_alert,
     render_stale_cache,
@@ -71,6 +73,9 @@ from jo_watchdog.ledger.db import Ledger, OutboxMessage, fmt_utc, telegram_key
 from jo_watchdog.ledger.states import State
 
 log = logging.getLogger("jo_watchdog.worker")
+
+# A queued post the gateway has not sent after this long is logged as stuck (#113).
+STUCK_AFTER = timedelta(hours=1)
 
 # A failed reaction is retried inline after these delays, then counted.
 REACTION_RETRY_SECONDS = (2, 5)
@@ -170,6 +175,7 @@ class Worker:
         self.clock = clock
         self.sleep = sleep
         self.deadman_interval = deadman_interval
+        self.stuck_warned: set[int] = set()  # outbox rows already warned about as stuck
 
     # -- scope -------------------------------------------------------------
 
@@ -865,10 +871,11 @@ class Worker:
             )
 
     async def resolve_accepted(self) -> None:
-        """Ask the gateway which Telegram message each queued post became (#109).
+        """Ask the gateway which Telegram message each queued post became (#109, #113).
 
-        A ``sent`` answer stores the real ID; ``queued`` leaves the row for a later cycle.
-        A lookup that errors is skipped here and tried again next cycle.
+        ``sent`` stores the real ID; ``queued`` leaves the row for a later cycle (and warns
+        once it has waited over an hour). ``failed`` and unknown (404) mark the row failed
+        and never re-send it. A lookup that errors is tried again next cycle.
         """
         for row in self.ledger.accepted_outbox():
             try:
@@ -882,6 +889,7 @@ class Worker:
                 )
                 continue
             if status.state == "sent" and status.telegram_message_id is not None:
+                self.stuck_warned.discard(row["id"])
                 self.ledger.outbox_resolved(row["id"], status.telegram_message_id)
                 log.info(
                     "ops post outbox=%s kind=%s sent as telegram message %s",
@@ -889,6 +897,52 @@ class Worker:
                     row["kind"],
                     status.telegram_message_id,
                 )
+            elif status.state in ("failed", "unknown"):
+                self._gateway_post_failed(row, status.error or f"gateway reported {status.state}")
+            else:
+                self._warn_if_stuck(row)
+
+    def _gateway_post_failed(self, row: dict, error: str) -> None:
+        window = self.ledger.heartbeat_window(row["id"])
+        alert = None
+        if window is not None:
+            alert = OutboxMessage(
+                kind="outage_alert",
+                chat_id=self.config.ops_chat_id,
+                topic_id=self.config.ops_topic_id,
+                text=render_heartbeat_failed_alert(
+                    window_start=window[0],
+                    window_end=window[1],
+                    error=outbound_text(error).text,
+                    owner_handle=self.config.owner_telegram_handle,
+                ),
+            )
+        if self.ledger.outbox_gateway_failed(row["id"], error, alert=alert):
+            self.stuck_warned.discard(row["id"])
+            log.error(
+                "ops post outbox=%s kind=%s failed at the gateway (ref %s): %s",
+                row["id"],
+                row["kind"],
+                row["gateway_ref"],
+                outbound_text(error).text,
+            )
+
+    def _warn_if_stuck(self, row: dict) -> None:
+        """Warn once per row (per process) that the gateway still has not sent it."""
+        if row["id"] in self.stuck_warned:
+            return
+        queued_at = datetime.strptime(row["created_at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+        age = self.clock() - queued_at
+        if age >= STUCK_AFTER:
+            self.stuck_warned.add(row["id"])
+            log.warning(
+                "ops post outbox=%s kind=%s is still unresolved at the gateway after %s (ref %s);"
+                " not re-sending, it stays out of backlinks",
+                row["id"],
+                row["kind"],
+                age,
+                row["gateway_ref"],
+            )
 
     # -- loop --------------------------------------------------------------
 
