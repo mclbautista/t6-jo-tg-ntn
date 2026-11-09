@@ -39,7 +39,7 @@ department_aliases:                 # header token -> Notion Department option
 # --- Resolution and caches (#22) ---
 contacts_data_source_id: "77b2a701-71db-4e88-a694-37f07303e77e"
 projects_data_source_id: "cc1dc02a-8f32-4c97-81e4-dc1e08d7f134"
-standing_cc_contact_page_id: "3d8fb4d5-9e59-8035-acbf-f9b01f1430cd"  # Priya, standing cc on every JO
+standing_cc_contact_page_id: "00000000-0000-0000-0000-000000000000"  # FILL IN: Contacts page id of the standing cc on every JO
 cache_refresh_hours: 6
 cache_stale_alert_hours: 24
 fuzzy_min_score: 90
