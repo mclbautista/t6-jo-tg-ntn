@@ -61,7 +61,7 @@ from jo_watchdog.core.backfill import (
 )
 from jo_watchdog.core.payload import page_url_for
 from jo_watchdog.core.plan import first_line_of
-from jo_watchdog.ledger.db import Ledger, fmt_utc
+from jo_watchdog.ledger.db import Ledger, LedgerNotReady, fmt_utc
 from jo_watchdog.ledger.states import State
 
 log = logging.getLogger("jo_watchdog.backfill_gateway_refs")
@@ -150,7 +150,14 @@ def run_backfill_gateway_refs(config_path: str, apply: bool) -> int:
     except RuntimeError:
         print("backfill-gateway-refs: WATCHDOG_SECRET is not set", file=sys.stderr)
         return 2
-    ledger = Ledger(config.ledger_path, gateway_mode=True)
+    try:
+        if apply:
+            ledger = Ledger(config.ledger_path, gateway_mode=True)
+        else:  # a dry run must not migrate, repair, create or chmod anything
+            ledger = Ledger.open_read_only(config.ledger_path)
+    except LedgerNotReady as exc:
+        print(f"backfill-gateway-refs: {exc}", file=sys.stderr)
+        return 2
     client = GatewayTelegramClient(config.gateway_url, secret)
     try:
         rows = ledger.unreconciled_gateway_rows()
