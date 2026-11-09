@@ -1150,21 +1150,39 @@ class Ledger:
             (telegram_message_id, _now(), outbox_id),
         )
 
-    def outbox_accepted(self, outbox_id: int, gateway_ref: int) -> None:
-        """The gateway queued the post; its real Telegram message ID is not known yet."""
+    def outbox_accepted(
+        self, outbox_id: int, gateway_ref: int, *, now: str | None = None
+    ) -> None:
+        """The gateway queued the post; its real Telegram message ID is not known yet.
+
+        ``accepted_at`` records when, so the stuck warning counts from acceptance.
+        """
         self._conn.execute(
             "UPDATE outbox SET state = 'accepted', attempts = attempts + 1,"
-            " gateway_ref = ?, last_error = NULL"
+            " gateway_ref = ?, accepted_at = ?, last_error = NULL"
             " WHERE id = ? AND state = 'pending'",
-            (gateway_ref, outbox_id),
+            (gateway_ref, now or _now(), outbox_id),
         )
 
     def accepted_outbox(self, *, limit: int = 20) -> list[dict]:
-        """Rows the gateway queued whose real Telegram ID is unresolved, oldest first."""
+        """Rows the gateway queued whose real Telegram ID is unresolved.
+
+        Never-polled rows come first, then the least recently polled, so repeated calls
+        (each followed by ``mark_polled``) rotate through every row (#121).
+        """
         rows = self._conn.execute(
-            "SELECT * FROM outbox WHERE state = 'accepted' ORDER BY id LIMIT ?", (limit,)
+            "SELECT * FROM outbox WHERE state = 'accepted' ORDER BY poll_seq, id LIMIT ?",
+            (limit,),
         ).fetchall()
         return [dict(r) for r in rows]
+
+    def mark_polled(self, outbox_id: int) -> None:
+        """Move an accepted row to the back of the polling order."""
+        self._conn.execute(
+            "UPDATE outbox SET poll_seq = (SELECT COALESCE(MAX(poll_seq), 0) + 1 FROM outbox)"
+            " WHERE id = ?",
+            (outbox_id,),
+        )
 
     def outbox_resolved(self, outbox_id: int, telegram_message_id: int) -> None:
         """The gateway reported the post sent: store the real Telegram message ID."""
