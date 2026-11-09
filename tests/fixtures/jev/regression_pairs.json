@@ -70,7 +70,7 @@
     "source_text": "SOMSOM - TOC - #0155\nSeptember 11 / Friday\n\nTitle: Show Hotel\nTask: Download the following mats & copy to ate hdd\n- wk10 d5 patch and rev vfx\n- wk11d1 vfx\nPurpose: For grading\nSource: Lucid (attached ss)\nTransfer: lucid to color grading 4 and ate lara hdd\nDeadline: September 11, 3:30pm\nAssigned to: @user_two\ncc: @priya",
     "project": {
       "page_id": "1f4fb4d5-9e59-80bd-85e2-e7ad544bd933",
-      "name": "Someone, Someday"
+      "name": "Show Hotel"
     },
     "candidates": [
       {
@@ -81,7 +81,7 @@
     "expected_request": {
       "model": "~typesafe/jev-latest",
       "state": {
-        "project": "Someone, Someday",
+        "project": "Show Hotel",
         "job_order": "SOMSOM - TOC - #0155\nSeptember 11 / Friday\n\nTitle: Show Hotel\nTask: Download the following mats & copy to ate hdd\n- wk10 d5 patch and rev vfx\n- wk11d1 vfx\nPurpose: For grading\nSource: Lucid (attached ss)\nTransfer: lucid to color grading 4 and ate lara hdd\nDeadline: September 11, 3:30pm\nAssigned to: @user_two\ncc: @priya"
       },
       "questions": {

@@ -66,7 +66,7 @@ class FixtureParsingTests(unittest.TestCase):
     def test_contacts_fields_read_by_live_property_names(self):
         by_id = {p.page_id: p for p in people()}
         self.assertEqual(by_id[NINA].telegram_handle, "@user_three")
-        self.assertEqual(by_id[NINA].aliases, "Nina, Debz, KUYA debs")
+        self.assertEqual(by_id[NINA].aliases, "Nina, sam, KUYA sam")
         self.assertEqual(by_id[RAMON].end_of_shift, "10:00 PM")
         self.assertEqual(by_id[MIRA].telegram_user_id, "5550001")
         self.assertEqual(by_id[PRIYA].end_of_shift, "")
@@ -80,7 +80,7 @@ class FixtureParsingTests(unittest.TestCase):
 
 class NormalizationTests(unittest.TestCase):
     def test_aliases_split_trim_casefold_and_drop_honorifics(self):
-        self.assertEqual(split_aliases("Nina,  Debz , KUYA debs,,"), ["nina", "debz", "debs"])
+        self.assertEqual(split_aliases("Nina,  sam , KUYA sam,,"), ["nina", "sam", "sam"])
 
     def test_honorifics_dropped_on_mention_side(self):
         for raw in ("ate Lena", "Ate LENA", "sir lena", "kuya  Lena"):
@@ -108,9 +108,9 @@ class MentionSplittingTests(unittest.TestCase):
         "@user_two tyvmmmm": ["@user_two"],
         "ate Nina thank u!": ["ate Nina"],
         "Lena po": ["Lena"],
-        "Mira / @user_two kung sakaling umabot kay raedss": [
+        "Mira / @user_two kung sakaling umabot kay user_two": [
             "Mira",
-            "@user_two kung sakaling umabot kay raedss",
+            "@user_two kung sakaling umabot kay user_two",
         ],
         "ate Lena / Ramon, if abutin the next day": [
             "ate Lena",
@@ -175,7 +175,7 @@ class PeopleStepTests(unittest.TestCase):
         self.assertEqual(resolve("ate @user_six").page_id, LARA)
 
     def test_step3_alias_with_honorifics_on_both_sides(self):
-        for raw in ("Lena", "ate Lena", "Debz", "kuya debs", "sir Nina"):
+        for raw in ("Lena", "ate Lena", "sam", "kuya sam", "sir Nina"):
             with self.subTest(raw=raw):
                 result = resolve(raw)
                 self.assertEqual(result.method, "alias")

@@ -139,7 +139,7 @@ Deadline: Sept 28 / Mon / within the day
 ```
 
 ```
-MC7 - AE - #008
+SH1 - AE - #008
 September 25 / Friday
 
 Title: 2nd Show Echo
@@ -149,12 +149,12 @@ Purpose: for offline
 Watermark: none
 Mode of Transfer: copy to offline 1
 
-Source material: MC7 offline 2
+Source material: SH1 offline 2
 
 Deadline: September 26, 4PM
 Status as of 7pm:
 Pending:
-Notes: pa apply nalang here yung tinuro ni ate debs na pag sort 
+Notes: pa apply nalang here yung tinuro ni ate sam na pag sort 
 
 Assigned: @user_one  thank you!
 
@@ -162,7 +162,7 @@ cc: @priya
 ```
 
 ```
-MC7 - AE - #007
+SH1 - AE - #007
 September 25 / Friday
 
 Title: 2nd Show Echo
@@ -172,7 +172,7 @@ Purpose: for pregrade and vfx test
 Watermark: FOR VFX SAMPLE ONLY
 Mode of Transfer: smash, dl w pw
 
-Source material: MC7 FOOTAGE DRIVES
+Source material: SH1 FOOTAGE DRIVES
 
 Deadline: September 25, 7PM
 Status as of 7pm:
@@ -511,7 +511,7 @@ cc @priya
 ```
 
 ```
-MC7 - AE - #004
+SH1 - AE - #004
 September 23 / Wednesday
 
 Title: 2nd Show Echo
@@ -521,7 +521,7 @@ Purpose: for offline edit
 
 Mode of Transfer: copy to offline drive
 
-Source material: MC7 OFFLINE 2
+Source material: SH1 OFFLINE 2
 
 Deadline: September 25, 3PM
 Status as of 5am:
@@ -1538,7 +1538,7 @@ Deadline: August 26, 4PM
 Status as of 5am:
 Pending:
 
-Assigned: Mira / @user_two kung sakaling umabot kay raedss
+Assigned: Mira / @user_two kung sakaling umabot kay user_two
 
 cc: @priya
 ```
@@ -1567,7 +1567,7 @@ Deadline: August 26, 4PM
 Status as of 5am:
 Pending:
 
-Assigned: Mira / @user_two kung sakaling umabot kay raedss
+Assigned: Mira / @user_two kung sakaling umabot kay user_two
 
 cc: @priya
 ```
