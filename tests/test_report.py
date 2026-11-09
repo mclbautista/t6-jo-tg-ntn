@@ -27,8 +27,8 @@ TABLE = [
      'Assignee "Jhun" didn\'t match a contact'),
     (Finding(code="unresolved_person", params={"role": "cc", "raw": "Bea"}),
      'cc "Bea" didn\'t match a contact'),
-    (Finding(code="ambiguous_person", params={"role": "assignee", "raw": "Piolo"}),
-     'Assignee "Piolo" matches more than one contact'),
+    (Finding(code="ambiguous_person", params={"role": "assignee", "raw": "Ramon"}),
+     'Assignee "Ramon" matches more than one contact'),
     (Finding(code="unresolved_project", params={"raw": "PP2 APC"}),
      'Project mention "PP2 APC" didn\'t match any known Project Code'),
     (Finding(code="unknown_department", params={"token": "XYZ"}),
@@ -126,7 +126,7 @@ class CombinedReportTests(unittest.TestCase):
             ],
             page_url=ROW,
             intake_url="https://t.me/c/123/5/42",
-            leizette_handle="@leizette",
+            standing_cc_handle="@priya",
         )
         self.assertEqual(
             text,
@@ -145,18 +145,18 @@ class CombinedReportTests(unittest.TestCase):
             name="#0087",
             findings=[
                 Finding(code="unresolved_project", params={"raw": "PP2 APC"}),
-                Finding(code="ambiguous_person", params={"role": "assignee", "raw": "Piolo"}),
+                Finding(code="ambiguous_person", params={"role": "assignee", "raw": "Ramon"}),
                 Finding(code="forward_origin", params={"origin": "channel", "name": "Studio"}),
             ],
             page_url=ROW,
             intake_url="https://t.me/c/123/5/42",
             original_url="https://t.me/studio/77",
-            leizette_handle="leizette",
+            standing_cc_handle="priya",
         )
         lines = text.split("\n")
         self.assertEqual(lines[-3], '<a href="https://t.me/studio/77">Original message</a>')
-        self.assertEqual(lines[-2:], ["", "@leizette"])
-        self.assertEqual(text.count("@leizette"), 1)
+        self.assertEqual(lines[-2:], ["", "@priya"])
+        self.assertEqual(text.count("@priya"), 1)
 
     def test_tag_skipped_when_handle_not_configured(self):
         text = render_capture_report(
@@ -164,7 +164,7 @@ class CombinedReportTests(unittest.TestCase):
             findings=[Finding(code="unknown_department", params={"token": "Q"})],
             page_url=ROW,
             intake_url="https://t",
-            leizette_handle=None,
+            standing_cc_handle=None,
         )
         self.assertNotIn("@", text)
 

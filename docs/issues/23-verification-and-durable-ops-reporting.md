@@ -19,7 +19,7 @@ Add deterministic verification and durable private-ops reporting without gating 
 - [ ] One immediate report per triggered capture uses the locked vertical, one-fact-per-line format and includes the Notion row link, Job Order Name or fallback first line, triggered checks, relevant model reasons, and intake-topic message link.
 - [ ] The full raw message is excluded from reports, and every outbound text field passes through the shared masker.
 - [ ] An original-message link appears only for a channel-origin forward with sufficient Telegram metadata.
-- [ ] No one is tagged by default; Leizette is tagged only for unresolved People/Projects, unknown Department, and suspected multiple Job Orders; the owner is reserved for exhausted outage alerts.
+- [ ] No one is tagged by default; Priya is tagged only for unresolved People/Projects, unknown Department, and suspected multiple Job Orders; the owner is reserved for exhausted outage alerts.
 - [ ] The five locked report families and current amendments are represented, including probability-style Deliverable hints, fuzzy-match lines, `Passwords withheld`, and model-change wording.
 - [ ] Pending outbox entries are inserted in the same SQLite transaction that moves a message to `written`.
 - [ ] Outbox delivery is at-least-once with traceable IDs; a crash may duplicate a report but cannot omit the pending report.
@@ -47,14 +47,14 @@ Display fields (reasons, Title, Names, finding payloads) are masked, then line b
 [Telegram message](INTAKE_LINK)
 [Original message](CHANNEL_LINK)      ← channel-origin forwards only
 
-@<leizette handle>                      ← only if any finding is tagged
+@<priya handle>                      ← only if any finding is tagged
 ```
 
 A capture with no findings posts nothing. `PAGE_URL` is the Notion page URL. `INTAKE_LINK`: `https://t.me/c/<chat id without -100>/<topic id>/<message id>`. `CHANNEL_LINK`: `https://t.me/<username>/<id>` for a public channel, `https://t.me/c/<id>/<id>` for a private one.
 
 ### Finding lines
 
-| Code | Line | Tags Leizette |
+| Code | Line | Tags Priya |
 |---|---|---|
 | `unsure` | `Classifier unsure: <reasons>` | no |
 | `multiple_jo` | `Looks like more than one JO in this message, split by hand: <reasons>` | yes |
@@ -102,7 +102,7 @@ The outage alert and the daily heartbeat are specified in #25.
 
 ### Configuration
 
-`ops_chat_id`, `ops_topic_id`, `leizette_telegram_handle`, `header_date_tolerance_days` (1).
+`ops_chat_id`, `ops_topic_id`, `standing_cc_telegram_handle`, `header_date_tolerance_days` (1).
 
 ## Blocked by
 

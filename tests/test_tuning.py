@@ -76,7 +76,7 @@ class CorpusScoringTests(unittest.TestCase):
         cases = fuzzy_cases(assignee_mentions(CORPUS), people(), ResolveSettings())
         names = {c.mention for c in cases}
         self.assertIn("Paul", names)
-        self.assertNotIn("@leizette", names)  # resolved by handle, never fuzzy
+        self.assertNotIn("@priya", names)  # resolved by handle, never fuzzy
 
     def test_scores_match_the_production_resolver(self):
         settings = ResolveSettings()
@@ -92,7 +92,7 @@ class CorpusScoringTests(unittest.TestCase):
 
     def test_two_name_mentions_are_never_resolved_at_the_default_thresholds(self):
         cases = [c for c in fuzzy_cases(assignee_mentions(CORPUS), people(), ResolveSettings())
-                 if c.mention in ("Majo Jade", "Jade Majo")]  # fmt: skip
+                 if c.mention in ("Lena Mira", "Mira Lena")]  # fmt: skip
         self.assertTrue(cases)
         for case in cases:
             self.assertNotEqual(fuzzy_outcome(case, 90, 8), "resolved")

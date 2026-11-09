@@ -17,7 +17,7 @@ This ticket wires existing code. It does not change parsing, resolution or verif
 - [ ] `Worker.process` builds the plan with `plan_job_order` from the stored #20 extraction (the `extract` stage result), not with `build_plan`. `posted_at` is the intake posting time already used by `_posted_at`.
 - [ ] People are resolved with `CacheManager.resolve_people(assignees_raw, cc_raw, entities)`, using the message's Telegram mention entities, and the resolved assignees' `End of Shift` values are passed to `plan_job_order` as `assignee_shifts`, so shift deadlines use live Contacts data end to end.
 - [ ] The Project is resolved with `CacheManager.resolve_project(project_raw)`, and the Department with `CacheManager.resolve_department(...)`; the live Department option set is passed to `plan_job_order` as `valid_departments`.
-- [ ] `relation_properties(people, project)` is merged into the plan's properties, so Assigned, cc (Leizette always included) and Projects are written; Coordinator stays blank.
+- [ ] `relation_properties(people, project)` is merged into the plan's properties, so Assigned, cc (Priya always included) and Projects are written; Coordinator stays blank.
 - [ ] Resolver findings (unresolved, ambiguous, fuzzy-only, unknown Department) and planner findings (deadline, ASAP, and so on) are all in `plan.findings`, and reach `verify()` through `_capture_facts`. The "once the pipeline plans with them" note is removed.
 - [ ] Planning still holds at `extracted` while `caches.ready` is false, without spending an attempt or producing an unresolved finding.
 - [ ] The source block passed to `plan_job_order` is #24's `Worker._source_block`.

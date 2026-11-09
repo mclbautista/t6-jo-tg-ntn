@@ -43,7 +43,7 @@ def plan(ext, raw_text="SOMSOM - TOC - #0155\nbody", **kwargs):
         telegram_key="-1001:42",
         raw_text=raw_text,
         posted_at=POSTED,
-        source_block="Posted by: Leizette (@leizette)",
+        source_block="Posted by: Priya (@priya)",
         **kwargs,
     )
 
@@ -73,9 +73,9 @@ class NameTests(unittest.TestCase):
         self.assertEqual(p.name, "ALTA - OE - JO #04")
 
     def test_leading_tag_line_is_not_the_header(self):
-        raw = "[ADVANCED]\nMC7 - TOC - #0034\nbody"
-        p = plan(extraction(header_raw="MC7 - TOC - #0034", jo_number_raw="#0034"), raw_text=raw)
-        self.assertEqual(p.name, "MC7 - TOC - JO #0034")
+        raw = "[ADVANCED]\nSH1 - TOC - #0034\nbody"
+        p = plan(extraction(header_raw="SH1 - TOC - #0034", jo_number_raw="#0034"), raw_text=raw)
+        self.assertEqual(p.name, "SH1 - TOC - JO #0034")
         self.assertEqual(text_of(p.properties["JO Number"]), "#0034")
 
     def test_escaped_tag_line_is_skipped(self):
@@ -144,10 +144,10 @@ class FieldTests(unittest.TestCase):
         p = plan(
             extraction(
                 header_raw="MFG - TOC - JO #74",
-                title="My Father's Girlfriend FTR",
+                title="Show Alpha FTR",
                 task="D14-15 Upload synced dailies",
                 purpose="For prod and NF review",
-                source="Offline Coby",
+                source="Offline Owen",
                 platform="Frame.io",
                 link_settings="N/A",
                 watermark="Follow netflix guidelines",
@@ -157,10 +157,10 @@ class FieldTests(unittest.TestCase):
             )
         )
         expected = {
-            "Title": "My Father's Girlfriend FTR",
+            "Title": "Show Alpha FTR",
             "Task": "D14-15 Upload synced dailies",
             "Purpose": "For prod and NF review",
-            "Source / Source Drive": "Offline Coby",
+            "Source / Source Drive": "Offline Owen",
             "Platform": "Frame.io",
             "Link Settings": "N/A",
             "Watermark": "Follow netflix guidelines",
@@ -344,7 +344,7 @@ class FieldTests(unittest.TestCase):
         p = plan(extraction(), raw_text="MFG - TOC - JO #74\nPW: secret")
         self.assertEqual(
             p.body_blocks,
-            ["Posted by: Leizette (@leizette)", f"MFG - TOC - JO #74\nPW: {WITHHELD}"],
+            ["Posted by: Priya (@priya)", f"MFG - TOC - JO #74\nPW: {WITHHELD}"],
         )
 
     def test_long_raw_text_splits_into_2000_character_blocks(self):
@@ -417,7 +417,7 @@ class ReplayTests(unittest.TestCase):
                 notes="note",
                 title="T",
             ),
-            assignee_shifts=[("Majo", "7:00 PM")],
+            assignee_shifts=[("Lena", "7:00 PM")],
         )
         payload = build_job_order_payload(p, data_source_id="ds-1")
         stored = json.loads(p.model_dump_json())

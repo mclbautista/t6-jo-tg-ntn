@@ -45,8 +45,8 @@ FINDING_ORDER = [
     "duplicate_key",
 ]
 
-# The only findings Leizette has to act on herself (verification ticket).
-TAGS_LEIZETTE = frozenset(
+# The only findings Priya has to act on herself (verification ticket).
+TAGS_standing_cc = frozenset(
     {
         "multiple_jo",
         "unresolved_person",
@@ -341,5 +341,5 @@ def verify(facts: CaptureFacts, *, header_date_tolerance_days: int = 1) -> list[
     return order_findings(out)
 
 
-def tags_leizette(findings: list[Finding]) -> bool:
-    return any(f.code in TAGS_LEIZETTE for f in findings)
+def tags_standing_cc(findings: list[Finding]) -> bool:
+    return any(f.code in TAGS_standing_cc for f in findings)

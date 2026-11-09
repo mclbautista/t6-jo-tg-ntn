@@ -86,9 +86,9 @@ class ValidationTests(unittest.TestCase):
                 make(**overrides)
 
     def test_handles_are_normalized_with_at_sign(self):
-        config = make(owner_telegram_handle="cyril_owner", leizette_telegram_handle="@leizette")
+        config = make(owner_telegram_handle="cyril_owner", standing_cc_telegram_handle="@priya")
         self.assertEqual(config.owner_telegram_handle, "@cyril_owner")
-        self.assertEqual(config.leizette_telegram_handle, "@leizette")
+        self.assertEqual(config.standing_cc_telegram_handle, "@priya")
 
     def test_live_keys_are_required_at_boot(self):
         with self.assertRaises(ValueError) as ctx:
@@ -98,8 +98,8 @@ class ValidationTests(unittest.TestCase):
 
 
 LIVE = dict(
-    leizette_contact_page_id="3d8fb4d5-9e59-8035-acbf-f9b01f1430cd",
-    leizette_telegram_handle="@leizette",
+    standing_cc_contact_page_id="3d8fb4d5-9e59-8035-acbf-f9b01f1430cd",
+    standing_cc_telegram_handle="@priya",
     owner_telegram_handle="@cyril_owner",
     job_orders_data_source_id="3d8fb4d5-9e59-8073-a0d0-000b77632947",
 )
@@ -112,7 +112,7 @@ def live(**overrides) -> Config:
 class ProductionReadinessTests(unittest.TestCase):
     def test_valid_configuration_boots(self):
         require_live_keys(live())
-        require_live_keys(live(leizette_contact_page_id="3d8fb4d59e5980358acbf9b01f1430cd"))
+        require_live_keys(live(standing_cc_contact_page_id="3d8fb4d59e5980358acbf9b01f1430cd"))
         require_live_keys(live(deepseek_base_url="http://localhost:8080"))
         require_live_keys(live(notion_version="2027-01-31"))
 
@@ -125,7 +125,7 @@ class ProductionReadinessTests(unittest.TestCase):
             "contacts_data_source_id": ["", "xyz"],
             "projects_data_source_id": [""],
             "deliverables_data_source_id": [""],
-            "leizette_contact_page_id": ["", "short"],
+            "standing_cc_contact_page_id": ["", "short"],
             "intake_topic_id": [-5],
             "ops_topic_id": [-1],
             "deepseek_base_url": ["", "ftp://x.example", "api.deepseek.com", "https://"],
@@ -156,7 +156,7 @@ class ProductionReadinessTests(unittest.TestCase):
         require_live_keys(config)  # structurally valid...
         self.assertEqual(  # ...yet still not production-ready
             set(placeholder_keys(config)),
-            {"intake_chat_id", "ops_chat_id", "leizette_telegram_handle", "owner_telegram_handle"},
+            {"intake_chat_id", "ops_chat_id", "standing_cc_telegram_handle", "owner_telegram_handle"},
         )
         self.assertEqual(placeholder_keys(live()), [])
 
@@ -178,3 +178,27 @@ class ExampleFilesTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RenamedKeysTests(unittest.TestCase):
+    def test_old_standing_cc_keys_still_load_with_a_deprecation_warning(self):
+        import warnings
+
+        example = (ROOT / "config.example.yaml").read_text(encoding="utf-8")
+        kept = "".join(
+            line for line in example.splitlines(keepends=True)
+            if not line.startswith("standing_cc_")
+        )
+        legacy = (
+            "leizette_contact_page_id: '3d8fb4d5-9e59-8035-acbf-f9b01f1430cd'\n"
+            "leizette_telegram_handle: '@priya'\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "config.yaml"
+            path.write_text(kept + legacy, encoding="utf-8")
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                config = load_config(path)
+        self.assertEqual(config.standing_cc_contact_page_id, "3d8fb4d5-9e59-8035-acbf-f9b01f1430cd")
+        self.assertEqual(config.standing_cc_telegram_handle, "@priya")
+        self.assertEqual(len([w for w in caught if issubclass(w.category, DeprecationWarning)]), 2)

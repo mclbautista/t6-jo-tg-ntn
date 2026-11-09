@@ -5,7 +5,7 @@ from datetime import datetime, time
 
 from jo_watchdog.core.deadline import MANILA, parse_shift_hour, resolve_deadline, strip_hedges
 
-DAY = [("Majo", "7:00 PM")]
+DAY = [("Lena", "7:00 PM")]
 NIGHT = [("Paul", "5:00 AM")]
 FLEX = [("Che", "Flexible / Variable")]
 
@@ -164,7 +164,7 @@ class DeadlineRuleTests(unittest.TestCase):
         self.assertEqual(result.findings[1].params, {"reason": "no assignee resolved"})
 
     def test_parsed_shift_times_are_accepted(self):
-        result = resolve_deadline("end of shift", at(9, 1, 10), [("Majo", time(21))])
+        result = resolve_deadline("end of shift", at(9, 1, 10), [("Lena", time(21))])
         self.assertEqual(result.deadline, at(9, 1, 21))
 
     def test_year_closest_to_posting_date(self):

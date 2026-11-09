@@ -153,7 +153,7 @@ SMOKE_MARK = "SMOKE TEST — delete this row"
 # The three real JO-to-Deliverable pairs (deliverable-matching design, #26).
 JEV_REGRESSION_DELIVERABLES = [
     "Moonglow FTR SCR",
-    "Someone Someday WK11 VFX",
+    "Show Hotel WK11 VFX",
     "Mag-Iina FTR SCR",
 ]
 
@@ -365,7 +365,7 @@ async def step_bot_rights(s: Smoke) -> Result:
 async def step_owner_handle(s: Smoke) -> Result:
     return evaluate_owner_handle(
         s.config.owner_telegram_handle,
-        s.config.leizette_telegram_handle,
+        s.config.standing_cc_telegram_handle,
         s.attestations.get("owner_handle"),
     )
 

@@ -39,7 +39,7 @@ department_aliases:                 # header token -> Notion Department option
 # --- Resolution and caches (#22) ---
 contacts_data_source_id: "77b2a701-71db-4e88-a694-37f07303e77e"
 projects_data_source_id: "cc1dc02a-8f32-4c97-81e4-dc1e08d7f134"
-leizette_contact_page_id: "3d8fb4d5-9e59-8035-acbf-f9b01f1430cd"  # Leizette, standing cc on every JO
+standing_cc_contact_page_id: "3d8fb4d5-9e59-8035-acbf-f9b01f1430cd"  # Priya, standing cc on every JO
 cache_refresh_hours: 6
 cache_stale_alert_hours: 24
 fuzzy_min_score: 90
@@ -49,7 +49,7 @@ honorifics: [ate, kuya, sir]
 # --- Ops reporting (#23) ---
 ops_chat_id: -1000000000001         # FILL IN: the ops supergroup's chat id
 ops_topic_id: 1                     # FILL IN: the ops forum topic's message_thread_id
-leizette_telegram_handle: "@leizette_handle"  # FILL IN
+standing_cc_telegram_handle: "@standing_cc_handle"  # FILL IN
 header_date_tolerance_days: 1
 message_gap_alerts: true           # alert when intake chat message ids skip (#101)
 

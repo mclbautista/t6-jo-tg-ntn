@@ -34,7 +34,7 @@ def make_config(**overrides) -> Config:
         intake_topic_id=5,
         ops_chat_id=-100999,
         ops_topic_id=7,
-        leizette_telegram_handle="leizette",
+        standing_cc_telegram_handle="priya",
         captured_reaction="✅",
         job_orders_data_source_id="ds-1",
     )
@@ -157,7 +157,7 @@ class CaptureReportTests(unittest.IsolatedAsyncioTestCase):
             '<a href="https://t.me/c/123/5/42">Telegram message</a>\n'
             '<a href="https://t.me/studio/88">Original message</a>',
         )
-        self.assertNotIn("@leizette", text)  # forward origin tags no one
+        self.assertNotIn("@priya", text)  # forward origin tags no one
         self.assertNotIn("Task: edit", text)  # the raw message is never included
         [row] = h.outbox()
         self.assertEqual(row["state"], "sent")
@@ -196,7 +196,7 @@ class CaptureReportTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(f"<code>PW: {WITHHELD}</code>", row["text"])
         self.assertNotIn("swordfish", h.telegram.sent[0][2])
 
-    async def test_plan_findings_tag_leizette(self):
+    async def test_plan_findings_tag_standing_cc(self):
         # #21 stores planner findings on the plan; they join the same report.
         def plan(*args, **kwargs):
             planned = plan_job_order(*args, **kwargs)
@@ -208,7 +208,7 @@ class CaptureReportTests(unittest.IsolatedAsyncioTestCase):
             await h.worker.run_once()
         [(_, _, text)] = h.telegram.sent
         self.assertIn('Department "XYZ" isn\'t a Notion option', text)
-        self.assertTrue(text.endswith("\n\n@leizette"))
+        self.assertTrue(text.endswith("\n\n@priya"))
 
 
 class ExtractionFactsTests(unittest.IsolatedAsyncioTestCase):
@@ -232,7 +232,7 @@ class ExtractionFactsTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertNotIn("@", text)
 
-    async def test_multiple_jo_tags_leizette(self):
+    async def test_multiple_jo_tags_standing_cc(self):
         classifier = FakeClassifier(
             ok_result(title="T", task="X", multiple_jo_suspected=True, reasons="Two headers.")
         )
@@ -242,7 +242,7 @@ class ExtractionFactsTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(
             "Looks like more than one JO in this message, split by hand: Two headers.", text
         )
-        self.assertTrue(text.endswith("\n\n@leizette"))
+        self.assertTrue(text.endswith("\n\n@priya"))
 
 
 class StaleCacheTests(unittest.IsolatedAsyncioTestCase):
@@ -423,7 +423,7 @@ class ConfigTests(unittest.TestCase):
     def test_defaults(self):
         c = make_config()
         self.assertEqual(c.header_date_tolerance_days, 1)
-        self.assertIsNone(make_config(leizette_telegram_handle=None).leizette_telegram_handle)
+        self.assertIsNone(make_config(standing_cc_telegram_handle=None).standing_cc_telegram_handle)
 
 
 if __name__ == "__main__":

@@ -17,7 +17,7 @@ from jo_watchdog.ledger.db import Ledger
 from tests.fakes import FakeClassifier, FakeNotion, FakeTelegram, live_date, ok_result, update
 
 KEY = "-100123:42"
-LEIZETTE = "c-leizette"
+PRIYA = "c-priya"
 FETCHED = "2026-09-28T00:00:00Z"
 PEOPLE = [
     {
@@ -27,7 +27,7 @@ PEOPLE = [
         "end_of_shift": "10:00 PM",
     },
     {"page_id": "c-ana", "name": "Anabelle Reyes", "aliases": "Ana"},
-    {"page_id": LEIZETTE, "name": "Leizette"},
+    {"page_id": PRIYA, "name": "Priya"},
 ]
 PROJECTS = [{"page_id": "proj-mfg", "name": "Manufacturing", "code": "MFG"}]
 
@@ -59,7 +59,7 @@ class Harness:
             ops_chat_id=-100999,
             ops_topic_id=7,
             job_orders_data_source_id="ds-1",
-            leizette_contact_page_id=LEIZETTE,
+            standing_cc_contact_page_id=PRIYA,
         )
         self.notion = FakeNotion()
         self.telegram = FakeTelegram(
@@ -111,7 +111,7 @@ class PlannerWiringTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(props["Department"], {"select": {"name": "TOC"}})
         self.assertEqual(props["Projects"], {"relation": [{"id": "proj-mfg"}]})
         self.assertEqual(props["Assigned"], {"relation": [{"id": "c-ben"}]})
-        self.assertEqual(props["cc"], {"relation": [{"id": "c-ana"}, {"id": LEIZETTE}]})
+        self.assertEqual(props["cc"], {"relation": [{"id": "c-ana"}, {"id": PRIYA}]})
         self.assertEqual(
             manila_iso(datetime.fromisoformat(props["Deadline"]["date"]["start"])), "2026-09-30T22:00:00+08:00"
         )  # Benjamin's End of Shift
@@ -122,7 +122,7 @@ class PlannerWiringTests(unittest.IsolatedAsyncioTestCase):
                 "project_page_id": "proj-mfg",
                 "department": "TOC",
                 "assigned": ["c-ben"],
-                "cc": ["c-ana", LEIZETTE],
+                "cc": ["c-ana", PRIYA],
                 "unresolved": [],
             },
         )
@@ -200,13 +200,13 @@ class PlannerWiringTests(unittest.IsolatedAsyncioTestCase):
     async def test_overlapping_entity_does_not_assign_the_wrong_person(self):
         people = [
             {"page_id": "c-jo", "name": "Jo Lim", "telegram_user_id": "123"},
-            {"page_id": "c-majo", "name": "Majo Cruz", "aliases": "Majo"},
-            {"page_id": LEIZETTE, "name": "Leizette"},
+            {"page_id": "c-lena", "name": "Lena Cruz", "aliases": "Lena"},
+            {"page_id": PRIYA, "name": "Priya"},
         ]
         h = Harness(
             self,
             task="Cut",
-            assignees_raw="Majo",
+            assignees_raw="Lena",
             extra={
                 "entities": [
                     {"type": "text_mention", "offset": 0, "length": 2, "user": {"id": 123}}
@@ -217,7 +217,7 @@ class PlannerWiringTests(unittest.IsolatedAsyncioTestCase):
         await h.run()
 
         self.assertEqual(
-            h.notion.created[0]["properties"]["Assigned"], {"relation": [{"id": "c-majo"}]}
+            h.notion.created[0]["properties"]["Assigned"], {"relation": [{"id": "c-lena"}]}
         )
 
     async def test_planner_and_resolver_findings_reach_the_capture_report(self):

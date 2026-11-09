@@ -20,7 +20,7 @@ NOTION = Path(__file__).parent / "fixtures" / "notion"
 CONTACTS = "77b2a701-71db-4e88-a694-37f07303e77e"
 PROJECTS = "cc1dc02a-8f32-4c97-81e4-dc1e08d7f134"
 JOB_ORDERS = "3d8fb4d5-9e59-8073-a0d0-000b77632947"
-LEIZETTE = "c0000000-0000-4000-8000-000000000001"
+PRIYA = "c0000000-0000-4000-8000-000000000001"
 
 
 def _load(name):
@@ -34,7 +34,7 @@ def config(**overrides) -> Config:
         ops_chat_id=-100999,
         ops_topic_id=7,
         job_orders_data_source_id=JOB_ORDERS,
-        leizette_contact_page_id=LEIZETTE,
+        standing_cc_contact_page_id=PRIYA,
     )
     values.update(overrides)
     return Config(**values)
@@ -149,9 +149,9 @@ class RefreshTests(CacheTestCase):
     async def test_resolution_through_manager(self):
         caches = self.manager()
         await caches.refresh()
-        people = caches.resolve_people("Piolo / @raedsss", None)
+        people = caches.resolve_people("Ramon / @user_two", None)
         self.assertEqual(len(people.assigned), 2)
-        self.assertEqual(people.cc, [LEIZETTE])
+        self.assertEqual(people.cc, [PRIYA])
         self.assertEqual(caches.resolve_project("MFG - TOC").code, "MFG")
         self.assertEqual(caches.resolve_department("TO").department, "TOC")
         self.assertEqual(caches.resolve_department("XX").findings[0].code, "unknown_department")

@@ -69,7 +69,7 @@ class ResolveSettings(BaseModel):
     fuzzy_min_lead: float = 8
     honorifics: tuple[str, ...] = DEFAULT_HONORIFICS
     department_aliases: dict[str, str] = Field(default_factory=dict)
-    leizette_contact_page_id: str | None = None
+    standing_cc_contact_page_id: str | None = None
 
 
 class MentionEntity(BaseModel):
@@ -186,7 +186,7 @@ def split_mentions(raw: str | None) -> list[str]:
     """Split an ``assignees_raw``/``cc_raw`` value into individual mentions.
 
     ``@handles`` are split from the names around them. A hedged mention
-    (``Piolo but maybe Majo``) is kept whole so it is reported as one ambiguous
+    (``Ramon but maybe Lena``) is kept whole so it is reported as one ambiguous
     mention, quoted as written. A condition (``if abutin the next day``,
     ``kung sakaling ...``) is joined, complete, to the mention before it, so
     that mention is ambiguous and nothing is assigned on a condition.
@@ -216,7 +216,7 @@ def _split_head(text: str) -> list[str]:
 
 
 def _split_handles(part: str) -> list[str]:
-    """``Piolo @raedsss`` -> ``Piolo``, ``@raedsss``; ``ate @debz38`` stays whole."""
+    """``Ramon @user_two`` -> ``Ramon``, ``@user_two``; ``ate @user_four`` stays whole."""
     pieces: list[str] = []
     last = 0
     for m in _HANDLE_RE.finditer(part):
@@ -224,7 +224,7 @@ def _split_handles(part: str) -> list[str]:
         if before and normalize_name(before):
             pieces.append(before)
         elif before:
-            # Only an honorific before the handle: keep it attached (``ate @debz38``).
+            # Only an honorific before the handle: keep it attached (``ate @user_four``).
             pieces.append(f"{before} {m.group(0)}")
             last = m.end()
             continue
@@ -268,7 +268,7 @@ def _entity_for(
 
     A ``mention`` entity binds when its ``@handle`` is a whole token of the
     segment; a ``text_mention`` binds when its display text equals the segment
-    after normalization. ``Jo`` therefore never supplies identity for ``Majo``.
+    after normalization. ``Jo`` therefore never supplies identity for ``Lena``.
     """
     handles = {normalize_handle(m.group(1)) for m in _HANDLE_RE.finditer(segment)}
     norm = normalize_name(segment, honorifics)
@@ -386,7 +386,7 @@ def _mention_finding(result: MentionResult) -> Finding | None:
 def _split_unresolved_names(
     result: MentionResult, index: PeopleIndex, settings: ResolveSettings
 ) -> list[MentionResult]:
-    """``Jade Majo`` (names with no separator) splits only if every word is an exact alias."""
+    """``Mira Lena`` (names with no separator) splits only if every word is an exact alias."""
     if result.status != "unresolved" or "@" in result.raw:
         return [result]
     words = [w for w in result.raw.split() if normalize_name(w, settings.honorifics)]
@@ -413,7 +413,7 @@ def resolve_people(
     settings: ResolveSettings,
     entities: Sequence[MentionEntity] = (),
 ) -> PeopleResolution:
-    """Resolve Assigned and cc. Leizette is always in cc; Coordinator stays blank."""
+    """Resolve Assigned and cc. Priya is always in cc; Coordinator stays blank."""
     index = people if isinstance(people, PeopleIndex) else PeopleIndex(people, settings.honorifics)
     out = PeopleResolution()
     for role, raw in (("assignee", assignees_raw), ("cc", cc_raw)):
@@ -431,8 +431,8 @@ def resolve_people(
                 else:
                     _add_unique(out.cc, part.page_id)
 
-    if settings.leizette_contact_page_id:
-        _add_unique(out.cc, settings.leizette_contact_page_id)
+    if settings.standing_cc_contact_page_id:
+        _add_unique(out.cc, settings.standing_cc_contact_page_id)
 
     for page_id in out.assigned:
         person = index.people[page_id]

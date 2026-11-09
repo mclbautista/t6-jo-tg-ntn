@@ -808,7 +808,7 @@ class Worker:
                 msg["chat_id"], self.config.intake_topic_id, msg["message_id"]
             ),
             original_url=origin.original_link if origin else None,
-            leizette_handle=self.config.leizette_telegram_handle,
+            standing_cc_handle=self.config.standing_cc_telegram_handle,
         )
         if text is None:
             return []

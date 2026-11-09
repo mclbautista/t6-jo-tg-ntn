@@ -16,7 +16,7 @@ from datetime import date, datetime
 from typing import Any
 
 from jo_watchdog.core.masker import outbound_text
-from jo_watchdog.core.verify import MANILA, Finding, ForwardOrigin, tags_leizette
+from jo_watchdog.core.verify import MANILA, Finding, ForwardOrigin, tags_standing_cc
 
 FLAGGED_HEADER = "⚠️ Flagged on capture"
 EDITED_HEADER = "✏️ Edited after capture, row not updated"
@@ -185,7 +185,7 @@ def render_capture_report(
     page_url: str,
     intake_url: str,
     original_url: str | None = None,
-    leizette_handle: str | None = None,
+    standing_cc_handle: str | None = None,
 ) -> str | None:
     """The one combined report for a capture, or None when nothing triggered."""
     if not findings:
@@ -195,7 +195,7 @@ def render_capture_report(
     lines += ["", _link("Notion row", page_url), _link("Telegram message", intake_url)]
     if original_url:
         lines.append(_link("Original message", original_url))
-    mention = handle_mention(leizette_handle) if tags_leizette(findings) else None
+    mention = handle_mention(standing_cc_handle) if tags_standing_cc(findings) else None
     if mention:
         lines += ["", mention]
     return "\n".join(lines)

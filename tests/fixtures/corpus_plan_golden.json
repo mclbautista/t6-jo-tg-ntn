@@ -26,13 +26,13 @@
    "department": "TOC",
    "number": "01"
   },
-  "MC7 - AE - #008": {
-   "project": "MC7",
+  "SH1 - AE - #008": {
+   "project": "SH1",
    "department": "AE",
    "number": "008"
   },
-  "MC7 - AE - #007": {
-   "project": "MC7",
+  "SH1 - AE - #007": {
+   "project": "SH1",
    "department": "AE",
    "number": "007"
   },
@@ -98,8 +98,8 @@
    "department": "TOC",
    "number": "107"
   },
-  "MC7 - AE - #004": {
-   "project": "MC7",
+  "SH1 - AE - #004": {
+   "project": "SH1",
    "department": "AE",
    "number": "004"
   },
@@ -424,7 +424,7 @@
   },
   {
    "index": 6,
-   "name": "MC7 - AE - JO #008",
+   "name": "SH1 - AE - JO #008",
    "jo_number": "#008",
    "jo_number_int": 8,
    "deadline_raw": "September 26, 4PM",
@@ -435,7 +435,7 @@
   },
   {
    "index": 7,
-   "name": "MC7 - AE - JO #007",
+   "name": "SH1 - AE - JO #007",
    "jo_number": "#007",
    "jo_number_int": 7,
    "deadline_raw": "September 25, 7PM",
@@ -600,7 +600,7 @@
   },
   {
    "index": 22,
-   "name": "MC7 - AE - JO #004",
+   "name": "SH1 - AE - JO #004",
    "jo_number": "#004",
    "jo_number_int": 4,
    "deadline_raw": "September 25, 3PM",

@@ -94,8 +94,8 @@ seams. The real-account checks live in `smoke.py` and are run by hand.
    content**. Put its token in `.env` as `NOTION_API_KEY`, then share Job
    Orders, Contacts, Projects and Deliverables with it (each database's `•••`
    menu, Connections).
-5. Fill `leizette_contact_page_id` (Leizette's page in Contacts),
-   `leizette_telegram_handle` and `owner_telegram_handle`. Add
+5. Fill `standing_cc_contact_page_id` (Priya's page in Contacts),
+   `standing_cc_telegram_handle` and `owner_telegram_handle`. Add
    `DEEPSEEK_API_KEY` and `OPENROUTER_API_KEY` to `.env`.
 6. Prepare the data directory and run the smoke check until it passes:
 
@@ -173,7 +173,7 @@ table), which keeps mentions, forward origin and the posting time:
 
 ```sh
 docker compose exec -T watchdog python -m jo_watchdog.app ingest --json - --wait 120 --config /app/config.yaml < update.json
-docker compose exec watchdog python -m jo_watchdog.app ingest --text "JO-TOC #12 ..." --message-id 3121 --from-user @hmmkayy --date 2026-11-04T11:39 --config /app/config.yaml
+docker compose exec watchdog python -m jo_watchdog.app ingest --text "JO-TOC #12 ..." --message-id 3121 --from-user @user_eight --date 2026-11-04T11:39 --config /app/config.yaml
 ```
 
 `--json` takes a Telegram update, a bare Telegram message or a gateway item.

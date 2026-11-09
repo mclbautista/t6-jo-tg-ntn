@@ -113,7 +113,7 @@ Both new columns are read by the existing 6-hour People cache; no new cache mech
 - Never applies to an `@handle` mention (exact or nothing).
 - Requires score ≥ 90 **and** a lead ≥ 8 points over the runner-up (both in config); otherwise it's a miss.
 - A fuzzy-only link still writes (not blocked), but posts one untagged ops line ("matched by name: '`X`' → Contact `Y`"), visible the same day.
-- One alias string matching more than one contact is a miss (blank relation, ops report, Leizette tagged), never a guess — same rule as exact-alias collisions.
+- One alias string matching more than one contact is a miss (blank relation, ops report, Priya tagged), never a guess — same rule as exact-alias collisions.
 - Corpus becomes a `rapidfuzz` test fixture.
 
 Principles: **Precision over recall when a human can fill the gap**, **Schema is the contract**, **Annotate, don't gate**.
@@ -153,7 +153,7 @@ Principle: **Silence is a failure mode**, accepted as the detector for the one g
 
 ## 13. Config, secrets and logging
 
-- `config.yaml` (non-secrets, Pydantic-validated at startup — a bad value fails the boot, not a message): intake chat/topic ids, ops chat/topic ids, Leizette's Contacts page id, the owner's real Telegram handle, `T_link`, `T_hint`, fuzzy score/lead thresholds, heartbeat time/timezone, cache interval, retry schedule, `deliverable_link_enabled`, `dry_run`.
+- `config.yaml` (non-secrets, Pydantic-validated at startup — a bad value fails the boot, not a message): intake chat/topic ids, ops chat/topic ids, Priya's Contacts page id, the owner's real Telegram handle, `T_link`, `T_hint`, fuzzy score/lead thresholds, heartbeat time/timezone, cache interval, retry schedule, `deliverable_link_enabled`, `dry_run`.
 - `.env`: Telegram token, Notion token, DeepSeek key, TypeSafe (Jev) key.
 - Logging: JSON lines to stdout + a rotated file next to the ledger. Fields: message key, state, stage, attempt, duration, returned model id. Every log line passes through the masker first — raw text never appears in logs, only the masked first line.
 
