@@ -98,7 +98,7 @@ class ValidationTests(unittest.TestCase):
 
 
 LIVE = dict(
-    standing_cc_contact_page_id="3d8fb4d5-9e59-8035-acbf-f9b01f1430cd",
+    standing_cc_contact_page_id="c0000000-0000-4000-8000-0000000000cc",
     standing_cc_telegram_handle="@priya",
     owner_telegram_handle="@cyril_owner",
     job_orders_data_source_id="3d8fb4d5-9e59-8073-a0d0-000b77632947",
@@ -112,7 +112,7 @@ def live(**overrides) -> Config:
 class ProductionReadinessTests(unittest.TestCase):
     def test_valid_configuration_boots(self):
         require_live_keys(live())
-        require_live_keys(live(standing_cc_contact_page_id="3d8fb4d59e5980358acbf9b01f1430cd"))
+        require_live_keys(live(standing_cc_contact_page_id="c00000000000400080000000000000cc"))
         require_live_keys(live(deepseek_base_url="http://localhost:8080"))
         require_live_keys(live(notion_version="2027-01-31"))
 
@@ -156,7 +156,13 @@ class ProductionReadinessTests(unittest.TestCase):
         require_live_keys(config)  # structurally valid...
         self.assertEqual(  # ...yet still not production-ready
             set(placeholder_keys(config)),
-            {"intake_chat_id", "ops_chat_id", "standing_cc_telegram_handle", "owner_telegram_handle"},
+            {
+                "intake_chat_id",
+                "ops_chat_id",
+                "standing_cc_contact_page_id",
+                "standing_cc_telegram_handle",
+                "owner_telegram_handle",
+            },
         )
         self.assertEqual(placeholder_keys(live()), [])
 
@@ -190,7 +196,7 @@ class RenamedKeysTests(unittest.TestCase):
             if not line.startswith("standing_cc_")
         )
         legacy = (
-            "leizette_contact_page_id: '3d8fb4d5-9e59-8035-acbf-f9b01f1430cd'\n"
+            "leizette_contact_page_id: 'c0000000-0000-4000-8000-0000000000cc'\n"
             "leizette_telegram_handle: '@priya'\n"
         )
         with tempfile.TemporaryDirectory() as tmp:
@@ -199,6 +205,6 @@ class RenamedKeysTests(unittest.TestCase):
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always")
                 config = load_config(path)
-        self.assertEqual(config.standing_cc_contact_page_id, "3d8fb4d5-9e59-8035-acbf-f9b01f1430cd")
+        self.assertEqual(config.standing_cc_contact_page_id, "c0000000-0000-4000-8000-0000000000cc")
         self.assertEqual(config.standing_cc_telegram_handle, "@priya")
         self.assertEqual(len([w for w in caught if issubclass(w.category, DeprecationWarning)]), 2)
