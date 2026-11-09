@@ -296,6 +296,26 @@ def render_outage_alert(
     return "\n".join(lines)
 
 
+def render_heartbeat_failed_alert(
+    *,
+    window_start: datetime,
+    window_end: datetime,
+    error: str,
+    owner_handle: str | None,
+) -> str:
+    """The one owner-tagged alert when the gateway reports a heartbeat as not delivered (#113)."""
+    lines = [
+        "🔴 Daily heartbeat was not delivered",
+        f"Window: {_stamp(window_start)} → {_stamp(window_end)}",
+        f"Gateway error: {_field(error)}",
+        "Not re-sent automatically; the next heartbeat links the last delivered one",
+    ]
+    mention = handle_mention(owner_handle)
+    if mention:
+        lines += ["", mention]
+    return "\n".join(lines)
+
+
 def _stamp(when: datetime) -> str:
     local = when.astimezone(MANILA)
     return f"{local.strftime('%b')} {local.day} {local.strftime('%H:%M')}"

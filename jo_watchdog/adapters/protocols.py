@@ -42,9 +42,12 @@ class GatewayRef(BaseModel):
 
 
 class NotifyStatus(BaseModel):
-    """The gateway's answer to ``GET /notify/{ref}``."""
+    """The gateway's answer to ``GET /notify/{ref}``.
 
-    state: Literal["queued", "sent", "failed"]
+    ``unknown`` is the client's reading of a 404: the gateway has forgotten the ref.
+    """
+
+    state: Literal["queued", "sent", "failed", "unknown"]
     telegram_message_id: int | None = None
     error: str | None = None
 
