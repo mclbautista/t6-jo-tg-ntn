@@ -17,6 +17,7 @@ from unittest import mock
 import yaml
 
 from jo_watchdog.adapters.gateway import GatewayTelegramClient
+from jo_watchdog.adapters.protocols import NotifyStatus
 from jo_watchdog.app import __main__ as entry
 from jo_watchdog.ledger.db import Ledger
 from tests.fake_gateway import SECRET, FakeGateway, telegram_id_for
@@ -100,6 +101,28 @@ class DryRunTests(unittest.TestCase):
         self.assertEqual(rig.dump(), before)
 
 
+class DryRunOutcomeTests(unittest.TestCase):
+    def test_failed_unknown_and_incomplete_answers_are_reported_and_not_written(self):
+        rig = BackfillRig(self)
+        for ref in (5530, 5531, 5532):
+            rig.legacy_row(ref=ref)
+        rig.gateway.set_notify_state(5530, "failed")
+        rig.gateway.set_notify_state(5531, "unknown")
+        rig.gateway.set_notify_state(5532, "sent")
+        before = rig.dump()
+
+        async def answer(_client, ref):
+            state = {5530: "failed", 5531: "unknown", 5532: "sent"}[ref]
+            return NotifyStatus(state=state, telegram_message_id=None)  # sent with no ID
+
+        with mock.patch.object(GatewayTelegramClient, "notify_status", answer):
+            code, out, _ = rig.run()
+        self.assertEqual(code, 1)  # a sent answer with no ID is an error, not a resolution
+        for word in ("failed", "unknown", "error"):
+            self.assertIn(word, out)
+        self.assertEqual(rig.dump(), before)
+
+
 class ApplyTests(unittest.TestCase):
     def test_a_sent_ref_gets_its_real_telegram_id(self):
         rig = BackfillRig(self)
@@ -138,6 +161,7 @@ class ApplyTests(unittest.TestCase):
             self.assertIsNone(row["telegram_message_id"])
             self.assertNotEqual(row["state"], "sent")
         self.assertEqual(rig.row(failed)["last_error"], "chat not found")
+        self.assertEqual(rig.row(failed)["state"], "failed")
         self.assertNotIn("chat not found", out)  # outcomes only
 
     def test_a_queued_ref_is_left_untouched(self):
@@ -147,6 +171,16 @@ class ApplyTests(unittest.TestCase):
         before = tuple(rig.row(row_id))
         rig.run("--apply")
         self.assertEqual(tuple(rig.row(row_id)), before)
+
+    def test_a_queued_ref_is_reported_again_but_never_counted_as_fixable(self):
+        rig = BackfillRig(self)
+        rig.legacy_row(ref=5530)
+        rig.gateway.set_notify_state(5530, "queued")
+        rig.run("--apply")
+        code, out, _ = rig.run("--apply")
+        self.assertEqual(code, 0)
+        self.assertIn("nothing left to fix", out.lower())
+        self.assertIn("1 still waiting", out)
 
     def test_a_second_run_changes_nothing_and_reports_nothing_to_fix(self):
         rig = BackfillRig(self)

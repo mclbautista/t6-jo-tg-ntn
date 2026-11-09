@@ -38,6 +38,7 @@ import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import NamedTuple
 from zoneinfo import ZoneInfo
 
 from jo_watchdog.adapters.gateway import GatewayTelegramClient
@@ -104,8 +105,18 @@ def run_reset_offset(config_path: str, to: int) -> int:
     return 0
 
 
-async def _look_up_refs(client: GatewayTelegramClient, rows: list[dict]) -> list[tuple]:
-    """``(row, outcome, telegram_id, error)`` per row; a lookup that errors is ``error``."""
+class RefLookup(NamedTuple):
+    row: dict
+    outcome: str  # the gateway's state, or "error" when the lookup failed or made no sense
+    telegram_id: int | None
+    error: str | None
+
+
+_FIXABLE = ("sent", "failed", "unknown")
+
+
+async def _look_up_refs(client: GatewayTelegramClient, rows: list[dict]) -> list[RefLookup]:
+    """One lookup per row; a lookup that errors is outcome ``error``."""
     results = []
     try:
         for row in rows:
@@ -114,12 +125,14 @@ async def _look_up_refs(client: GatewayTelegramClient, rows: list[dict]) -> list
             except Exception as exc:
                 ref, name = row["gateway_ref"], type(exc).__name__
                 log.warning("could not look up gateway ref %s (%s)", ref, name)
-                results.append((row, "error", None, None))
+                results.append(RefLookup(row, "error", None, None))
                 continue
             if status.state == "sent" and status.telegram_message_id is None:
-                results.append((row, "error", None, None))
+                results.append(RefLookup(row, "error", None, None))
             else:
-                results.append((row, status.state, status.telegram_message_id, status.error))
+                results.append(
+                    RefLookup(row, status.state, status.telegram_message_id, status.error)
+                )
     finally:
         await client.close()
     return results
@@ -145,20 +158,20 @@ def run_backfill_gateway_refs(config_path: str, apply: bool) -> int:
         # Refs, IDs and outcomes only: never message text, chat ids or links.
         if results:
             print(f"{'ref':>8}  {'telegram id':>11}  outcome")
-            for row, outcome, telegram_id, _ in results:
-                shown = "-" if telegram_id is None else str(telegram_id)
-                print(f"{row['gateway_ref']:>8}  {shown:>11}  {outcome}")
+            for found in results:
+                shown = "-" if found.telegram_id is None else str(found.telegram_id)
+                print(f"{found.row['gateway_ref']:>8}  {shown:>11}  {found.outcome}")
         resolved = cleared = 0
         if apply:
-            for row, outcome, telegram_id, error in results:
-                if outcome == "sent":
-                    resolved += ledger.backfill_resolved(row["id"], telegram_id)
-                elif outcome in ("failed", "unknown"):
-                    reason = error or f"gateway reported {outcome}"
-                    cleared += ledger.backfill_unreachable(row["id"], reason)
-        left = sum(1 for _, outcome, _, _ in results if outcome in ("queued", "error"))
-        errors = sum(1 for _, outcome, _, _ in results if outcome == "error")
-        fixable = sum(1 for _, outcome, _, _ in results if outcome in ("sent", "failed", "unknown"))
+            for found in results:
+                if found.outcome == "sent":
+                    resolved += ledger.backfill_resolved(found.row["id"], found.telegram_id)
+                elif found.outcome in ("failed", "unknown"):
+                    reason = found.error or f"gateway reported {found.outcome}"
+                    cleared += ledger.backfill_unreachable(found.row["id"], reason)
+        fixable = sum(found.outcome in _FIXABLE for found in results)
+        left = len(results) - fixable
+        errors = sum(found.outcome == "error" for found in results)
     finally:
         ledger.close()
     log.info(
@@ -170,8 +183,9 @@ def run_backfill_gateway_refs(config_path: str, apply: bool) -> int:
         cleared,
         left,
     )
-    if not results:
-        print("nothing left to fix")
+    if not fixable:
+        note = f" ({left} still waiting on the gateway)" if left else ""
+        print(f"nothing left to fix{note}")
     elif apply:
         print(f"applied: {resolved} resolved, {cleared} cleared, {left} left as they were")
     else:
