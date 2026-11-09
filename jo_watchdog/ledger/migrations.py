@@ -333,6 +333,47 @@ def _migration_9(conn: sqlite3.Connection) -> None:
 
 MIGRATION_9 = _migration_9
 
+def _migration_10(conn: sqlite3.Connection) -> None:
+    """Outbox: the gateway ref beside the Telegram message ID, and the ``accepted`` state (#109).
+
+    SQLite cannot alter a CHECK, so ``outbox`` is rebuilt with every existing column
+    carried over; the caller runs this with foreign keys off (``heartbeats`` points at
+    ``outbox``) and checks them before commit. ``accepted`` means the gateway queued the
+    post and its real Telegram ID is not known yet; ``sent`` always carries a real ID.
+    """
+    columns = [row[1] for row in conn.execute("PRAGMA table_info(outbox)")]
+    indexes = [
+        row[0]
+        for row in conn.execute(
+            "SELECT sql FROM sqlite_master"
+            " WHERE type = 'index' AND tbl_name = 'outbox' AND sql IS NOT NULL"
+        )
+    ]
+    (ddl,) = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'outbox'"
+    ).fetchone()
+    ddl = ddl.replace("'pending', 'sent', 'failed'", "'pending', 'accepted', 'sent', 'failed'")
+    conn.execute(ddl.replace("CREATE TABLE outbox", "CREATE TABLE outbox_new", 1))
+    conn.execute("ALTER TABLE outbox_new ADD COLUMN gateway_ref INTEGER")
+    carried = ", ".join(f'"{name}"' for name in columns)
+    conn.execute(f"INSERT INTO outbox_new ({carried}) SELECT {carried} FROM outbox")
+    conn.execute("DROP TABLE outbox")
+    conn.execute("ALTER TABLE outbox_new RENAME TO outbox")
+    for sql in indexes:
+        conn.execute(sql)
+
+
+# Gateway-mode only, run in the same transaction as migration 10 (see ``Ledger._migrate``):
+# before this fix a gateway ``message_ref`` was stored as the Telegram message ID, so those
+# rows keep the ref where it belongs and lose the wrong ID. They stay ``sent`` but have no
+# ID, so no backlink uses them; the backfill ticket reconciles them later.
+MIGRATION_10_GATEWAY_ROWS = (
+    "UPDATE outbox SET gateway_ref = telegram_message_id, telegram_message_id = NULL"
+    " WHERE state = 'sent' AND telegram_message_id IS NOT NULL"
+)
+
+MIGRATION_10 = _migration_10
+
 Migration = list[str] | Callable[[sqlite3.Connection], None]
 
 # Keyed by number and applied in ascending order of the numbers not yet recorded.
@@ -346,7 +387,8 @@ MIGRATIONS: dict[int, Migration] = {
     7: MIGRATION_7,
     8: MIGRATION_8,
     9: MIGRATION_9,
+    10: MIGRATION_10,
 }
 
 # Migrations that rebuild a referenced table run with foreign-key enforcement off.
-REBUILDS_TABLES: frozenset[int] = frozenset({3})
+REBUILDS_TABLES: frozenset[int] = frozenset({3, 10})

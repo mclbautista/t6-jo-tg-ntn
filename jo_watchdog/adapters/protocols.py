@@ -31,6 +31,24 @@ class IncomingUpdate(BaseModel):
     edit_date: int | None = None
 
 
+class GatewayRef(BaseModel):
+    """What a gateway client returns from ``send_message``: the post is queued, not delivered.
+
+    The ref is the gateway's own number, never a Telegram message ID. A client that
+    returns a plain ``int`` has delivered the post and that int is the real ID (#109).
+    """
+
+    ref: int
+
+
+class NotifyStatus(BaseModel):
+    """The gateway's answer to ``GET /notify/{ref}``."""
+
+    state: Literal["queued", "sent", "failed"]
+    telegram_message_id: int | None = None
+    error: str | None = None
+
+
 class PageRef(BaseModel):
     """The reference Notion returns after creating a page."""
 
@@ -68,7 +86,8 @@ class TelegramClient(Protocol):
         """Post Telegram-HTML ``text`` to a forum topic; return the new message id.
 
         A client that sets ``accepts_idempotency_key`` (the gateway client, #95) also
-        takes ``idempotency_key=`` and returns the gateway's ``message_ref`` instead.
+        takes ``idempotency_key=`` and returns a ``GatewayRef`` (queued, not delivered)
+        instead; ``notify_status`` then reports the real message id.
         """
         ...
 

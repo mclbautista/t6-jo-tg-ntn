@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import httpx
 
-from jo_watchdog.adapters.protocols import IncomingUpdate
+from jo_watchdog.adapters.protocols import GatewayRef, IncomingUpdate, NotifyStatus
 
 # Slack on top of the long-poll ``timeout`` so the HTTP read does not give up first.
 _POLL_SLACK_SECONDS = 15.0
@@ -77,10 +77,16 @@ class GatewayTelegramClient:
 
     async def send_message(
         self, chat_id: int, topic_id: int, text: str, *, idempotency_key: str | None = None
-    ) -> int:
+    ) -> GatewayRef:
         body: dict = {"to": chat_id, "topic": topic_id, "text": text, "format": "html"}
         if idempotency_key is not None:
             body["idempotency_key"] = idempotency_key
         response = await self._http.post("/notify", json=body)
         response.raise_for_status()
-        return response.json()["message_ref"]
+        # The gateway has only queued the post: this is its ref, not a Telegram message ID.
+        return GatewayRef(ref=response.json()["message_ref"])
+
+    async def notify_status(self, ref: int) -> NotifyStatus:
+        response = await self._http.get(f"/notify/{ref}")
+        response.raise_for_status()
+        return NotifyStatus.model_validate(response.json())
