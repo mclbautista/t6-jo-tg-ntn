@@ -100,7 +100,7 @@ class MigrationFiveTests(unittest.TestCase):
             {
                 "id", "message_id", "kind", "chat_id", "topic_id", "text", "state",
                 "attempts", "next_attempt_at", "last_error", "telegram_message_id",
-                "created_at", "sent_at", "gateway_ref",
+                "created_at", "sent_at", "gateway_ref", "accepted_at", "poll_seq",
             },
         )
         msg_cols = {r[1] for r in conn.execute("PRAGMA table_info(messages)")}

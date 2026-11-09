@@ -854,7 +854,7 @@ class Worker:
                 continue
             if isinstance(sent_id, GatewayRef):
                 # Queued at the gateway: the real Telegram ID comes from ``resolve_accepted``.
-                self.ledger.outbox_accepted(row["id"], sent_id.ref)
+                self.ledger.outbox_accepted(row["id"], sent_id.ref, now=fmt_utc(self.clock()))
                 log.info(
                     "ops post outbox=%s kind=%s accepted by the gateway as ref %s",
                     row["id"],
@@ -878,6 +878,8 @@ class Worker:
         and never re-send it. A lookup that errors is tried again next cycle.
         """
         for row in self.ledger.accepted_outbox():
+            # Least recently polled first: a full batch of stuck rows cannot starve newer ones.
+            self.ledger.mark_polled(row["id"])
             try:
                 status = await self.telegram.notify_status(row["gateway_ref"])
             except Exception as exc:
@@ -887,6 +889,7 @@ class Worker:
                     row["gateway_ref"],
                     type(exc).__name__,
                 )
+                self._warn_if_stuck(row)
                 continue
             if status.state == "sent" and status.telegram_message_id is not None:
                 self.stuck_warned.discard(row["id"])
@@ -931,7 +934,10 @@ class Worker:
         """Warn once per row (per process) that the gateway still has not sent it."""
         if row["id"] in self.stuck_warned:
             return
-        queued_at = datetime.strptime(row["created_at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+        # Counted from gateway acceptance; rows accepted before ``accepted_at`` existed fall
+        # back to when they were queued.
+        since = row.get("accepted_at") or row["created_at"]
+        queued_at = datetime.strptime(since, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
         age = self.clock() - queued_at
         if age >= STUCK_AFTER:
             self.stuck_warned.add(row["id"])

@@ -374,6 +374,14 @@ MIGRATION_10_GATEWAY_ROWS = (
 
 MIGRATION_10 = _migration_10
 
+# Gateway polling (#121): ``accepted_at`` is when the gateway accepted the post (the stuck
+# clock starts there, not at ``created_at``); ``poll_seq`` ranks rows by how recently the
+# resolver last asked about them, so a full batch cannot starve newer accepted rows.
+MIGRATION_11 = [
+    "ALTER TABLE outbox ADD COLUMN accepted_at TEXT",
+    "ALTER TABLE outbox ADD COLUMN poll_seq INTEGER",
+]
+
 Migration = list[str] | Callable[[sqlite3.Connection], None]
 
 # Keyed by number and applied in ascending order of the numbers not yet recorded.
@@ -388,6 +396,7 @@ MIGRATIONS: dict[int, Migration] = {
     8: MIGRATION_8,
     9: MIGRATION_9,
     10: MIGRATION_10,
+    11: MIGRATION_11,
 }
 
 # Migrations that rebuild a referenced table run with foreign-key enforcement off.
