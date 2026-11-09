@@ -11,6 +11,27 @@ slice) proves the ledger, the commit-before-offset ordering, and the Notion
 adapter's shape; DeepSeek classification and credential masking are in. Resolution,
 verification, reliability, and Deliverable matching arrive in later tickets.
 
+## This repo is public
+
+Anyone can read this repository and its full history. Never commit:
+
+- `.env` or any real secret: the Telegram bot token, the Notion API key, the
+  DeepSeek or OpenRouter keys, gateway secrets
+- `config.yaml` (it holds the real chat, topic and Notion ids; only
+  `config.example.yaml` is tracked)
+- `data/`, `*.db` or any SQLite file (the ledger holds raw JO text, including
+  transfer passwords before masking)
+- raw Telegram exports or unredacted JOs (the old `old_files/sample-corpus.md`
+  stays local and ignored)
+- real client, show or person names, in code, tests, fixtures, prompts or docs
+
+`.gitignore` covers the files above, and the **Public repo safety** workflow
+(from t6-core, `.github/workflows/public-repo-safety.yml`) fails any push or pull
+request that adds a secret, one of those paths or a name from the
+`T6_NAMES_DENYLIST` Actions secret. Run it by hand (Actions > Public repo safety >
+Run workflow) for a full-history secret scan. If a secret ever lands in a commit,
+rotate it; deleting the commit is not enough.
+
 ## Layout
 
 ```

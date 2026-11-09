@@ -5,10 +5,14 @@ __pycache__/
 venv/
 data/
 .env
+.env.*
+!.env.example
 config.yaml
 *.db
 *.db-wal
 *.db-shm
+*.sqlite
+*.sqlite3
 .pytest_cache/
 .ruff_cache/
 .worktrees/
