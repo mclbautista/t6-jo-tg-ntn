@@ -8,6 +8,7 @@ maps an aiogram ``Update`` into.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Literal, Protocol, runtime_checkable
 
 from pydantic import BaseModel
@@ -29,6 +30,26 @@ class IncomingUpdate(BaseModel):
     # ``edit_date`` is Telegram's unix time of the edit.
     edited: bool = False
     edit_date: int | None = None
+
+
+@dataclass(frozen=True)
+class GatewayRef:
+    """What ``send_message`` returns when the post is only queued (gateway mode, #109).
+
+    A ref is the gateway's queue handle, not a Telegram message id: the worker stores it
+    in its own column and waits for the gateway to report the real id. A client that
+    returns a plain ``int`` has posted straight to Telegram and returned the real id.
+    """
+
+    ref: int
+
+
+@dataclass(frozen=True)
+class NotifyStatus:
+    """The gateway's answer for one ref: ``queued`` or ``sent`` (with the real id)."""
+
+    state: str
+    telegram_message_id: int | None = None
 
 
 class PageRef(BaseModel):
@@ -68,7 +89,8 @@ class TelegramClient(Protocol):
         """Post Telegram-HTML ``text`` to a forum topic; return the new message id.
 
         A client that sets ``accepts_idempotency_key`` (the gateway client, #95) also
-        takes ``idempotency_key=`` and returns the gateway's ``message_ref`` instead.
+        takes ``idempotency_key=`` and returns a ``GatewayRef`` (the gateway's
+        ``message_ref``, not a Telegram id) and offers ``notify_status(ref)``.
         """
         ...
 

@@ -197,8 +197,11 @@ unchanged.
   (that is, `next_offset - 1`).
 - An ops post carries `idempotency_key = watchdog-outbox-<outbox row id>`. A
   retry of the same row reuses the key, so the gateway queues it once. The
-  outbox stores the returned `message_ref` where it stored the Telegram message
-  id.
+  outbox keeps the returned `message_ref` in `gateway_ref` and the row becomes
+  `accepted`: a ref is not a Telegram message id. Each cycle asks
+  `GET /notify/{ref}` for up to 20 accepted rows; once the gateway reports the
+  post `sent`, the real Telegram id is stored and the row becomes `sent`. Only
+  `sent` rows with a real id feed the next heartbeat's "Previous heartbeat" link.
 - `in_scope` still filters intake as a safety net.
 
 **Cutover (once).** The cursor moves from Telegram update ids to gateway

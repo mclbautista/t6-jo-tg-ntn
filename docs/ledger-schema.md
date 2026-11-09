@@ -172,11 +172,13 @@ Telegram accepts a post but before the row is marked `sent` re-posts it.
 | chat_id             | INTEGER | ops chat id                                            |
 | topic_id            | INTEGER | ops forum topic id                                     |
 | text                | TEXT    | rendered Telegram HTML; every source field masked      |
-| state               | TEXT    | `pending` \| `sent` \| `failed`                         |
+| state               | TEXT    | `pending` \| `accepted` \| `sent` \| `failed`                       |
 | attempts            | INTEGER | send attempts so far (default 0)                       |
 | next_attempt_at     | TEXT    | ISO-8601 UTC; null = due now                           |
 | last_error          | TEXT    | masked error of the last failed attempt                |
-| telegram_message_id | INTEGER | id of the posted ops message once `sent`               |
+| telegram_message_id | INTEGER | real Telegram id of the posted ops message once `sent` |
+| gateway_ref | INTEGER | gateway queue ref (gateway mode), set when `accepted`; never a Telegram id |
+| telegram_id_verified | INTEGER | 1 when `telegram_message_id` is a confirmed real id; rows from before migration 10 are 0 |
 | created_at          | TEXT    | ISO-8601 UTC                                           |
 | sent_at             | TEXT    | ISO-8601 UTC                                           |
 

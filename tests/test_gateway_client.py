@@ -5,7 +5,7 @@ import unittest
 import httpx
 
 from jo_watchdog.adapters.gateway import GatewayTelegramClient
-from jo_watchdog.adapters.protocols import TelegramClient
+from jo_watchdog.adapters.protocols import GatewayRef, TelegramClient
 from tests.fake_gateway import SECRET, FakeGateway
 
 URL = "http://gateway.test:8780"
@@ -89,7 +89,7 @@ class SendTests(unittest.IsolatedAsyncioTestCase):
         ref = await client(gateway).send_message(
             -100999, 7, "<b>hi</b>", idempotency_key="watchdog-outbox-3"
         )
-        self.assertEqual(ref, 5530)
+        self.assertEqual(ref, GatewayRef(5530))
         self.assertEqual(
             gateway.notifications,
             [

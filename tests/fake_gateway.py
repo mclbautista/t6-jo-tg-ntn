@@ -1,7 +1,8 @@
 """An in-memory Sixto gateway (spec section 7), served through ``httpx.MockTransport``.
 
 Only the module API the watchdog uses: ``GET /updates``, ``POST /notify`` and
-``POST /react``, all behind a bearer secret. ``/notify`` is idempotent on
+``POST /react`` and ``GET /notify/{ref}`` (status), all behind a bearer
+secret. ``/notify`` is idempotent on
 ``idempotency_key`` like the real gateway.
 """
 
@@ -23,6 +24,9 @@ class FakeGateway:
         self.requests: list[httpx.Request] = []
         self.fail_next = 0  # answer 503 to this many requests
         self._refs: dict[str, int] = {}
+        # ref -> (state, telegram id); unlisted refs answer ``default_status``.
+        self.statuses: dict[int, tuple[str, int | None]] = {}
+        self.default_status: tuple[str, int | None] = ("queued", None)
         self._next_ref = 5530
 
     def post(self, chat: int, topic: int | None, message_id: int, text: str, **extra) -> dict:
@@ -48,6 +52,10 @@ class FakeGateway:
         self.items.append(item)
         return item
 
+    def set_status(self, ref: int, state: str, telegram_message_id: int | None = None) -> None:
+        """Choose what ``GET /notify/{ref}`` answers: ``queued`` or ``sent`` with a real id."""
+        self.statuses[ref] = (state, telegram_message_id)
+
     def transport(self) -> httpx.MockTransport:
         return httpx.MockTransport(self._handle)
 
@@ -63,6 +71,15 @@ class FakeGateway:
             after = int(request.url.params["after"])
             items = [i for i in self.items if i["seq"] > after][:100]
             return httpx.Response(200, json={"items": items})
+        if request.method == "GET" and path.startswith("/notify/"):
+            ref = int(path.rsplit("/", 1)[1])
+            if ref >= self._next_ref:
+                return httpx.Response(404, json={"detail": "unknown ref"})
+            state, telegram_id = self.statuses.get(ref, self.default_status)
+            payload = {"message_ref": ref, "state": state}
+            if state == "sent":
+                payload["telegram_message_id"] = telegram_id if telegram_id else ref + 1000
+            return httpx.Response(200, json=payload)
         body = json.loads(request.content or b"{}")
         if request.method == "POST" and path == "/notify":
             key = body.get("idempotency_key")

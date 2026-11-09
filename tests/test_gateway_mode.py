@@ -137,7 +137,7 @@ class WorkerOverGatewayTests(unittest.IsolatedAsyncioTestCase):
         await rig.worker.poll_once()
         self.assertFalse(rig.ledger.has_message("-100777:1"))
 
-    async def test_ops_post_goes_through_notify_and_stores_the_message_ref(self):
+    async def test_ops_post_goes_through_notify_and_is_accepted_with_its_ref_only(self):
         rig = Rig(self)
         outbox_id = rig.ledger.enqueue_system(OutboxMessage("stale_cache", -100999, 7, "stale"))
         await rig.worker.deliver_outbox()
@@ -145,17 +145,19 @@ class WorkerOverGatewayTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(posted["idempotency_key"], f"watchdog-outbox-{outbox_id}")
         self.assertEqual((posted["to"], posted["topic"]), (-100999, 7))
         (row,) = [r for r in rig.ledger._conn.execute("SELECT * FROM outbox")]
-        self.assertEqual(row["state"], "sent")
-        self.assertEqual(row["telegram_message_id"], 5530)
+        # The ref is not a Telegram id: the row waits for the gateway to report the real one.
+        self.assertEqual(row["state"], "accepted")
+        self.assertEqual(row["gateway_ref"], 5530)
+        self.assertIsNone(row["telegram_message_id"])
 
     async def test_a_retried_ops_post_reuses_its_key_so_the_gateway_queues_once(self):
         rig = Rig(self)
         rig.ledger.enqueue_system(OutboxMessage("stale_cache", -100999, 7, "stale"))
         # The gateway accepted the post but the answer was lost: the row stays pending.
-        real = rig.ledger.outbox_sent
-        rig.ledger.outbox_sent = lambda *a, **k: None
+        real = rig.ledger.outbox_accepted
+        rig.ledger.outbox_accepted = lambda *a, **k: None
         await rig.worker.deliver_outbox()
-        rig.ledger.outbox_sent = real
+        rig.ledger.outbox_accepted = real
         await rig.worker.deliver_outbox()
         self.assertEqual(len(rig.gateway.notifications), 1)
         self.assertEqual(len(rig.gateway.requests), 2)

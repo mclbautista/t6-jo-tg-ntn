@@ -20,6 +20,7 @@ from jo_watchdog.adapters.protocols import (
     Classifier,
     DeliverableMatcher,
     DeliverableSource,
+    GatewayRef,
     NotionClient,
     PageRef,
     TelegramClient,
@@ -70,6 +71,9 @@ from jo_watchdog.ledger.db import Ledger, OutboxMessage, fmt_utc, telegram_key
 from jo_watchdog.ledger.states import State
 
 log = logging.getLogger("jo_watchdog.worker")
+
+# Queued ops posts looked up per cycle.
+_RESOLVE_BATCH = 20
 
 # A failed reaction is retried inline after these delays, then counted.
 REACTION_RETRY_SECONDS = (2, 5)
@@ -845,6 +849,16 @@ class Worker:
                     state,
                 )
                 continue
+            if isinstance(sent_id, GatewayRef):
+                # Queued, not delivered: the real Telegram id arrives via ``resolve_accepted``.
+                self.ledger.outbox_accepted(row["id"], sent_id.ref)
+                log.info(
+                    "ops post outbox=%s kind=%s accepted by the gateway as ref %s",
+                    row["id"],
+                    row["kind"],
+                    sent_id.ref,
+                )
+                continue
             self.ledger.outbox_sent(row["id"], sent_id)
             log.info(
                 "ops post outbox=%s kind=%s sent as telegram message %s",
@@ -852,6 +866,31 @@ class Worker:
                 row["kind"],
                 sent_id,
             )
+
+    async def resolve_accepted(self) -> None:
+        """Ask the gateway which Telegram message each queued post became (a bounded batch)."""
+        lookup = getattr(self.telegram, "notify_status", None)
+        if lookup is None:
+            return
+        for row in self.ledger.accepted_outbox(limit=_RESOLVE_BATCH):
+            try:
+                status = await lookup(row["gateway_ref"])
+            except Exception as exc:
+                log.warning(
+                    "could not resolve outbox=%s ref=%s (%s)",
+                    row["id"],
+                    row["gateway_ref"],
+                    type(exc).__name__,
+                )
+                continue
+            if status.state == "sent" and status.telegram_message_id is not None:
+                self.ledger.outbox_resolved(row["id"], status.telegram_message_id)
+                log.info(
+                    "ops post outbox=%s ref=%s sent as telegram message %s",
+                    row["id"],
+                    row["gateway_ref"],
+                    status.telegram_message_id,
+                )
 
     # -- loop --------------------------------------------------------------
 
@@ -947,6 +986,11 @@ class Worker:
             self._beat()
             await self.drain_once()
         finally:
+            try:
+                # Resolve first, so this heartbeat can link a just-confirmed predecessor.
+                await self.resolve_accepted()
+            except Exception:
+                log.exception("could not resolve queued ops posts")
             try:
                 self.enqueue_heartbeat_if_due()
             except Exception:

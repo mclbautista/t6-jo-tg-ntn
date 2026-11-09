@@ -333,6 +333,50 @@ def _migration_9(conn: sqlite3.Connection) -> None:
 
 MIGRATION_9 = _migration_9
 
+def _migration_10(conn: sqlite3.Connection) -> None:
+    """Gateway ref beside the Telegram id, and the ``accepted`` outbox state (#109).
+
+    ``accepted`` means the gateway queued the post and its real Telegram id is not yet
+    known. ``telegram_id_verified`` is 1 only where ``telegram_message_id`` is a real id.
+    Rows stored before this release may hold a gateway ref in ``telegram_message_id`` (the
+    ledger cannot tell which), so they are marked 0 and never feed a backlink; the backfill
+    reconciles them. SQLite cannot alter a CHECK, so the table is rebuilt; the caller runs
+    this with foreign keys off.
+    """
+    conn.execute(
+        """
+        CREATE TABLE outbox_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message_id INTEGER REFERENCES messages(id),
+            kind TEXT NOT NULL,
+            chat_id INTEGER NOT NULL,
+            topic_id INTEGER NOT NULL,
+            text TEXT NOT NULL,
+            state TEXT NOT NULL CHECK (state IN ('pending', 'accepted', 'sent', 'failed')),
+            attempts INTEGER NOT NULL DEFAULT 0,
+            next_attempt_at TEXT,
+            last_error TEXT,
+            telegram_message_id INTEGER,
+            created_at TEXT NOT NULL,
+            sent_at TEXT,
+            gateway_ref INTEGER,
+            telegram_id_verified INTEGER NOT NULL DEFAULT 0
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO outbox_new (id, message_id, kind, chat_id, topic_id, text, state, attempts,"
+        " next_attempt_at, last_error, telegram_message_id, created_at, sent_at)"
+        " SELECT id, message_id, kind, chat_id, topic_id, text, state, attempts,"
+        " next_attempt_at, last_error, telegram_message_id, created_at, sent_at FROM outbox"
+    )
+    conn.execute("DROP TABLE outbox")
+    conn.execute("ALTER TABLE outbox_new RENAME TO outbox")
+    conn.execute("CREATE INDEX outbox_state_next_attempt ON outbox (state, next_attempt_at)")
+
+
+MIGRATION_10 = _migration_10
+
 Migration = list[str] | Callable[[sqlite3.Connection], None]
 
 # Keyed by number and applied in ascending order of the numbers not yet recorded.
@@ -346,7 +390,8 @@ MIGRATIONS: dict[int, Migration] = {
     7: MIGRATION_7,
     8: MIGRATION_8,
     9: MIGRATION_9,
+    10: MIGRATION_10,
 }
 
 # Migrations that rebuild a referenced table run with foreign-key enforcement off.
-REBUILDS_TABLES: frozenset[int] = frozenset({3})
+REBUILDS_TABLES: frozenset[int] = frozenset({3, 10})

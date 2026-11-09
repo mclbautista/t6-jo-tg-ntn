@@ -672,6 +672,7 @@ class Ledger:
             "SELECT h.window_end, o.chat_id, o.topic_id, o.telegram_message_id"
             " FROM heartbeats h JOIN outbox o ON o.id = h.outbox_id"
             " WHERE h.window_start < ? AND o.state = 'sent' AND o.telegram_message_id IS NOT NULL"
+            " AND o.telegram_id_verified = 1"
             " ORDER BY h.window_start DESC LIMIT 1",
             (fmt_utc(window_start),),
         ).fetchone()
@@ -1069,8 +1070,31 @@ class Ledger:
     def outbox_sent(self, outbox_id: int, telegram_message_id: int | None) -> None:
         self._conn.execute(
             "UPDATE outbox SET state = 'sent', attempts = attempts + 1,"
-            " telegram_message_id = ?, sent_at = ?, last_error = NULL"
+            " telegram_message_id = ?, telegram_id_verified = 1, sent_at = ?, last_error = NULL"
             " WHERE id = ? AND state = 'pending'",
+            (telegram_message_id, _now(), outbox_id),
+        )
+
+    def outbox_accepted(self, outbox_id: int, gateway_ref: int) -> None:
+        """The gateway queued the post: keep its ref; the real Telegram id comes later."""
+        self._conn.execute(
+            "UPDATE outbox SET state = 'accepted', attempts = attempts + 1,"
+            " gateway_ref = ?, last_error = NULL WHERE id = ? AND state = 'pending'",
+            (gateway_ref, outbox_id),
+        )
+
+    def accepted_outbox(self, *, limit: int = 20) -> list[dict]:
+        """Rows queued at the gateway whose real Telegram id is still unknown, oldest first."""
+        rows = self._conn.execute(
+            "SELECT * FROM outbox WHERE state = 'accepted' ORDER BY id LIMIT ?", (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def outbox_resolved(self, outbox_id: int, telegram_message_id: int) -> None:
+        """The gateway reported the real Telegram id for an accepted row."""
+        self._conn.execute(
+            "UPDATE outbox SET state = 'sent', telegram_message_id = ?,"
+            " telegram_id_verified = 1, sent_at = ? WHERE id = ? AND state = 'accepted'",
             (telegram_message_id, _now(), outbox_id),
         )
 

@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 from jo_watchdog.ledger.db import Ledger
-from jo_watchdog.ledger.migrations import MIGRATION_1, MIGRATION_2, MIGRATIONS
+from jo_watchdog.ledger.migrations import MIGRATION_1, MIGRATION_2, MIGRATION_5, MIGRATIONS
 from jo_watchdog.ledger.states import State
 
 
@@ -294,12 +294,10 @@ class Migration3Tests(unittest.TestCase):
         self.conn.execute("ALTER TABLE messages ADD COLUMN findings_json TEXT")
         self.conn.execute("ALTER TABLE messages ADD COLUMN reaction_state TEXT DEFAULT 'pending'")
         self.conn.execute("CREATE INDEX messages_state ON messages (state)")
-        self.conn.execute(
-            "CREATE TABLE outbox (id INTEGER PRIMARY KEY,"
-            " message_id INTEGER REFERENCES messages(id), text TEXT)"
-        )
+        self.conn.execute(MIGRATION_5[0])  # the real outbox, as a later migration made it
         self.conn.execute("UPDATE messages SET findings_json = '[]'")
-        self.conn.execute("INSERT INTO outbox (message_id, text) VALUES (1, 'hi')")
+        self.conn.execute("INSERT INTO outbox (message_id, kind, chat_id, topic_id, text, state, created_at)"
+            " VALUES (1, 'stale_cache', -1, 1, 'hi', 'pending', 't')")
         self.conn.execute("INSERT INTO schema_version VALUES (5, 't')")
         self.conn.commit()
 
