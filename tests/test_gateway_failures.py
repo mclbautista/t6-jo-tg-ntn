@@ -69,7 +69,7 @@ class FailedPostTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("heartbeat was not delivered", alert["text"])
         self.assertIn(rig.gateway.notify_error, alert["text"])
 
-    async def test_the_alert_is_queued_once_even_after_a_restart(self):
+    async def test_the_alert_is_queued_once_across_later_cycles(self):
         rig = Failing(self)
         await rig.worker.run_once()
         rig.gateway.set_notify_state(FIRST_REF, "unknown")
