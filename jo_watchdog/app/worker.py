@@ -20,6 +20,7 @@ from jo_watchdog.adapters.protocols import (
     Classifier,
     DeliverableMatcher,
     DeliverableSource,
+    GatewayRef,
     NotionClient,
     PageRef,
     TelegramClient,
@@ -845,6 +846,16 @@ class Worker:
                     state,
                 )
                 continue
+            if isinstance(sent_id, GatewayRef):
+                # Queued at the gateway: the real Telegram ID comes from ``resolve_accepted``.
+                self.ledger.outbox_accepted(row["id"], sent_id.ref)
+                log.info(
+                    "ops post outbox=%s kind=%s accepted by the gateway as ref %s",
+                    row["id"],
+                    row["kind"],
+                    sent_id.ref,
+                )
+                continue
             self.ledger.outbox_sent(row["id"], sent_id)
             log.info(
                 "ops post outbox=%s kind=%s sent as telegram message %s",
@@ -852,6 +863,32 @@ class Worker:
                 row["kind"],
                 sent_id,
             )
+
+    async def resolve_accepted(self) -> None:
+        """Ask the gateway which Telegram message each queued post became (#109).
+
+        A ``sent`` answer stores the real ID; ``queued`` leaves the row for a later cycle.
+        A lookup that errors is skipped here and tried again next cycle.
+        """
+        for row in self.ledger.accepted_outbox():
+            try:
+                status = await self.telegram.notify_status(row["gateway_ref"])
+            except Exception as exc:
+                log.warning(
+                    "could not resolve outbox=%s gateway ref %s (%s)",
+                    row["id"],
+                    row["gateway_ref"],
+                    type(exc).__name__,
+                )
+                continue
+            if status.state == "sent" and status.telegram_message_id is not None:
+                self.ledger.outbox_resolved(row["id"], status.telegram_message_id)
+                log.info(
+                    "ops post outbox=%s kind=%s sent as telegram message %s",
+                    row["id"],
+                    row["kind"],
+                    status.telegram_message_id,
+                )
 
     # -- loop --------------------------------------------------------------
 
@@ -947,6 +984,10 @@ class Worker:
             self._beat()
             await self.drain_once()
         finally:
+            try:
+                await self.resolve_accepted()
+            except Exception:
+                log.exception("could not resolve accepted ops posts")
             try:
                 self.enqueue_heartbeat_if_due()
             except Exception:

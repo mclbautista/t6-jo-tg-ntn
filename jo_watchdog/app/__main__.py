@@ -68,7 +68,7 @@ async def run(config_path: str) -> None:
     if missing:
         raise RuntimeError(f"missing secrets in the environment: {', '.join(missing)}")
     configure_logging(log_path=Path(config.ledger_path).with_name("jo-watchdog.jsonl"))
-    ledger = Ledger(config.ledger_path)
+    ledger = Ledger(config.ledger_path, gateway_mode=config.telegram_mode == "gateway")
 
     adapters = build_adapters(config)
     worker = build_worker(config, ledger, adapters)
@@ -84,7 +84,7 @@ def run_reset_offset(config_path: str, to: int) -> int:
     """Set the polling offset (once, at the gateway cutover); run with the watchdog stopped."""
     config = load_config(config_path)
     configure_logging(log_path=Path(config.ledger_path).with_name("jo-watchdog.jsonl"))
-    ledger = Ledger(config.ledger_path)
+    ledger = Ledger(config.ledger_path, gateway_mode=config.telegram_mode == "gateway")
     try:
         previous = ledger.reset_offset(to)
     finally:
@@ -114,7 +114,7 @@ def run_retry(config_path: str, telegram_key: str | None, all_exhausted: bool) -
         return 2
     config = load_config(config_path)
     configure_logging(log_path=Path(config.ledger_path).with_name("jo-watchdog.jsonl"))
-    ledger = Ledger(config.ledger_path)
+    ledger = Ledger(config.ledger_path, gateway_mode=config.telegram_mode == "gateway")
     try:
         now = datetime.now(UTC)
         if all_exhausted:
@@ -189,7 +189,7 @@ def run_ingest(config_path: str, args) -> int:
     if problem:
         print(f"ingest: not an intake message: {problem}", file=sys.stderr)
         return 2
-    ledger = Ledger(config.ledger_path)
+    ledger = Ledger(config.ledger_path, gateway_mode=config.telegram_mode == "gateway")
     try:
         try:
             key = ledger.ingest_message(

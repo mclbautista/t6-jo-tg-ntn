@@ -27,7 +27,11 @@ from typing import NamedTuple
 from jo_watchdog.core.duplicates import text_sha256
 from jo_watchdog.core.masker import outbound_text
 from jo_watchdog.core.plan import build_plan
-from jo_watchdog.ledger.migrations import MIGRATIONS, REBUILDS_TABLES
+from jo_watchdog.ledger.migrations import (
+    MIGRATION_10_GATEWAY_ROWS,
+    MIGRATIONS,
+    REBUILDS_TABLES,
+)
 from jo_watchdog.ledger.states import State, can_transition
 
 CACHE_SNAPSHOTS_KEPT = 10
@@ -101,7 +105,15 @@ def _forward_origin_type(raw_source: str) -> str | None:
 class Ledger:
     """A single connection to the ledger database."""
 
-    def __init__(self, path: str | Path, *, apply_migrations: bool = True):
+    def __init__(
+        self,
+        path: str | Path,
+        *,
+        apply_migrations: bool = True,
+        gateway_mode: bool = False,
+    ):
+        # Only a gateway-mode ledger holds gateway refs in ``telegram_message_id`` (#109).
+        self._gateway_mode = gateway_mode
         db_path = Path(path)
         db_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         try:
@@ -154,6 +166,8 @@ class Ledger:
                     else:
                         for statement in migration:
                             self._conn.execute(statement)
+                    if version == 10 and self._gateway_mode:
+                        self._conn.execute(MIGRATION_10_GATEWAY_ROWS)
                     if rebuild and self._conn.execute("PRAGMA foreign_key_check").fetchone():
                         raise sqlite3.IntegrityError(
                             f"migration {version} left dangling foreign keys"
@@ -1071,6 +1085,30 @@ class Ledger:
             "UPDATE outbox SET state = 'sent', attempts = attempts + 1,"
             " telegram_message_id = ?, sent_at = ?, last_error = NULL"
             " WHERE id = ? AND state = 'pending'",
+            (telegram_message_id, _now(), outbox_id),
+        )
+
+    def outbox_accepted(self, outbox_id: int, gateway_ref: int) -> None:
+        """The gateway queued the post; its real Telegram message ID is not known yet."""
+        self._conn.execute(
+            "UPDATE outbox SET state = 'accepted', attempts = attempts + 1,"
+            " gateway_ref = ?, last_error = NULL"
+            " WHERE id = ? AND state = 'pending'",
+            (gateway_ref, outbox_id),
+        )
+
+    def accepted_outbox(self, *, limit: int = 20) -> list[dict]:
+        """Rows the gateway queued whose real Telegram ID is unresolved, oldest first."""
+        rows = self._conn.execute(
+            "SELECT * FROM outbox WHERE state = 'accepted' ORDER BY id LIMIT ?", (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def outbox_resolved(self, outbox_id: int, telegram_message_id: int) -> None:
+        """The gateway reported the post sent: store the real Telegram message ID."""
+        self._conn.execute(
+            "UPDATE outbox SET state = 'sent', telegram_message_id = ?, sent_at = ?"
+            " WHERE id = ? AND state = 'accepted'",
             (telegram_message_id, _now(), outbox_id),
         )
 
