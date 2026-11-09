@@ -4,7 +4,7 @@
     "note": "Response synthesized in the documented OpenRouter Decisions API format (#26); no live Jev capture yet. Replace the response with a live capture during the #27 smoke run.",
     "source_note": "Reconstructed from the Notion row 'MG - TOC - JO #32'; the original Telegram text is not in the redacted corpus.",
     "why": "The link rests on coordinator knowledge (London FF library screener), not on words in the text, so the safe outcome is a hint, never a wrong-confidence link.",
-    "source_text": "MG - TOC - JO #32\nSeptember 11 / Friday\n\nTitle: Moonglow FTR\nTask: Export no watermark with English subtitle QuickTime .MOV file in H264 codec\nPurpose: For London FF video library\nSource Drive: Moonglow on the NAS\nWatermark: None\nSubtitle: English\nMode of Transfer: Fromsmash\nLink Settings: with password, 15 day expiry\nDeadline: September 15, 5am\nAssigned: Jade\ncc: @leizette",
+    "source_text": "MG - TOC - JO #32\nSeptember 11 / Friday\n\nTitle: Moonglow FTR\nTask: Export no watermark with English subtitle QuickTime .MOV file in H264 codec\nPurpose: For London FF video library\nSource Drive: Moonglow on the NAS\nWatermark: None\nSubtitle: English\nMode of Transfer: Fromsmash\nLink Settings: with password, 15 day expiry\nDeadline: September 15, 5am\nAssigned: Mira\ncc: @priya",
     "project": {
       "page_id": "eecb1f05-358e-4999-8e45-347530be07fd",
       "name": "Moonglow"
@@ -19,7 +19,7 @@
       "model": "~typesafe/jev-latest",
       "state": {
         "project": "Moonglow",
-        "job_order": "MG - TOC - JO #32\nSeptember 11 / Friday\n\nTitle: Moonglow FTR\nTask: Export no watermark with English subtitle QuickTime .MOV file in H264 codec\nPurpose: For London FF video library\nSource Drive: Moonglow on the NAS\nWatermark: None\nSubtitle: English\nMode of Transfer: Fromsmash\nLink Settings: with password, 15 day expiry\nDeadline: September 15, 5am\nAssigned: Jade\ncc: @leizette"
+        "job_order": "MG - TOC - JO #32\nSeptember 11 / Friday\n\nTitle: Moonglow FTR\nTask: Export no watermark with English subtitle QuickTime .MOV file in H264 codec\nPurpose: For London FF video library\nSource Drive: Moonglow on the NAS\nWatermark: None\nSubtitle: English\nMode of Transfer: Fromsmash\nLink Settings: with password, 15 day expiry\nDeadline: September 15, 5am\nAssigned: Mira\ncc: @priya"
       },
       "questions": {
         "c0": {
@@ -67,7 +67,7 @@
     "note": "Response synthesized in the documented OpenRouter Decisions API format (#26); no live Jev capture yet. Replace the response with a live capture during the #27 smoke run.",
     "source_note": "Reconstructed from the Notion row 'SOMSOM - TOC - #0155'; the original Telegram text is not in the redacted corpus.",
     "why": "The text names wk11 VFX directly.",
-    "source_text": "SOMSOM - TOC - #0155\nSeptember 11 / Friday\n\nTitle: Someone Someday\nTask: Download the following mats & copy to ate hdd\n- wk10 d5 patch and rev vfx\n- wk11d1 vfx\nPurpose: For grading\nSource: Lucid (attached ss)\nTransfer: lucid to color grading 4 and ate lara hdd\nDeadline: September 11, 3:30pm\nAssigned to: @raedsss\ncc: @leizette",
+    "source_text": "SOMSOM - TOC - #0155\nSeptember 11 / Friday\n\nTitle: Show Hotel\nTask: Download the following mats & copy to ate hdd\n- wk10 d5 patch and rev vfx\n- wk11d1 vfx\nPurpose: For grading\nSource: Lucid (attached ss)\nTransfer: lucid to color grading 4 and ate lara hdd\nDeadline: September 11, 3:30pm\nAssigned to: @user_two\ncc: @priya",
     "project": {
       "page_id": "1f4fb4d5-9e59-80bd-85e2-e7ad544bd933",
       "name": "Someone, Someday"
@@ -75,19 +75,19 @@
     "candidates": [
       {
         "page_id": "3dafb4d5-9e59-8059-8a70-c05720b5306b",
-        "name": "Someone Someday WK11 VFX"
+        "name": "Show Hotel WK11 VFX"
       }
     ],
     "expected_request": {
       "model": "~typesafe/jev-latest",
       "state": {
         "project": "Someone, Someday",
-        "job_order": "SOMSOM - TOC - #0155\nSeptember 11 / Friday\n\nTitle: Someone Someday\nTask: Download the following mats & copy to ate hdd\n- wk10 d5 patch and rev vfx\n- wk11d1 vfx\nPurpose: For grading\nSource: Lucid (attached ss)\nTransfer: lucid to color grading 4 and ate lara hdd\nDeadline: September 11, 3:30pm\nAssigned to: @raedsss\ncc: @leizette"
+        "job_order": "SOMSOM - TOC - #0155\nSeptember 11 / Friday\n\nTitle: Show Hotel\nTask: Download the following mats & copy to ate hdd\n- wk10 d5 patch and rev vfx\n- wk11d1 vfx\nPurpose: For grading\nSource: Lucid (attached ss)\nTransfer: lucid to color grading 4 and ate lara hdd\nDeadline: September 11, 3:30pm\nAssigned to: @user_two\ncc: @priya"
       },
       "questions": {
         "c0": {
           "type": "choice",
-          "instructions": "Does this Job Order belong to the Deliverable 'Someone Someday WK11 VFX'?",
+          "instructions": "Does this Job Order belong to the Deliverable 'Show Hotel WK11 VFX'?",
           "criteria": {
             "match": "The Job Order is clearly work for this Deliverable.",
             "maybe": "The Job Order could be for this Deliverable, but the text doesn't make it clear.",
@@ -130,7 +130,7 @@
     "note": "Response synthesized in the documented OpenRouter Decisions API format (#26); no live Jev capture yet. Replace the response with a live capture during the #27 smoke run.",
     "source_note": "Verbatim from tests/fixtures/redacted_corpus.json.",
     "why": "A full-film screener upload for Mag-iina is the FTR screener Deliverable.",
-    "source_text": "JO CODE: INA-TOC-30\nDate / Day: Sep 10 / Thu\n\nTitle: Mag-iina\nTask/s: Upload screener to fio\nPurpose: For screener\nWatermark: Embedded na sa export\nSubtitle: Embedded na sa export\nMode of Transfer: Frameio\nLink Settings: DL w pw\nSource Material: T6\nNotes: \n\nStatus:\nPending: \nProject File: \nLocpath: '/Volumes/MAG-IINA ONLINE 01/MAG IINA ONLINE/02_EXPORTS /FULL FILM/H264/WITH VIOLATOR/FOR ACFM/INA_FTR_MP4 STEREO_20260909_FOR ACFM.mp4'\n\nDeadline: Sep 10 / Thu\nAssigned to: Jade Majo \ncc: @leizette",
+    "source_text": "JO CODE: INA-TOC-30\nDate / Day: Sep 10 / Thu\n\nTitle: Mag-iina\nTask/s: Upload screener to fio\nPurpose: For screener\nWatermark: Embedded na sa export\nSubtitle: Embedded na sa export\nMode of Transfer: Frameio\nLink Settings: DL w pw\nSource Material: T6\nNotes: \n\nStatus:\nPending: \nProject File: \nLocpath: '/Volumes/MAG-IINA ONLINE 01/MAG IINA ONLINE/02_EXPORTS /FULL FILM/H264/WITH VIOLATOR/FOR ACFM/INA_FTR_MP4 STEREO_20260909_FOR ACFM.mp4'\n\nDeadline: Sep 10 / Thu\nAssigned to: Mira Lena \ncc: @priya",
     "project": {
       "page_id": "2fbfb4d5-9e59-80a4-8bd2-dee405efe576",
       "name": "Mag-Iina"
@@ -145,7 +145,7 @@
       "model": "~typesafe/jev-latest",
       "state": {
         "project": "Mag-Iina",
-        "job_order": "JO CODE: INA-TOC-30\nDate / Day: Sep 10 / Thu\n\nTitle: Mag-iina\nTask/s: Upload screener to fio\nPurpose: For screener\nWatermark: Embedded na sa export\nSubtitle: Embedded na sa export\nMode of Transfer: Frameio\nLink Settings: DL w pw\nSource Material: T6\nNotes: \n\nStatus:\nPending: \nProject File: \nLocpath: '/Volumes/MAG-IINA ONLINE 01/MAG IINA ONLINE/02_EXPORTS /FULL FILM/H264/WITH VIOLATOR/FOR ACFM/INA_FTR_MP4 STEREO_20260909_FOR ACFM.mp4'\n\nDeadline: Sep 10 / Thu\nAssigned to: Jade Majo \ncc: @leizette"
+        "job_order": "JO CODE: INA-TOC-30\nDate / Day: Sep 10 / Thu\n\nTitle: Mag-iina\nTask/s: Upload screener to fio\nPurpose: For screener\nWatermark: Embedded na sa export\nSubtitle: Embedded na sa export\nMode of Transfer: Frameio\nLink Settings: DL w pw\nSource Material: T6\nNotes: \n\nStatus:\nPending: \nProject File: \nLocpath: '/Volumes/MAG-IINA ONLINE 01/MAG IINA ONLINE/02_EXPORTS /FULL FILM/H264/WITH VIOLATOR/FOR ACFM/INA_FTR_MP4 STEREO_20260909_FOR ACFM.mp4'\n\nDeadline: Sep 10 / Thu\nAssigned to: Mira Lena \ncc: @priya"
       },
       "questions": {
         "c0": {

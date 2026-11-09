@@ -147,16 +147,16 @@ class ReactionTests(unittest.TestCase):
 class OwnerHandleTests(unittest.TestCase):
     ATT = Attestation(
         "owner_handle", "Cyril", "2026-10-25T10:00:00+08:00",
-        "@cyril_owner and leizette_h are the real handles", "screenshot of both profiles",
+        "@cyril_owner and standing_cc_h are the real handles", "screenshot of both profiles",
     )
 
     def test_unattested_is_manual_and_names_the_handles(self):
-        result = evaluate_owner_handle("@cyril_owner", "@leizette_h", None)
+        result = evaluate_owner_handle("@cyril_owner", "@standing_cc_h", None)
         self.assertEqual(result.status, MANUAL)
         self.assertIn("@cyril_owner", result.detail)
 
     def test_an_attestation_naming_both_handles_settles_it(self):
-        result = evaluate_owner_handle("@cyril_owner", "@leizette_h", self.ATT)
+        result = evaluate_owner_handle("@cyril_owner", "@standing_cc_h", self.ATT)
         self.assertEqual(attest(result, self.ATT).status, ATTESTED)
 
     def test_an_attestation_missing_a_handle_fails(self):

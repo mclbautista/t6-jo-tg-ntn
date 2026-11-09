@@ -7,10 +7,10 @@ Redactions: every URL replaced with [LINK] and one transfer password replaced wi
 MFG - TOC - JO #74
 September 28 / Monday
 
-Title: My Father's Girlfriend FTR
+Title: Show Alpha FTR
 Task: D14-15 Upload synced dailies
 Purpose: For prod and NF review
-Source Drive: Offline Coby
+Source Drive: Offline Owen
 Watermark: Follow netflix guidelines
 Mode of Transfer: Contenthub, share thru PIX
 Link Settings: N/A
@@ -19,15 +19,15 @@ Status:
 Pending:
 Note: 
 
-Assigned: Majo 
-cc: @leizette
+Assigned: Lena 
+cc: @priya
 ```
 
 ```
 MFG - TOC - JO #74
 September 26 / Saturday
 
-Title: My Father's Girlfriend FTR
+Title: Show Alpha FTR
 Task: copy day 14-15bproxies to kuya Ben's drive 
 Purpose: For offline prep 
 Source Drive: NAS
@@ -40,7 +40,7 @@ Pending:
 Note: 
 
 Assigned: Paul   
-cc: @leizette
+cc: @priya
 ```
 
 ```
@@ -64,8 +64,8 @@ Project File:
 Locpath: 
 
 Deadline: within shift 
-Assigned to: Paul / Piolo  
-cc: @leizette
+Assigned to: Paul / Ramon  
+cc: @priya
 ```
 
 ```
@@ -91,16 +91,16 @@ Project File:
 Locpath: 
 
 Deadline: within shift if kaya
-Assigned to: ate Majo / Piolo, if abutin the next day
+Assigned to: ate Lena / Ramon, if abutin the next day
   
-cc: @leizette
+cc: @priya
 ```
 
 ```
 MFG - TOC - JO #69
 September 25 / Friday 
 
-Title: My Father's Girlfriend FTR
+Title: Show Alpha FTR
 Task: mirror kuya Ben's drive to MFG Folder sa NAS
 Purpose: for offline prep 
 Source Drive: MFG offline Ben
@@ -112,15 +112,15 @@ Status:
 Pending:
 Note: 
 
-Assigned: ate Majo    
-cc: @leizette
+Assigned: ate Lena    
+cc: @priya
 ```
 
 ```
 MP-TOC-JO01
 Sept 25 / Fri
 
-Title: Maybe in Another Universe (look test mats)
+Title: Show Lima (look test mats)
 Task/s: process prores 
 Purpose: for test grade and LUT creation
 Watermark: -
@@ -142,7 +142,7 @@ Deadline: Sept 28 / Mon / within the day
 MC7 - AE - #008
 September 25 / Friday
 
-Title: 2nd Miracle in Cell No. 7
+Title: 2nd Show Echo
 Tasks: sync day5
 Purpose: for offline 
 
@@ -156,16 +156,16 @@ Status as of 7pm:
 Pending:
 Notes: pa apply nalang here yung tinuro ni ate debs na pag sort 
 
-Assigned: @joshua0826  thank you!
+Assigned: @user_one  thank you!
 
-cc: @leizette
+cc: @priya
 ```
 
 ```
 MC7 - AE - #007
 September 25 / Friday
 
-Title: 2nd Miracle in Cell No. 7
+Title: 2nd Show Echo
 Tasks: prep the ff. for pregrade and VFX test (PRORES444, SOURCE RESO)
 Purpose: for pregrade and vfx test
 
@@ -183,16 +183,16 @@ DAY 1 - B002C002, BO02COO5
 DAY 2 - A004C011, B003CO17
 DAY 3 - B006C011
 
-Assigned: @joshua0826  thank you!
+Assigned: @user_one  thank you!
 
-cc: @leizette
+cc: @priya
 ```
 
 ```
 MP-TOC-JO22
 Sept 25 / Fri
 
-Title: Makikiraan Po (FTR v2)
+Title: Show Kilo (FTR v2)
 Task/s: MP4 4k and DCP 2k
 Purpose: for sales agent
 Watermark: -
@@ -214,7 +214,7 @@ Deadline: Sept 25 / within the day
 MFG - TOC - JO #67
 September 24 / Thursday
 
-Title: My Father's Girlfriend FTR
+Title: Show Alpha FTR
 Task: Day 14 Upload footage to MPS
 Purpose: For Archival
 Source Drive: MFG Shuttle 01
@@ -226,15 +226,15 @@ Status:
 Pending:
 Note: Ideally done na ito by Sat night for pickup sa shoot next day
 
-Assigned: Piolo  
-cc: @leizette
+Assigned: Ramon  
+cc: @priya
 ```
 
 ```
 MFG - TOC - JO #66
 September 24 / Thursday
 
-Title: My Father's Girlfriend FTR
+Title: Show Alpha FTR
 Task: Day 14 proxies and copy to NAS
 Purpose: Offline edit, dailies
 Source Drive: MFG Shuttle 01
@@ -246,15 +246,15 @@ Status:
 Pending:
 Note: Please send file sizes for proxies, needed for report.
 
-Assigned: Majo 
-cc: @leizette
+Assigned: Lena 
+cc: @priya
 ```
 
 ```
 MFG - TOC - JO #65
 September 24 / Thursday
 
-Title: My Father's Girlfriend FTR
+Title: Show Alpha FTR
 Task: Day 14 - Stow footage to Master Drive
 Purpose: For archiving
 Source Drive: MFG Shuttle 01
@@ -266,15 +266,15 @@ Status:
 Pending:
 Note:
 
-Assigned: Majo Jade 
-cc: @leizette
+Assigned: Lena Mira 
+cc: @priya
 ```
 
 ```
 TOC - Job Order
 September 24 / Thursday 
 
-Title: I Have a Name
+Title: Show Quebec
 Task/s: process unencrypted DCP
 Purpose: 
 Watermark: 
@@ -290,8 +290,8 @@ Project File:
 Locpath: 
 
 Deadline: 
-Assigned to: Paul / Piolo 
-cc: @leizette
+Assigned to: Paul / Ramon 
+cc: @priya
 ```
 
 ```
@@ -304,11 +304,11 @@ Watermark: none
 Subtitle:
 Mode of Transfer: gdrive link below
 Link Settings: 
-Source Material: '/Volumes/SIMBAHAN TMP MASTERS/STUCK ON YOU/__DELIVERABLES'
+Source Material: '/Volumes/SIMBAHAN TMP MASTERS/SHOW BRAVO/__DELIVERABLES'
 Notes: 
 
 
-- Panalong Aktres (Xyriel Manabat)
+- Panalong Aktres (Yara Manabat)
 - Panalong Aktor (River Joseph)
 - Panalong Pangalawang Aktor (Roger Naldo)
 - Panalo sa Cinematography (Rommel Sales, LPS)
@@ -328,8 +328,8 @@ Project File:
 Locpath: 
 
 Deadline: September 25, 3pm
-Assigned to: Paul / Piolo     
-cc: @leizette
+Assigned to: Paul / Ramon     
+cc: @priya
 ```
 
 ```
@@ -353,8 +353,8 @@ Project File:
 Locpath: 
 
 Deadline:  end of shift 
-Assigned to: ate @debz0313         
-cc: @leizette
+Assigned to: ate @user_three         
+cc: @priya
 ```
 
 ```
@@ -380,7 +380,7 @@ Note:
 ALTA-TO-JO04
 Sept 23 / Wed
 
-Title: A Ghost Can Howl
+Title: Show India
 Task/s: process OMF, send all livesound mats
 Purpose: for sound
 Watermark: 
@@ -402,7 +402,7 @@ Deadline: Sept 23 / end of shift
 MFG - TOC - JO #63
 September 23 / Wednesday
 
-Title: My Father's Girlfriend FTR
+Title: Show Alpha FTR
 Task: copy day 12-13 proxies and livesound sa drive ni kuya ben
 Purpose: for kuya ben's copy
 Source Drive: NAS
@@ -414,8 +414,8 @@ Status:
 Pending:
 Note: 
 
-Assigned: Paul / Piolo  
-cc: @leizette
+Assigned: Paul / Ramon  
+cc: @priya
 ```
 
 ```
@@ -436,16 +436,16 @@ Pending:
 
 Note: 
 
-Assigned: for @joshua0826  thank youuu
+Assigned: for @user_one  thank youuu
 
-cc:  @leizette
+cc:  @priya
 ```
 
 ```
 ALTA-TO-JO03
 Sept 23 / Wed
 
-Title: A Ghost Can Howl
+Title: Show India
 Task/s: prep for VFX — prores 4444
 Purpose: for online
 Watermark: for guides — COPY FOR VFX
@@ -467,7 +467,7 @@ Deadline: Sept 25 / end of shift
 LSB-TOC-020
 Date:  Sep 23 / WEDNESDAY           
 
-Title: [OFFLINE] LOS SALVAJES BRAVOS
+Title: [OFFLINE] SHOW FOXTROT
 Task: Export Hires copy for promo 
 
 Purpose: For Promo   
@@ -485,8 +485,8 @@ Status:
 Pending:
 Note:
 
-assigned to: Piolo    
-cc: @leizette
+assigned to: Ramon    
+cc: @priya
 ```
 
 ```
@@ -506,15 +506,15 @@ Source Material:
 
 Note: 
 
-Assigned: Paul, Piolo / Jade, Majo  
-cc @leizette
+Assigned: Paul, Ramon / Mira, Lena  
+cc @priya
 ```
 
 ```
 MC7 - AE - #004
 September 23 / Wednesday
 
-Title: 2nd Miracle in Cell No. 7
+Title: 2nd Show Echo
 Tasks: sync days 3 and 4
 
 Purpose: for offline edit
@@ -528,26 +528,26 @@ Status as of 5am:
 Pending:
 Notes: 
 
-Assigned: ate @debz0313 thank you!
+Assigned: ate @user_three thank you!
 
-cc: @leizette
+cc: @priya
 ```
 
 ```
 R23 - OE - JO #35
 September 22 / Tuesday
 
-Title: Race to 23 FTR
+Title: Show Romeo FTR
 Task: Export FTR in ProRes 4444
-Purpose: Jade  creates the DCP from this ProRes
+Purpose: Mira  creates the DCP from this ProRes
 Source Drive: R23 Online
 Mode of Transfer: none
 Deadline: September 23 / Wednesday 12:00 AM
 Status:
 Pending:
 
-Assigned: @Direkjson 
-cc: @leizette
+Assigned: @user_five 
+cc: @priya
 ```
 
 ```
@@ -570,8 +570,8 @@ Deadline: September 22, 7PM
 Status as of 7pm:
 Pending:
 
-Assigned: @raedsss tyvmmmm
-cc: @leizette
+Assigned: @user_two tyvmmmm
+cc: @priya
 ```
 
 ```
@@ -581,7 +581,7 @@ September 22 / Tuesday
 Title: Romano FTR
 Tasks: UPLOAD ALL LIVESOUND FILES TO SMASH 
 
-Purpose: for @hanooots 
+Purpose: for @user_ten 
 Source Material: romano offline drive
 
 Mode of Transfer: smash, dl w pw
@@ -592,9 +592,9 @@ Pending:
 
 Note: 
 
-Assigned: for @joshua0826  thank youuu
+Assigned: for @user_one  thank youuu
 
-cc:  @leizette
+cc:  @priya
 ```
 
 ```
@@ -607,7 +607,7 @@ Current file storage: 405.32 GB
 Deadline: Sep 26
 Status: 
 
-Assigned to: @hmmkayy thankies!!
+Assigned to: @user_eight thankies!!
 ```
 
 ```
@@ -620,7 +620,7 @@ Current file storage: 405.32 GB
 Deadline: Sep 26
 Status: 
 
-Assigned to: @hmmkayy thankies!!
+Assigned to: @user_eight thankies!!
 ```
 
 ```
@@ -633,7 +633,7 @@ Current file storage: 628.93 GB
 Deadline: Sep 24
 Status: 
 
-Assigned to: @alecgaba thanks thanks!
+Assigned to: @user_nine thanks thanks!
 ```
 
 ```
@@ -659,15 +659,15 @@ Project File:
 Locpath: 
 
 Deadline:  1pm
-Assigned to: Piolo     
-cc: @leizette
+Assigned to: Ramon     
+cc: @priya
 ```
 
 ```
 2VI-TOC-061 
 Date:  Sept 21 / MONDAY       
 
-Title: [ARCHIVE] 2 VALID IDs
+Title: [ARCHIVE] Show Golf
 Task:  
 Process Encryption for Current 2K DCP (0918) 
 — then upload to google Drive 
@@ -685,8 +685,8 @@ Status:
 
 Notes:
 
-assigned to: Jade 
-cc: @leizette @Direkjson
+assigned to: Mira 
+cc: @priya @user_five
 ```
 
 ```
@@ -709,10 +709,10 @@ Pending:
 Status: 
 Pending:
 Note:
-— after nalang po mag-sync ni Ate Debbie later 
+— after nalang po mag-sync ni Ate Nina later 
 
-assigned to: Piolo @raedsss // @debz0313 
-cc: @leizette
+assigned to: Ramon @user_two // @user_three 
+cc: @priya
 ```
 
 ```
@@ -735,15 +735,15 @@ Status:
 Pending:
 Note:
 
-assigned to: @debz0313 
-cc: @leizette
+assigned to: @user_three 
+cc: @priya
 ```
 
 ```
 LSB-AE-018
 Date:  Sep 21 / MONDAY          
 
-Title: [OFFLINE] LOS SALVAJES BRAVOS
+Title: [OFFLINE] SHOW FOXTROT
 Task: Prep Additional VFX 
 
 Purpose: for VFX 
@@ -765,15 +765,15 @@ Note:
 
 LSB OFFICIAL VFX TRACKER 
 
-assigned to: @debz0313  
-cc: @leizette
+assigned to: @user_three  
+cc: @priya
 ```
 
 ```
 2VI-TOC-059
 Date:  Sept 21 / MONDAY       
 
-Title: [ARCHIVE] 2 VALID IDs
+Title: [ARCHIVE] Show Golf
 Task:  Convert current master then prep Super! Drive with: 
 
 (1) FTR
@@ -803,13 +803,13 @@ Link Settings:
 Source material:
 
 TSR:
-'/Volumes/2 VALID IDS ONLINE/!_DELIVERABLES/00_TSR'
+'/Volumes/SHOW GOLF ONLINE/!_DELIVERABLES/00_TSR'
 
 TLR:
-'/Volumes/2 VALID IDS ONLINE/!_DELIVERABLES/02_TLR'
+'/Volumes/SHOW GOLF ONLINE/!_DELIVERABLES/02_TLR'
 
 FTR
-'/Volumes/2 VALID IDS ONLINE/!_DELIVERABLES/THEATRICAL SCREENING'
+'/Volumes/SHOW GOLF ONLINE/!_DELIVERABLES/THEATRICAL SCREENING'
 
 Deadline: Wednesday September 23 
 
@@ -828,15 +828,15 @@ Notes:
 
 
 
-assigned to:  Piolo @raedsss Jade Majo 
-cc: @leizette @Direkjson
+assigned to:  Ramon @user_two Mira Lena 
+cc: @priya @user_five
 ```
 
 ```
 SOMSOM - TOC - #0163
 September 21 / Monday 
 
-Title: Someone Someday
+Title: Show Hotel
 Tasks: Download the following mats & copy to ate hdd
 
 Purpose: for grading
@@ -850,9 +850,9 @@ Pending:
 
 Note: wk12 d5 abangan & wk 13 days 1-4 abangan
 
-Assigned: for @raedsss thank youuu
+Assigned: for @user_two thank youuu
 
-cc: ate @larabauts @leizette
+cc: ate @user_six @priya
 ```
 
 ```
@@ -861,7 +861,7 @@ September 19 / Saturday
 
 Title: Romano
 Tasks: PREP FOR GRADING AND VFX
-(both Prores444 source reso onli, let us know nalang din if may additional bilins kayo kuya @Direkjson and ate @larabauts)
+(both Prores444 source reso onli, let us know nalang din if may additional bilins kayo kuya @user_five and ate @user_six)
 
 Purpose: for online and grading and vfx
 Source Material: romano footage drives
@@ -874,9 +874,9 @@ Pending:
 
 Note: 
 
-Assigned: for @joshua0826  thank youuu
+Assigned: for @user_one  thank youuu
 
-cc:  @leizette
+cc:  @priya
 ```
 
 ```
@@ -898,8 +898,8 @@ Project File:
 Locpath: 
 
 Deadline:
-Assigned to: Piolo / Majo 
-cc: @leizette
+Assigned to: Ramon / Lena 
+cc: @priya
 ```
 
 ```
@@ -922,15 +922,15 @@ Project File:
 Locpath: 
 
 Deadline: September 18 / 7pm
-Assigned to: @joshua0826     
-cc: @leizette
+Assigned to: @user_one     
+cc: @priya
 ```
 
 ```
 MM - AE - JO #36
 September 18 / Friday
 
-Title: Mother Maybe FTR
+Title: Show Delta FTR
 Task: Export AAF for stagepost
 Purpose: For sound post turnover
 Source Drive: MM Offline 01
@@ -942,19 +942,19 @@ Status:
 Pending:
 Note:
 
-Assigned: @debz0313  @joshua0826 
-cc: @leizette
+Assigned: @user_three  @user_one 
+cc: @priya
 ```
 
 ```
 MM - AE - JO #35
 September 18 / Friday
 
-Title: Mother Maybe FTR
+Title: Show Delta FTR
 Task: Create guides for sound, music and translations
 Purpose: Guides
 Source Drive: MM offline 01
-Watermark: Copy for Stagepost (sound design), Copy for Teresa Barrozo (music), Copy for Arden Rod Condez (translations)
+Watermark: Copy for Stagepost (sound design), Copy for Grace Barrozo (music), Copy for Arden Rod Condez (translations)
 Mode of Transfer: frameio
 Link Settings: downloadable w password
 Deadline: September 18 / Friday 7pm
@@ -967,20 +967,20 @@ two-pops both ends, no reels
 Burn-in timecode starting at 00:59:52:00, so original start after 2-pop lands at 01:00:00:00
 
 For Music Guide:
-— no music, watermark "Copy for Teresa Barrozo".
+— no music, watermark "Copy for Grace Barrozo".
 - music only track as .WAV
 
 Watermarkless copy of the no-music file — for Sonny
 
-Assigned: @debz0313 @joshua0826 
-cc: @leizette
+Assigned: @user_three @user_one 
+cc: @priya
 ```
 
 ```
 PTG - TOC - #045
 September 15 / Tuesday
 
-Title: Patay Gutom 
+Title: Show Charlie 
 Tasks: send .wav files of the ff. livesound (see attached screenshot)
 
 Purpose: for audio revs
@@ -994,16 +994,16 @@ Status as of 5am:
 Pending:
 Notes: 
 
-Assigned: ate Majo thank youu! 
+Assigned: ate Lena thank youu! 
 
-cc: @leizette
+cc: @priya
 ```
 
 ```
 SOMSOM - TOC - #0159
 September 15 / Tuesday 
 
-Title: Someone Someday
+Title: Show Hotel
 Tasks: Download the following mats & copy to ate hdd
 
 Purpose: for grading
@@ -1017,16 +1017,16 @@ Pending:
 
 Note: wk11 days 3 and 4 vfx for postgrading
 
-Assigned: for @raedsss thank youuu
+Assigned: for @user_two thank youuu
 
-cc: ate @larabauts @leizette
+cc: ate @user_six @priya
 ```
 
 ```
 SOY - TOC - JOB ORDER 27
 September 11 / Friday 
 
-Title: Stuck On You FTR
+Title: Show Bravo FTR
 Task: 
 
 1. reformat 2TB HAPLOS DRIVE to SOY DELIVS EXFAT
@@ -1044,8 +1044,8 @@ Project File:
 Locpath: 
 
 Deadline: September 11, pm
-Assigned to: Jade   
-cc: @leizette
+Assigned to: Mira   
+cc: @priya
 ```
 
 ```
@@ -1063,8 +1063,8 @@ Status:
 Pending:
 Note:
 
-Assigned: Jade
-cc: @leizette
+Assigned: Mira
+cc: @priya
 ```
 
 ```
@@ -1087,15 +1087,15 @@ Project File:
 Locpath: '/Volumes/MAG-IINA ONLINE 01/MAG IINA ONLINE/02_EXPORTS /FULL FILM/H264/WITH VIOLATOR/FOR ACFM/INA_FTR_MP4 STEREO_20260909_FOR ACFM.mp4'
 
 Deadline: Sep 10 / Thu
-Assigned to: Jade Majo 
-cc: @leizette
+Assigned to: Mira Lena 
+cc: @priya
 ```
 
 ```
 SOY - AE - JOB ORDER 25
 September 10  / Thursday 
 
-Title: Stuck On You FTR
+Title: Show Bravo FTR
 Task: export additional VFX based on the screenshots sent above
 
 Watermark: 
@@ -1111,15 +1111,15 @@ Project File:
 Locpath: 
 
 Deadline: September 10, asap
-Assigned to: @joshua0826   
-cc: @leizette
+Assigned to: @user_one   
+cc: @priya
 ```
 
 ```
 JO CODE: MT-AE-32
 Date / Day: Sep 8 / Tue
 
-Title: Multwoh
+Title: Show Sierra
 Task: Re-export VFX plates + guides
 Purpose: For vfx prep
 Watermark: None
@@ -1140,8 +1140,8 @@ Project File:
 Locpath:
 
 Deadline: Sep 8 / Tue
-Assigned to: @joshua0826 
-cc: @leizette
+Assigned to: @user_one 
+cc: @priya
 ```
 
 ```
@@ -1165,16 +1165,16 @@ Deadline: September 9, 8PM (if keri)
 Status as of 5am:
 Pending:
 
-Assigned: Jade / @raedsss 
+Assigned: Mira / @user_two 
 
-cc: @leizette
+cc: @priya
 ```
 
 ```
 MFG - TOC - JO #20
 September 7 / Monday
 
-Title: My Father's Girlfriend FTR
+Title: Show Alpha FTR
 Task: Generate edit proxies for Day 4 dailies
 Purpose: For offline editing
 Source Drive: MFG Shuttle 04
@@ -1185,8 +1185,8 @@ Status:
 Pending:
 Note: Paki-report ang total proxy file size for DPR. New framing chart sa Day 4, parang sa Cam C lang siya need, pero still Alexa35 cube LUTs. May nabanggit si Justin na may incomplete proxies ang Day 4 pacheck nalang.
 
-Assigned: Piolo but maybe Majo 
-cc: @leizette
+Assigned: Ramon but maybe Lena 
+cc: @priya
 ```
 
 ```
@@ -1209,8 +1209,8 @@ Project File:
 Locpath: 
 
 Deadline: September 9 / 7pm
-Assigned to: Piolo  
-cc: @leizette
+Assigned to: Ramon  
+cc: @priya
 ```
 
 ```
@@ -1235,14 +1235,14 @@ Status as of 7pm:
 Pending:
 Notes:
 
-assigned to ate Debbie  cc @leizette
+assigned to ate Nina  cc @priya
 ```
 
 ```
 OLSEN'S - TOC - #007
 September 04 / Friday
 
-Title: Olsen's Day
+Title: Show November
 Task: 
 - COPY UNENCRYPTED DCP TO HDD
 - COPY MAINPIC  CAPTIONED MP4 COPY TO FLASHDRIVE (1080p)
@@ -1252,7 +1252,7 @@ Source material: T6 Color Grading 02 & Olsen's Master Drive
 Status by 5am: 
 Pending:
 
-Assigned: Piolo & @raedsss 
+Assigned: Ramon & @user_two 
 
 thank youu!
 ```
@@ -1261,7 +1261,7 @@ thank youu!
 JO CODE: APL-TOC-37
 Date / Day: Sep 3 / Thu
 
-Title: Apol of My Ai
+Title: Show Oscar
 Task: Render R1-5 Grade + Transfer to raid*
 Purpose: For online
 Watermark: None
@@ -1277,8 +1277,8 @@ Project File:
 Locpath:
 
 Deadline: Sep 3 / Thu
-Assigned to: Piolo @raedsss      
-cc: @leizette
+Assigned to: Ramon @user_two      
+cc: @priya
 ```
 
 ```
@@ -1287,9 +1287,9 @@ September 2 / Wednesday
 
 Task: 
 
-1. export AAF, XML, EDL, for NC1 and LOCKED CUT (assigned: ate @debz38)
+1. export AAF, XML, EDL, for NC1 and LOCKED CUT (assigned: ate @user_four)
 
-2. upload materials to content hub (assigned: Piolo)
+2. upload materials to content hub (assigned: Ramon)
 
 
 Purpose: for netflix requirements
@@ -1299,15 +1299,15 @@ Mode of Transfer: Content hub
 Link Settings: 
 Source Material: 
 
-Notes: Ate @debz38 hingi nalang po ng locpath para kay Pio nitong mga mats
+Notes: Ate @user_four hingi nalang po ng locpath para kay Pio nitong mga mats
 Status:
 Pending: 
 Project File: 
 Locpath: 
 
 Deadline: September 2, within shift 
-Assigned to:  ate @debz38 / Piolo 
-cc: @leizette
+Assigned to:  ate @user_four / Ramon 
+cc: @priya
 ```
 
 ```
@@ -1327,8 +1327,8 @@ Source Material: HADR Archive
 
 Note: 
 
-Assigned: Piolo 
-cc @leizette
+Assigned: Ramon 
+cc @priya
 ```
 
 ```
@@ -1348,15 +1348,15 @@ Source Material: HADR Archive
 
 Note: hingi nalang rin po ako ng locpath after. Ipapacopy ko sa drives ng riles sa Monday po
 
-Assigned: ate Majo 
-cc @leizette
+Assigned: ate Lena 
+cc @priya
 ```
 
 ```
 SK-TOC-JO02
 Aug 28 / Fri
 
-Title: JUAN AND LILY FOR SK look test
+Title: SHOW MIKE FOR SK look test
 Task/s: process mats for grading (prores 4444) for test grade
 Purpose: for test grade
 Watermark: 
@@ -1378,7 +1378,7 @@ Deadline: Aug 28 / Fri / 2pm
 SOY - TOC - JOB ORDER 22
 Aug 27 / Thursday
 
-Title: Stuck On You FTR
+Title: Show Bravo FTR
 Task: lay in subs to create SRT
 Watermark: 
 Subtitle:
@@ -1393,8 +1393,8 @@ Project File:
 Locpath: 
 
 Deadline: August 27 / Thurs / before photoshoot
-Assigned to: @joshua0826  
-cc: @leizette
+Assigned to: @user_one  
+cc: @priya
 ```
 
 ```
@@ -1417,8 +1417,8 @@ Project File:
 Locpath: 
 
 Deadline: kung kelan matapos yung render
-Assigned to: Piolo / Jade 
-cc: @leizette
+Assigned to: Ramon / Mira 
+cc: @priya
 ```
 
 ```
@@ -1430,7 +1430,7 @@ Task: export manila cityscape stock footage as color mats
 Purpose: for online
 Watermark: 
 Subtitle:
-Mode of Transfer: frameio + raid ni kuya @Direkjson 
+Mode of Transfer: frameio + raid ni kuya @user_five 
 Link Settings: dl with pw
 Source Material: [LINK]
 Notes: 
@@ -1441,8 +1441,8 @@ Project File:
 Locpath: 
 
 Deadline: Aug 26, end of shift
-Assigned to: @joshua0826 
-cc: @leizette
+Assigned to: @user_one 
+cc: @priya
 ```
 
 ```
@@ -1454,7 +1454,7 @@ Task: export manila cityscape stock footage as color mats
 Purpose: for online
 Watermark: 
 Subtitle:
-Mode of Transfer: frameio + raid ni kuya @Direkjson 
+Mode of Transfer: frameio + raid ni kuya @user_five 
 Link Settings: dl with pw
 Source Material: [LINK]
 Notes: 
@@ -1465,15 +1465,15 @@ Project File:
 Locpath: 
 
 Deadline: Aug 26, end of shift
-Assigned to: @joshua0826 
-cc: @leizette
+Assigned to: @user_one 
+cc: @priya
 ```
 
 ```
 OURS - TOC - #0002
 August 25 / Tuesday
 
-Title: Ours was a timeless night burning
+Title: Show Papa
 Tasks: Upload mp4 captionless screener to vimeo (from captionless master), add srt file separately to the link. 
 
 Purpose: for updated screener purposes
@@ -1489,14 +1489,14 @@ Status as of 5am:
 Pending:
 
 Notes: pa stack nalang ito over the captioned screener para may copy pa rin sila ng may burnt in na subs. 
-Assigned:  @raedsss thank youu
+Assigned:  @user_two thank youu
 ```
 
 ```
 LSB-AE-JO13
 Aug 25 / Tues
 
-Title: LOS SALVAJES BRAVOS (ASS04 53min cut)
+Title: SHOW FOXTROT (ASS04 53min cut)
 Task/s: export copy for scorer - with and without music
 Purpose: scorer’s guide
 Watermark: COPY FOR MUSIC SCORER
@@ -1538,9 +1538,9 @@ Deadline: August 26, 4PM
 Status as of 5am:
 Pending:
 
-Assigned: Jade / @raedsss kung sakaling umabot kay raedss
+Assigned: Mira / @user_two kung sakaling umabot kay raedss
 
-cc: @leizette
+cc: @priya
 ```
 
 ```
@@ -1567,9 +1567,9 @@ Deadline: August 26, 4PM
 Status as of 5am:
 Pending:
 
-Assigned: Jade / @raedsss kung sakaling umabot kay raedss
+Assigned: Mira / @user_two kung sakaling umabot kay raedss
 
-cc: @leizette
+cc: @priya
 ```
 
 ```
@@ -1589,15 +1589,15 @@ Pending:
 
 Instructions:
 
-Assigned: Jade 
-cc: @leizette
+Assigned: Mira 
+cc: @priya
 ```
 
 ```
 MM - TOC - JO #32
 August 20 / Thursday
 
-Title: Mother Maybe FTR
+Title: Show Delta FTR
 Task: Search/match timecodes and export 20-minute section from latest cut (v4)
 Purpose: For grant submission to NCCA
 Project File: Latest cut (v4)
@@ -1622,8 +1622,8 @@ Instructions:
 2. Export from the latest cut, making sure not to go over 20 minutes. If over 20 minutes, let us know agad.
 3. Apply required watermark upon export.
 
-Assigned: Jade 
-cc: @leizette
+Assigned: Mira 
+cc: @priya
 ```
 
 ```
@@ -1666,9 +1666,9 @@ Status as of 7pm:
 Pending:
 Notes: 
 
-Assigned: ate Debbie thank u! 
+Assigned: ate Nina thank u! 
 
-cc: @leizette
+cc: @priya
 ```
 
 ```
@@ -1676,7 +1676,7 @@ cc: @leizette
 PTG - AE - #040
 August 18 / Tuesday
 
-Title: Patay Gutom 
+Title: Show Charlie 
 Tasks: Consolidate Animation Prep with drt for oniel
 
 Purpose: for online
@@ -1690,9 +1690,9 @@ Status as of 7pm:
 Pending:
 Notes: 
 
-Assigned: ate Debbie thank you!
+Assigned: ate Nina thank you!
 
-cc: @leizette
+cc: @priya
 ```
 
 ```
@@ -1704,14 +1704,14 @@ Task/s: Delete files on frameio
 Current folder storage: 831.05 GB
 
 Deadline: Tonight if keri or tom 
-Assigned to: @alecgaba @mclb22
+Assigned to: @user_nine @user_seven
 ```
 
 ```
 PTG - AE - #039
 August 17 / Monday
 
-Title: Patay Gutom 
+Title: Show Charlie 
 Tasks: PREP FF FOR ANIMATION: 
 - all sementeryo scenes na di nagamit
 - stills sa unahan ng film
@@ -1727,9 +1727,9 @@ Status as of 7pm:
 Pending:
 Notes: 
 
-Assigned: ate Debbie thank you!
+Assigned: ate Nina thank you!
 
-cc: @leizette
+cc: @priya
 ```
 
 ```
@@ -1753,23 +1753,23 @@ Project File:
 Locpath: 
 
 Deadline: Aug 17, 1pm  
-Assigned to: Piolo   
-cc: @leizette, @mclb22
+Assigned to: Ramon   
+cc: @priya, @user_seven
 ```
 
 ```
 PP EP 2 (APC) - TOC - #0004
 August 17 / Monday
 
-Title: Paskong Pinoy EP 2: A Perfect Christmas
-Task: dl EXR files from kuya ogie, zip per EXR file and upload to frame io (yung VFX na folder sa paskong pinoy project sa fio)
+Title: Show Juliet EP 2: A Perfect Christmas
+Task: dl EXR files from kuya ogie, zip per EXR file and upload to frame io (yung VFX na folder sa show juliet project sa fio)
 
 Purpose: for turnover of VFX files to bb
 Mode of Transfer: frame.io, me na mag generate ng link
 
 Source material: 
 
-Paskong Pinoy from Kuya Ogie
+Show Juliet from Kuya Ogie
 Link: [LINK]
 PW: [REDACTED]
 
@@ -1777,9 +1777,9 @@ Deadline: August 17, 11AM if keri
 Status as of 11am: 
 Pending:
 
-Assigned: for @raedsss / Piolo kung sino man ang walang gawaa thank you!
+Assigned: for @user_two / Ramon kung sino man ang walang gawaa thank you!
 
-cc: @leizette
+cc: @priya
 ```
 
 ```
@@ -1821,7 +1821,7 @@ Status as of 7pm:
 Pending:
 Notes: 
 
-Assigned to @joshua0826 cc @leizette
+Assigned to @user_one cc @priya
 ```
 
 ```
@@ -1846,6 +1846,6 @@ Project File:
 Locpath: 
 
 Deadline: Aug 15, 5pm
-Assigned to: ate Debbie   
-cc: @leizette
+Assigned to: ate Nina   
+cc: @priya
 ```

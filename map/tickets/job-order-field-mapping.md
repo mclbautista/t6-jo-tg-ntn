@@ -47,7 +47,7 @@ Resolved 2026-09-28 in a grilling session with the owner. Verified in Notion the
 | Blocker | Only from an explicit blocker. |
 | Pending (new text column) | The JO's "Pending" line: what is supposed to happen next in a handoff. |
 | Notes | The message's own notes or instructions; anything that fits no field, as posted. |
-| Projects, Assigned, cc | Filled when resolvable (rules in Resolving people and projects). cc always includes Leizette, the traffic coordinator, as a standing rule kept in config. |
+| Projects, Assigned, cc | Filled when resolvable (rules in Resolving people and projects). cc always includes Priya, the traffic coordinator, as a standing rule kept in config. |
 | Coordinator | Blank in v1. |
 | Deliverable | Blank in v1. Matching is an open gap and a goal (see the map). |
 | Telegram Key (new text column) | Chat id plus message id; exact format is set in Re-posts, duplicates and idempotency. |

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import re
+import warnings
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
@@ -46,15 +47,15 @@ _NOTION_ID_KEYS = (
     "contacts_data_source_id",
     "projects_data_source_id",
     "deliverables_data_source_id",
-    "leizette_contact_page_id",
+    "standing_cc_contact_page_id",
 )
 _URL_KEYS = ("deepseek_base_url", "jev_url")
 _NON_EMPTY_KEYS = ("deepseek_model", "jev_model", "ledger_path")
 
 # Keys the running service cannot do without; checked by ``require_live_keys``.
 LIVE_REQUIRED_KEYS = (
-    "leizette_contact_page_id",
-    "leizette_telegram_handle",
+    "standing_cc_contact_page_id",
+    "standing_cc_telegram_handle",
     "owner_telegram_handle",
 )
 
@@ -83,7 +84,7 @@ class Config(BaseModel):
     # Ops topic (#23): where capture reports and system messages go
     ops_chat_id: int
     ops_topic_id: int
-    leizette_telegram_handle: str | None = None
+    standing_cc_telegram_handle: str | None = None
     header_date_tolerance_days: int = Field(default=1, ge=0)
     # #101: alert ops when intake chat message ids jump (messages that never arrived)
     message_gap_alerts: bool = True
@@ -109,7 +110,7 @@ class Config(BaseModel):
     # Live resolution caches (#22)
     contacts_data_source_id: str = "77b2a701-71db-4e88-a694-37f07303e77e"
     projects_data_source_id: str = "cc1dc02a-8f32-4c97-81e4-dc1e08d7f134"
-    leizette_contact_page_id: str | None = None
+    standing_cc_contact_page_id: str | None = None
     cache_refresh_hours: float = Field(default=6, gt=0)
     cache_stale_alert_hours: float = Field(default=24, gt=0)
     fuzzy_min_score: float = Field(default=90, ge=0, le=100)
@@ -148,7 +149,7 @@ class Config(BaseModel):
             raise ValueError(f"{info.field_name} must be an emoji")
         return value
 
-    @field_validator("leizette_telegram_handle", "owner_telegram_handle")
+    @field_validator("standing_cc_telegram_handle", "owner_telegram_handle")
     @classmethod
     def _telegram_handle(cls, value: str | None) -> str | None:
         if value is None or not value.strip():
@@ -217,7 +218,7 @@ def resolve_settings(config: Config) -> ResolveSettings:
         fuzzy_min_lead=config.fuzzy_min_lead,
         honorifics=tuple(config.honorifics),
         department_aliases=config.department_aliases,
-        leizette_contact_page_id=config.leizette_contact_page_id,
+        standing_cc_contact_page_id=config.standing_cc_contact_page_id,
     )
 
 
@@ -268,8 +269,8 @@ def require_live_keys(config: Config) -> None:
 def placeholder_keys(config: Config) -> list[str]:
     """Keys still holding the example file's FILL IN values (not production-ready)."""
     placeholders = []
-    for key in ("leizette_contact_page_id", "leizette_telegram_handle", "owner_telegram_handle"):
-        if str(getattr(config, key)).startswith(("00000000", "@leizette_handle", "@owner_handle")):
+    for key in ("standing_cc_contact_page_id", "standing_cc_telegram_handle", "owner_telegram_handle"):
+        if str(getattr(config, key)).startswith(("00000000", "@standing_cc_handle", "@owner_handle")):
             placeholders.append(key)
     if config.intake_chat_id == -1000000000000:
         placeholders.append("intake_chat_id")
@@ -278,11 +279,31 @@ def placeholder_keys(config: Config) -> list[str]:
     return placeholders
 
 
+# Keys renamed to role names (the standing cc person). Old files still load, with a warning.
+_RENAMED_KEYS = {
+    "leizette_contact_page_id": "standing_cc_contact_page_id",
+    "leizette_telegram_handle": "standing_cc_telegram_handle",
+}
+
+
+def _apply_renamed_keys(data: dict) -> dict:
+    for old, new in _RENAMED_KEYS.items():
+        if old in data:
+            warnings.warn(
+                f"config key {old!r} is renamed to {new!r}; update config.yaml",
+                DeprecationWarning,
+                stacklevel=3,
+            )
+            value = data.pop(old)
+            data.setdefault(new, value)
+    return data
+
+
 def load_config(path: str | Path) -> Config:
     """Load non-secret config from a YAML file."""
     with open(path, encoding="utf-8") as fh:
         data = yaml.safe_load(fh) or {}
-    return Config(**data)
+    return Config(**_apply_renamed_keys(data))
 
 
 def _secret(name: str) -> str:

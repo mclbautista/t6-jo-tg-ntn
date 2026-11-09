@@ -30,21 +30,21 @@ Locked with the owner 2026-09-28. Format rule applied throughout: default to lin
 > [Telegram message](https://t.me/c/…)
 
 ### 2. Unresolved person/project
-*(unresolved person/project is one of the three checks that tags Leizette, per the verification ticket)*
+*(unresolved person/project is one of the three checks that tags Priya, per the verification ticket)*
 
 > ⚠️ **Needs a manual link**
 > `#0087`
 >
 > Project mention "PP2 APC" didn't match any known Project Code
-> Assignee "Piolo but maybe Majo" is ambiguous
+> Assignee "Ramon but maybe Lena" is ambiguous
 >
 > [Notion row](https://notion.so/…)
 > [Telegram message](https://t.me/c/…)
 >
-> @leizette
+> @priya
 
 ### 3. Duplicate / reused number
-*(not in the tag-Leizette list — no tag, consistent with the settled rule)*
+*(not in the tag-Priya list — no tag, consistent with the settled rule)*
 
 > ⚠️ **Possible number reuse**
 > `SOMSOM - TOC - #0156`

@@ -320,7 +320,7 @@ class CrashInjectionTests(unittest.IsolatedAsyncioTestCase):
 # -- Jev and reconciliation (#56) -------------------------------------------
 
 PROJECTS = [{"page_id": "proj-mg", "name": "Moonglow", "code": "MG"}]
-PEOPLE = [{"page_id": "c-leizette", "name": "Leizette"}]
+PEOPLE = [{"page_id": "c-priya", "name": "Priya"}]
 FTR = Candidate(page_id="d-ftr", name="Moonglow FTR SCR")
 PROMO = Candidate(page_id="d-promo", name="Moonglow Promo")
 LINKABLE = {"d-ftr": (0.95, 0.04, 0.01), "d-promo": (0.02, 0.08, 0.90)}

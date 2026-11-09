@@ -14,7 +14,7 @@ from jo_watchdog.core.verify import (
     FuzzyMatch,
     PersonMention,
     parse_header_date,
-    tags_leizette,
+    tags_standing_cc,
     verify,
 )
 
@@ -54,7 +54,7 @@ class NineChecksTests(unittest.TestCase):
     def test_unresolved_and_ambiguous_people_and_projects(self):
         facts = extracted(
             unresolved_people=[PersonMention(raw="Jhun"), PersonMention(role="cc", raw="Bea")],
-            ambiguous_people=[PersonMention(raw="Piolo but maybe Majo")],
+            ambiguous_people=[PersonMention(raw="Ramon but maybe Lena")],
             unresolved_projects=["PP2 APC"],
         )
         found = verify(facts)
@@ -63,7 +63,7 @@ class NineChecksTests(unittest.TestCase):
             [
                 ("unresolved_person", {"role": "assignee", "raw": "Jhun"}),
                 ("unresolved_person", {"role": "cc", "raw": "Bea"}),
-                ("ambiguous_person", {"role": "assignee", "raw": "Piolo but maybe Majo"}),
+                ("ambiguous_person", {"role": "assignee", "raw": "Ramon but maybe Lena"}),
                 ("unresolved_project", {"raw": "PP2 APC"}),
             ],
         )
@@ -198,14 +198,14 @@ class AdditionalFindingTests(unittest.TestCase):
 
 
 class TaggingTests(unittest.TestCase):
-    def test_only_her_findings_tag_leizette(self):
+    def test_only_her_findings_tag_standing_cc(self):
         tagged = {
             "multiple_jo", "unresolved_person", "ambiguous_person",
             "unresolved_project", "unknown_department",
         }
         for code in FINDING_ORDER:
             with self.subTest(code=code):
-                self.assertEqual(tags_leizette([Finding(code=code)]), code in tagged)
+                self.assertEqual(tags_standing_cc([Finding(code=code)]), code in tagged)
 
 
 class HeaderDateParseTests(unittest.TestCase):

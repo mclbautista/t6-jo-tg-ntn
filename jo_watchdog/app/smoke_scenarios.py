@@ -237,7 +237,7 @@ class Harness:
         """Seed the cache snapshots the way a refresh would, so no Notion lookup is needed."""
         fetched = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         caches: CacheManager = self.worker.caches
-        caches._apply("people", [{"page_id": "c-leizette", "name": "Leizette"}], fetched)
+        caches._apply("people", [{"page_id": "c-priya", "name": "Priya"}], fetched)
         caches._apply(
             "projects", [{"page_id": PROJECT_ID, "name": "Manufacturing", "code": "MFG"}], fetched
         )

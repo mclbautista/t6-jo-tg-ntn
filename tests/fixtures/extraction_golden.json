@@ -10,10 +10,10 @@
     "project_raw": "MFG",
     "department_raw": "TOC",
     "header_date_raw": "September 28 / Monday",
-    "title": "My Father's Girlfriend FTR",
+    "title": "Show Alpha FTR",
     "task": "D14-15 Upload synced dailies",
     "purpose": "For prod and NF review",
-    "source": "Offline Coby",
+    "source": "Offline Owen",
     "watermark": "Follow netflix guidelines",
     "link_settings": "N/A",
     "mode_of_transfer": "Contenthub, share thru PIX",
@@ -22,8 +22,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "September 29 / Tues 5AM",
-    "assignees_raw": "Majo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Lena",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -35,7 +35,7 @@
     "project_raw": "MFG",
     "department_raw": "TOC",
     "header_date_raw": "September 26 / Saturday",
-    "title": "My Father's Girlfriend FTR",
+    "title": "Show Alpha FTR",
     "task": "copy day 14-15bproxies to kuya Ben's drive",
     "purpose": "For offline prep",
     "source": "NAS",
@@ -48,7 +48,7 @@
     "notes": null,
     "deadline_raw": "within shift",
     "assignees_raw": "Paul",
-    "cc_raw": "@leizette",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -72,8 +72,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "within shift",
-    "assignees_raw": "Paul / Piolo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Paul / Ramon",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -97,8 +97,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "within shift if kaya",
-    "assignees_raw": "ate Majo / Piolo, if abutin the next day",
-    "cc_raw": "@leizette",
+    "assignees_raw": "ate Lena / Ramon, if abutin the next day",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -110,7 +110,7 @@
     "project_raw": "MFG",
     "department_raw": "TOC",
     "header_date_raw": "September 25 / Friday",
-    "title": "My Father's Girlfriend FTR",
+    "title": "Show Alpha FTR",
     "task": "mirror kuya Ben's drive to MFG Folder sa NAS",
     "purpose": "for offline prep",
     "source": "MFG offline Ben",
@@ -122,8 +122,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "within shift",
-    "assignees_raw": "ate Majo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "ate Lena",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -135,7 +135,7 @@
     "project_raw": "MP",
     "department_raw": "TOC",
     "header_date_raw": "Sept 25 / Fri",
-    "title": "Maybe in Another Universe (look test mats)",
+    "title": "Show Lima (look test mats)",
     "task": "process prores",
     "purpose": "for test grade and LUT creation",
     "source": "look test mats HD",
@@ -160,7 +160,7 @@
     "project_raw": "MC7",
     "department_raw": "AE",
     "header_date_raw": "September 25 / Friday",
-    "title": "2nd Miracle in Cell No. 7",
+    "title": "2nd Show Echo",
     "task": "sync day5",
     "purpose": "for offline",
     "source": "MC7 offline 2",
@@ -172,8 +172,8 @@
     "pending": null,
     "notes": "pa apply nalang here yung tinuro ni ate debs na pag sort",
     "deadline_raw": "September 26, 4PM",
-    "assignees_raw": "@joshua0826  thank you!",
-    "cc_raw": "@leizette",
+    "assignees_raw": "@user_one  thank you!",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -185,7 +185,7 @@
     "project_raw": "MC7",
     "department_raw": "AE",
     "header_date_raw": "September 25 / Friday",
-    "title": "2nd Miracle in Cell No. 7",
+    "title": "2nd Show Echo",
     "task": "prep the ff. for pregrade and VFX test (PRORES444, SOURCE RESO)",
     "purpose": "for pregrade and vfx test",
     "source": "MC7 FOOTAGE DRIVES",
@@ -197,8 +197,8 @@
     "pending": null,
     "notes": "DAY 1 - B002C002, BO02COO5\nDAY 2 - A004C011, B003CO17\nDAY 3 - B006C011",
     "deadline_raw": "September 25, 7PM",
-    "assignees_raw": "@joshua0826  thank you!",
-    "cc_raw": "@leizette",
+    "assignees_raw": "@user_one  thank you!",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -210,7 +210,7 @@
     "project_raw": "MP",
     "department_raw": "TOC",
     "header_date_raw": "Sept 25 / Fri",
-    "title": "Makikiraan Po (FTR v2)",
+    "title": "Show Kilo (FTR v2)",
     "task": "MP4 4k and DCP 2k",
     "purpose": "for sales agent",
     "source": null,
@@ -235,7 +235,7 @@
     "project_raw": "MFG",
     "department_raw": "TOC",
     "header_date_raw": "September 24 / Thursday",
-    "title": "My Father's Girlfriend FTR",
+    "title": "Show Alpha FTR",
     "task": "Day 14 Upload footage to MPS",
     "purpose": "For Archival",
     "source": "MFG Shuttle 01",
@@ -247,8 +247,8 @@
     "pending": null,
     "notes": "Ideally done na ito by Sat night for pickup sa shoot next day",
     "deadline_raw": "September 27 / Sunday 5AM (pickup D16 shoot)",
-    "assignees_raw": "Piolo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Ramon",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -260,7 +260,7 @@
     "project_raw": "MFG",
     "department_raw": "TOC",
     "header_date_raw": "September 24 / Thursday",
-    "title": "My Father's Girlfriend FTR",
+    "title": "Show Alpha FTR",
     "task": "Day 14 proxies and copy to NAS",
     "purpose": "Offline edit, dailies",
     "source": "MFG Shuttle 01",
@@ -272,8 +272,8 @@
     "pending": null,
     "notes": "Please send file sizes for proxies, needed for report.",
     "deadline_raw": "September 25 / Friday 5AM",
-    "assignees_raw": "Majo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Lena",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -285,7 +285,7 @@
     "project_raw": "MFG",
     "department_raw": "TOC",
     "header_date_raw": "September 24 / Thursday",
-    "title": "My Father's Girlfriend FTR",
+    "title": "Show Alpha FTR",
     "task": "Day 14 - Stow footage to Master Drive",
     "purpose": "For archiving",
     "source": "MFG Shuttle 01",
@@ -297,8 +297,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "September 25 / Fri 5AM",
-    "assignees_raw": "Majo Jade",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Lena Mira",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -310,7 +310,7 @@
     "project_raw": null,
     "department_raw": "TOC",
     "header_date_raw": "September 24 / Thursday",
-    "title": "I Have a Name",
+    "title": "Show Quebec",
     "task": "process unencrypted DCP",
     "purpose": null,
     "source": "waiting for gdrive link",
@@ -322,8 +322,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": null,
-    "assignees_raw": "Paul / Piolo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Paul / Ramon",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -338,17 +338,17 @@
     "title": null,
     "task": "export clips for nomination videos from captionless MP4 master",
     "purpose": null,
-    "source": "'/Volumes/SIMBAHAN TMP MASTERS/STUCK ON YOU/__DELIVERABLES'",
+    "source": "'/Volumes/SIMBAHAN TMP MASTERS/SHOW BRAVO/__DELIVERABLES'",
     "watermark": "none",
     "link_settings": null,
     "mode_of_transfer": "gdrive link below",
     "platform": null,
     "blocker": null,
     "pending": null,
-    "notes": "- Panalong Aktres (Xyriel Manabat)\n- Panalong Aktor (River Joseph)\n- Panalong Pangalawang Aktor (Roger Naldo)\n- Panalo sa Cinematography (Rommel Sales, LPS)\n- Panalo sa Production Design (Jeric delos Angeles)\n\n\nPlease upload to your respective film folders here:\n[LINK]\n\nClips should be labeled accordingly: Category_Name\n\nE.g. Panalong Aktres_Juanita Dela Cruz",
+    "notes": "- Panalong Aktres (Yara Manabat)\n- Panalong Aktor (River Joseph)\n- Panalong Pangalawang Aktor (Roger Naldo)\n- Panalo sa Cinematography (Rommel Sales, LPS)\n- Panalo sa Production Design (Jeric delos Angeles)\n\n\nPlease upload to your respective film folders here:\n[LINK]\n\nClips should be labeled accordingly: Category_Name\n\nE.g. Panalong Aktres_Juanita Dela Cruz",
     "deadline_raw": "September 25, 3pm",
-    "assignees_raw": "Paul / Piolo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Paul / Ramon",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -372,8 +372,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "end of shift",
-    "assignees_raw": "ate @debz0313",
-    "cc_raw": "@leizette",
+    "assignees_raw": "ate @user_three",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -410,7 +410,7 @@
     "project_raw": "ALTA",
     "department_raw": "TO",
     "header_date_raw": "Sept 23 / Wed",
-    "title": "A Ghost Can Howl",
+    "title": "Show India",
     "task": "process OMF, send all livesound mats",
     "purpose": "for sound",
     "source": null,
@@ -435,7 +435,7 @@
     "project_raw": "MFG",
     "department_raw": "TOC",
     "header_date_raw": "September 23 / Wednesday",
-    "title": "My Father's Girlfriend FTR",
+    "title": "Show Alpha FTR",
     "task": "copy day 12-13 proxies and livesound sa drive ni kuya ben",
     "purpose": "for kuya ben's copy",
     "source": "NAS",
@@ -447,8 +447,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": null,
-    "assignees_raw": "Paul / Piolo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Paul / Ramon",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -472,8 +472,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "September 26, Saturday, 7PM",
-    "assignees_raw": "for @joshua0826  thank youuu",
-    "cc_raw": "@leizette",
+    "assignees_raw": "for @user_one  thank youuu",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -485,7 +485,7 @@
     "project_raw": "ALTA",
     "department_raw": "TO",
     "header_date_raw": "Sept 23 / Wed",
-    "title": "A Ghost Can Howl",
+    "title": "Show India",
     "task": "prep for VFX — prores 4444",
     "purpose": "for online",
     "source": "reference - Ben’s offline timeline, raw mats - footage HD",
@@ -510,7 +510,7 @@
     "project_raw": "LSB",
     "department_raw": "TOC",
     "header_date_raw": "Sep 23 / WEDNESDAY",
-    "title": "[OFFLINE] LOS SALVAJES BRAVOS",
+    "title": "[OFFLINE] SHOW FOXTROT",
     "task": "Export Hires copy for promo",
     "purpose": "For Promo",
     "source": "T6 Drive",
@@ -522,8 +522,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "end of shift",
-    "assignees_raw": "Piolo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Ramon",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -547,8 +547,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": null,
-    "assignees_raw": "Paul, Piolo / Jade, Majo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Paul, Ramon / Mira, Lena",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -560,7 +560,7 @@
     "project_raw": "MC7",
     "department_raw": "AE",
     "header_date_raw": "September 23 / Wednesday",
-    "title": "2nd Miracle in Cell No. 7",
+    "title": "2nd Show Echo",
     "task": "sync days 3 and 4",
     "purpose": "for offline edit",
     "source": "MC7 OFFLINE 2",
@@ -572,8 +572,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "September 25, 3PM",
-    "assignees_raw": "ate @debz0313 thank you!",
-    "cc_raw": "@leizette",
+    "assignees_raw": "ate @user_three thank you!",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -585,9 +585,9 @@
     "project_raw": "R23",
     "department_raw": "OE",
     "header_date_raw": "September 22 / Tuesday",
-    "title": "Race to 23 FTR",
+    "title": "Show Romeo FTR",
     "task": "Export FTR in ProRes 4444",
-    "purpose": "Jade  creates the DCP from this ProRes",
+    "purpose": "Mira  creates the DCP from this ProRes",
     "source": "R23 Online",
     "watermark": null,
     "link_settings": null,
@@ -597,8 +597,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "September 23 / Wednesday 12:00 AM",
-    "assignees_raw": "@Direkjson",
-    "cc_raw": "@leizette",
+    "assignees_raw": "@user_five",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -622,8 +622,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "September 22, 7PM",
-    "assignees_raw": "@raedsss tyvmmmm",
-    "cc_raw": "@leizette",
+    "assignees_raw": "@user_two tyvmmmm",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -637,7 +637,7 @@
     "header_date_raw": "September 22 / Tuesday",
     "title": "Romano FTR",
     "task": "UPLOAD ALL LIVESOUND FILES TO SMASH",
-    "purpose": "for @hanooots",
+    "purpose": "for @user_ten",
     "source": "romano offline drive",
     "watermark": null,
     "link_settings": null,
@@ -647,8 +647,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "September 22, Tuesday, 7PM",
-    "assignees_raw": "for @joshua0826  thank youuu",
-    "cc_raw": "@leizette",
+    "assignees_raw": "for @user_one  thank youuu",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -672,7 +672,7 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "Sep 26",
-    "assignees_raw": "@hmmkayy thankies!!",
+    "assignees_raw": "@user_eight thankies!!",
     "cc_raw": null,
     "subtitle": null
    }
@@ -697,7 +697,7 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "Sep 26",
-    "assignees_raw": "@hmmkayy thankies!!",
+    "assignees_raw": "@user_eight thankies!!",
     "cc_raw": null,
     "subtitle": null
    }
@@ -722,7 +722,7 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "Sep 24",
-    "assignees_raw": "@alecgaba thanks thanks!",
+    "assignees_raw": "@user_nine thanks thanks!",
     "cc_raw": null,
     "subtitle": null
    }
@@ -747,8 +747,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "1pm",
-    "assignees_raw": "Piolo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Ramon",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -760,7 +760,7 @@
     "project_raw": "2VI",
     "department_raw": "TOC",
     "header_date_raw": "Sept 21 / MONDAY",
-    "title": "[ARCHIVE] 2 VALID IDs",
+    "title": "[ARCHIVE] Show Golf",
     "task": "Process Encryption for Current 2K DCP (0918)\n— then upload to google Drive",
     "purpose": "For archive",
     "source": null,
@@ -772,8 +772,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "Tonight",
-    "assignees_raw": "Jade",
-    "cc_raw": "@leizette @Direkjson",
+    "assignees_raw": "Mira",
+    "cc_raw": "@priya @user_five",
     "subtitle": null
    }
   },
@@ -795,10 +795,10 @@
     "platform": null,
     "blocker": null,
     "pending": null,
-    "notes": "— after nalang po mag-sync ni Ate Debbie later",
+    "notes": "— after nalang po mag-sync ni Ate Nina later",
     "deadline_raw": "end of shift",
-    "assignees_raw": "Piolo @raedsss // @debz0313",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Ramon @user_two // @user_three",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -822,8 +822,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "If keri rin po today",
-    "assignees_raw": "@debz0313",
-    "cc_raw": "@leizette",
+    "assignees_raw": "@user_three",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -835,7 +835,7 @@
     "project_raw": "LSB",
     "department_raw": "AE",
     "header_date_raw": "Sep 21 / MONDAY",
-    "title": "[OFFLINE] LOS SALVAJES BRAVOS",
+    "title": "[OFFLINE] SHOW FOXTROT",
     "task": "Prep Additional VFX",
     "purpose": "for VFX",
     "source": "T6 Drive",
@@ -847,8 +847,8 @@
     "pending": null,
     "notes": "— Naka-reply here ate kung saan yung pinapa-prep ulit ni Vincent.  'Yung mga takes daw po here na kahit hindi pa naka-mask. 'Yung nag-usap po us kanina.\n\nLSB OFFICIAL VFX TRACKER",
     "deadline_raw": "end of shift if kaya, if not tomorrow na po",
-    "assignees_raw": "@debz0313",
-    "cc_raw": "@leizette",
+    "assignees_raw": "@user_three",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -860,10 +860,10 @@
     "project_raw": "2VI",
     "department_raw": "TOC",
     "header_date_raw": "Sept 21 / MONDAY",
-    "title": "[ARCHIVE] 2 VALID IDs",
+    "title": "[ARCHIVE] Show Golf",
     "task": "Convert current master then prep Super! Drive with:\n\n(1) FTR\n- 4K DCP Encrypted\n- 2K DCP Encrypted\n- 2K DCP Unencrypted\n- 4K QT ProRes 4444 5.1 Textless\n- 4K QT ProRes 422HQ 5.1 Captionless\n- 4K QT ProRes 422HQ 5.1 ENG Captioned\n- ENG SRT\n- 2K H264 MP4 STR Captionless\n- 2K H264 MP4 STR ENG Captioned\n\n(2) PROMO (15s, 30s, TLR)\n- 4K QT ProRes 422HQ 5.1 Captionless\n- 4K QT ProRes 422HQ 5.1 ENG Captioned\n- 4K H264 MP4 STR Captionless\n- 4K H264 MP4 STR ENG Captioned\n- 1080 H264 MP4 STR Captionless\n- 1080 H264 MP4 STR ENG Captioned",
     "purpose": "For archive",
-    "source": "TSR:\n'/Volumes/2 VALID IDS ONLINE/!_DELIVERABLES/00_TSR'\n\nTLR:\n'/Volumes/2 VALID IDS ONLINE/!_DELIVERABLES/02_TLR'\n\nFTR\n'/Volumes/2 VALID IDS ONLINE/!_DELIVERABLES/THEATRICAL SCREENING'",
+    "source": "TSR:\n'/Volumes/SHOW GOLF ONLINE/!_DELIVERABLES/00_TSR'\n\nTLR:\n'/Volumes/SHOW GOLF ONLINE/!_DELIVERABLES/02_TLR'\n\nFTR\n'/Volumes/SHOW GOLF ONLINE/!_DELIVERABLES/THEATRICAL SCREENING'",
     "watermark": null,
     "link_settings": null,
     "mode_of_transfer": "HD",
@@ -872,8 +872,8 @@
     "pending": null,
     "notes": "— Update-update nalang po here kung ano matapos every shift.\n\n— EXFAT po ang drive for here\n\n—  Note lang po na hindi encrypted ito.",
     "deadline_raw": "Wednesday September 23",
-    "assignees_raw": "Piolo @raedsss Jade Majo",
-    "cc_raw": "@leizette @Direkjson",
+    "assignees_raw": "Ramon @user_two Mira Lena",
+    "cc_raw": "@priya @user_five",
     "subtitle": null
    }
   },
@@ -885,7 +885,7 @@
     "project_raw": "SOMSOM",
     "department_raw": "TOC",
     "header_date_raw": "September 21 / Monday",
-    "title": "Someone Someday",
+    "title": "Show Hotel",
     "task": "Download the following mats & copy to ate hdd",
     "purpose": "for grading",
     "source": "Lucid (attached ss)",
@@ -897,8 +897,8 @@
     "pending": null,
     "notes": "wk12 d5 abangan & wk 13 days 1-4 abangan",
     "deadline_raw": "September 22, 3PM",
-    "assignees_raw": "for @raedsss thank youuu",
-    "cc_raw": "ate @larabauts @leizette",
+    "assignees_raw": "for @user_two thank youuu",
+    "cc_raw": "ate @user_six @priya",
     "subtitle": null
    }
   },
@@ -911,7 +911,7 @@
     "department_raw": "AE",
     "header_date_raw": "September 19 / Saturday",
     "title": "Romano",
-    "task": "PREP FOR GRADING AND VFX\n(both Prores444 source reso onli, let us know nalang din if may additional bilins kayo kuya @Direkjson and ate @larabauts)",
+    "task": "PREP FOR GRADING AND VFX\n(both Prores444 source reso onli, let us know nalang din if may additional bilins kayo kuya @user_five and ate @user_six)",
     "purpose": "for online and grading and vfx",
     "source": "romano footage drives",
     "watermark": null,
@@ -922,8 +922,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "September 21, Monday, 7PM",
-    "assignees_raw": "for @joshua0826  thank youuu",
-    "cc_raw": "@leizette",
+    "assignees_raw": "for @user_one  thank youuu",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -947,8 +947,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": null,
-    "assignees_raw": "Piolo / Majo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Ramon / Lena",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -972,8 +972,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "September 18 / 7pm",
-    "assignees_raw": "@joshua0826",
-    "cc_raw": "@leizette",
+    "assignees_raw": "@user_one",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -985,7 +985,7 @@
     "project_raw": "MM",
     "department_raw": "AE",
     "header_date_raw": "September 18 / Friday",
-    "title": "Mother Maybe FTR",
+    "title": "Show Delta FTR",
     "task": "Export AAF for stagepost",
     "purpose": "For sound post turnover",
     "source": "MM Offline 01",
@@ -997,8 +997,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "September 18, 7:00PM",
-    "assignees_raw": "@debz0313  @joshua0826",
-    "cc_raw": "@leizette",
+    "assignees_raw": "@user_three  @user_one",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1010,20 +1010,20 @@
     "project_raw": "MM",
     "department_raw": "AE",
     "header_date_raw": "September 18 / Friday",
-    "title": "Mother Maybe FTR",
+    "title": "Show Delta FTR",
     "task": "Create guides for sound, music and translations",
     "purpose": "Guides",
     "source": "MM offline 01",
-    "watermark": "Copy for Stagepost (sound design), Copy for Teresa Barrozo (music), Copy for Arden Rod Condez (translations)",
+    "watermark": "Copy for Stagepost (sound design), Copy for Grace Barrozo (music), Copy for Arden Rod Condez (translations)",
     "link_settings": "downloadable w password",
     "mode_of_transfer": "frameio",
     "platform": null,
     "blocker": null,
     "pending": null,
-    "notes": "For All:\ntwo-pops both ends, no reels\nBurn-in timecode starting at 00:59:52:00, so original start after 2-pop lands at 01:00:00:00\n\nFor Music Guide:\n— no music, watermark \"Copy for Teresa Barrozo\".\n- music only track as .WAV\n\nWatermarkless copy of the no-music file — for Sonny",
+    "notes": "For All:\ntwo-pops both ends, no reels\nBurn-in timecode starting at 00:59:52:00, so original start after 2-pop lands at 01:00:00:00\n\nFor Music Guide:\n— no music, watermark \"Copy for Grace Barrozo\".\n- music only track as .WAV\n\nWatermarkless copy of the no-music file — for Sonny",
     "deadline_raw": "September 18 / Friday 7pm",
-    "assignees_raw": "@debz0313 @joshua0826",
-    "cc_raw": "@leizette",
+    "assignees_raw": "@user_three @user_one",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1035,7 +1035,7 @@
     "project_raw": "PTG",
     "department_raw": "TOC",
     "header_date_raw": "September 15 / Tuesday",
-    "title": "Patay Gutom",
+    "title": "Show Charlie",
     "task": "send .wav files of the ff. livesound (see attached screenshot)",
     "purpose": "for audio revs",
     "source": "PTG OFFLINE 1/2",
@@ -1047,8 +1047,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "September 16, 2am",
-    "assignees_raw": "ate Majo thank youu!",
-    "cc_raw": "@leizette",
+    "assignees_raw": "ate Lena thank youu!",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1060,7 +1060,7 @@
     "project_raw": "SOMSOM",
     "department_raw": "TOC",
     "header_date_raw": "September 15 / Tuesday",
-    "title": "Someone Someday",
+    "title": "Show Hotel",
     "task": "Download the following mats & copy to ate hdd",
     "purpose": "for grading",
     "source": "Lucid (attached ss)",
@@ -1072,8 +1072,8 @@
     "pending": null,
     "notes": "wk11 days 3 and 4 vfx for postgrading",
     "deadline_raw": "September 15, 530PM",
-    "assignees_raw": "for @raedsss thank youuu",
-    "cc_raw": "ate @larabauts @leizette",
+    "assignees_raw": "for @user_two thank youuu",
+    "cc_raw": "ate @user_six @priya",
     "subtitle": null
    }
   },
@@ -1085,7 +1085,7 @@
     "project_raw": "SOY",
     "department_raw": "TOC",
     "header_date_raw": "September 11 / Friday",
-    "title": "Stuck On You FTR",
+    "title": "Show Bravo FTR",
     "task": "1. reformat 2TB HAPLOS DRIVE to SOY DELIVS EXFAT",
     "purpose": null,
     "source": null,
@@ -1097,8 +1097,8 @@
     "pending": null,
     "notes": "waiting for waiver",
     "deadline_raw": "September 11, pm",
-    "assignees_raw": "Jade",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Mira",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1122,8 +1122,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "September 10, 11pm",
-    "assignees_raw": "Jade",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Mira",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1147,8 +1147,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "Sep 10 / Thu",
-    "assignees_raw": "Jade Majo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Mira Lena",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1160,7 +1160,7 @@
     "project_raw": "SOY",
     "department_raw": "AE",
     "header_date_raw": "September 10  / Thursday",
-    "title": "Stuck On You FTR",
+    "title": "Show Bravo FTR",
     "task": "export additional VFX based on the screenshots sent above",
     "purpose": null,
     "source": null,
@@ -1172,8 +1172,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "September 10, asap",
-    "assignees_raw": "@joshua0826",
-    "cc_raw": "@leizette",
+    "assignees_raw": "@user_one",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1185,7 +1185,7 @@
     "project_raw": "MT",
     "department_raw": "AE",
     "header_date_raw": "Sep 8 / Tue",
-    "title": "Multwoh",
+    "title": "Show Sierra",
     "task": "Re-export VFX plates + guides",
     "purpose": "For vfx prep",
     "source": "T6",
@@ -1197,8 +1197,8 @@
     "pending": null,
     "notes": "ito yung clips na need nila:\n\nV1-0070_B001R011_2603159I_S008\nA003L018_26031723\nA012L003_2603243C",
     "deadline_raw": "Sep 8 / Tue",
-    "assignees_raw": "@joshua0826",
-    "cc_raw": "@leizette",
+    "assignees_raw": "@user_one",
+    "cc_raw": "@priya",
     "subtitle": "None"
    }
   },
@@ -1222,8 +1222,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "September 9, 8PM (if keri)",
-    "assignees_raw": "Jade / @raedsss",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Mira / @user_two",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1235,7 +1235,7 @@
     "project_raw": "MFG",
     "department_raw": "TOC",
     "header_date_raw": "September 7 / Monday",
-    "title": "My Father's Girlfriend FTR",
+    "title": "Show Alpha FTR",
     "task": "Generate edit proxies for Day 4 dailies",
     "purpose": "For offline editing",
     "source": "MFG Shuttle 04",
@@ -1247,8 +1247,8 @@
     "pending": null,
     "notes": "Paki-report ang total proxy file size for DPR. New framing chart sa Day 4, parang sa Cam C lang siya need, pero still Alexa35 cube LUTs. May nabanggit si Justin na may incomplete proxies ang Day 4 pacheck nalang.",
     "deadline_raw": "September 8 / Tuesday 5AM",
-    "assignees_raw": "Piolo but maybe Majo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Ramon but maybe Lena",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1272,8 +1272,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "September 9 / 7pm",
-    "assignees_raw": "Piolo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Ramon",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1297,8 +1297,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": null,
-    "assignees_raw": "ate Debbie",
-    "cc_raw": "@leizette",
+    "assignees_raw": "ate Nina",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1310,7 +1310,7 @@
     "project_raw": "OLSEN'S",
     "department_raw": "TOC",
     "header_date_raw": "September 04 / Friday",
-    "title": "Olsen's Day",
+    "title": "Show November",
     "task": "- COPY UNENCRYPTED DCP TO HDD\n- COPY MAINPIC  CAPTIONED MP4 COPY TO FLASHDRIVE (1080p)\n- COPY TLR CAPTIONED MP4 TO FLASHDRIVE (1080p)",
     "purpose": "for producers' copy",
     "source": "T6 Color Grading 02 & Olsen's Master Drive",
@@ -1322,7 +1322,7 @@
     "pending": null,
     "notes": null,
     "deadline_raw": null,
-    "assignees_raw": "Piolo & @raedsss",
+    "assignees_raw": "Ramon & @user_two",
     "cc_raw": null,
     "subtitle": null
    }
@@ -1335,7 +1335,7 @@
     "project_raw": "APL",
     "department_raw": "TOC",
     "header_date_raw": "Sep 3 / Thu",
-    "title": "Apol of My Ai",
+    "title": "Show Oscar",
     "task": "Render R1-5 Grade + Transfer to raid*",
     "purpose": "For online",
     "source": "T6",
@@ -1347,8 +1347,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "Sep 3 / Thu",
-    "assignees_raw": "Piolo @raedsss",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Ramon @user_two",
+    "cc_raw": "@priya",
     "subtitle": "None"
    }
   },
@@ -1361,7 +1361,7 @@
     "department_raw": "AE",
     "header_date_raw": "September 2 / Wednesday",
     "title": null,
-    "task": "1. export AAF, XML, EDL, for NC1 and LOCKED CUT (assigned: ate @debz38)\n\n2. upload materials to content hub (assigned: Piolo)",
+    "task": "1. export AAF, XML, EDL, for NC1 and LOCKED CUT (assigned: ate @user_four)\n\n2. upload materials to content hub (assigned: Ramon)",
     "purpose": "for netflix requirements",
     "source": null,
     "watermark": null,
@@ -1370,10 +1370,10 @@
     "platform": null,
     "blocker": null,
     "pending": null,
-    "notes": "Ate @debz38 hingi nalang po ng locpath para kay Pio nitong mga mats",
+    "notes": "Ate @user_four hingi nalang po ng locpath para kay Pio nitong mga mats",
     "deadline_raw": "September 2, within shift",
-    "assignees_raw": "ate @debz38 / Piolo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "ate @user_four / Ramon",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1397,8 +1397,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": null,
-    "assignees_raw": "Piolo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Ramon",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1422,8 +1422,8 @@
     "pending": null,
     "notes": "hingi nalang rin po ako ng locpath after. Ipapacopy ko sa drives ng riles sa Monday po",
     "deadline_raw": null,
-    "assignees_raw": "ate Majo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "ate Lena",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1435,7 +1435,7 @@
     "project_raw": "SK",
     "department_raw": "TOC",
     "header_date_raw": "Aug 28 / Fri",
-    "title": "JUAN AND LILY FOR SK look test",
+    "title": "SHOW MIKE FOR SK look test",
     "task": "process mats for grading (prores 4444) for test grade",
     "purpose": "for test grade",
     "source": "looktest HD",
@@ -1460,7 +1460,7 @@
     "project_raw": "SOY",
     "department_raw": "TOC",
     "header_date_raw": "Aug 27 / Thursday",
-    "title": "Stuck On You FTR",
+    "title": "Show Bravo FTR",
     "task": "lay in subs to create SRT",
     "purpose": null,
     "source": "[LINK]",
@@ -1472,8 +1472,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "August 27 / Thurs / before photoshoot",
-    "assignees_raw": "@joshua0826",
-    "cc_raw": "@leizette",
+    "assignees_raw": "@user_one",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1497,8 +1497,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "kung kelan matapos yung render",
-    "assignees_raw": "Piolo / Jade",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Ramon / Mira",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1516,14 +1516,14 @@
     "source": "[LINK]",
     "watermark": null,
     "link_settings": "dl with pw",
-    "mode_of_transfer": "frameio + raid ni kuya @Direkjson",
+    "mode_of_transfer": "frameio + raid ni kuya @user_five",
     "platform": null,
     "blocker": null,
     "pending": null,
     "notes": null,
     "deadline_raw": "Aug 26, end of shift",
-    "assignees_raw": "@joshua0826",
-    "cc_raw": "@leizette",
+    "assignees_raw": "@user_one",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1541,14 +1541,14 @@
     "source": "[LINK]",
     "watermark": null,
     "link_settings": "dl with pw",
-    "mode_of_transfer": "frameio + raid ni kuya @Direkjson",
+    "mode_of_transfer": "frameio + raid ni kuya @user_five",
     "platform": null,
     "blocker": null,
     "pending": null,
     "notes": null,
     "deadline_raw": "Aug 26, end of shift",
-    "assignees_raw": "@joshua0826",
-    "cc_raw": "@leizette",
+    "assignees_raw": "@user_one",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1560,7 +1560,7 @@
     "project_raw": "OURS",
     "department_raw": "TOC",
     "header_date_raw": "August 25 / Tuesday",
-    "title": "Ours was a timeless night burning",
+    "title": "Show Papa",
     "task": "Upload mp4 captionless screener to vimeo (from captionless master), add srt file separately to the link.",
     "purpose": "for updated screener purposes",
     "source": "Ours ssd",
@@ -1572,7 +1572,7 @@
     "pending": null,
     "notes": "pa stack nalang ito over the captioned screener para may copy pa rin sila ng may burnt in na subs.",
     "deadline_raw": "August 26, 5pm",
-    "assignees_raw": "@raedsss thank youu",
+    "assignees_raw": "@user_two thank youu",
     "cc_raw": null,
     "subtitle": null
    }
@@ -1585,7 +1585,7 @@
     "project_raw": "LSB",
     "department_raw": "AE",
     "header_date_raw": "Aug 25 / Tues",
-    "title": "LOS SALVAJES BRAVOS (ASS04 53min cut)",
+    "title": "SHOW FOXTROT (ASS04 53min cut)",
     "task": "export copy for scorer - with and without music",
     "purpose": "scorer’s guide",
     "source": null,
@@ -1622,8 +1622,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "August 26, 4PM",
-    "assignees_raw": "Jade / @raedsss kung sakaling umabot kay raedss",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Mira / @user_two kung sakaling umabot kay raedss",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1647,8 +1647,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "August 26, 4PM",
-    "assignees_raw": "Jade / @raedsss kung sakaling umabot kay raedss",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Mira / @user_two kung sakaling umabot kay raedss",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1672,8 +1672,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "August 21 / Friday 5:00 AM",
-    "assignees_raw": "Jade",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Mira",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1685,7 +1685,7 @@
     "project_raw": "MM",
     "department_raw": "TOC",
     "header_date_raw": "August 20 / Thursday",
-    "title": "Mother Maybe FTR",
+    "title": "Show Delta FTR",
     "task": "Search/match timecodes and export 20-minute section from latest cut (v4)",
     "purpose": "For grant submission to NCCA",
     "source": null,
@@ -1697,8 +1697,8 @@
     "pending": null,
     "notes": "Reference timecodes from v3 Vimeo cut: 31:37 - 51:47\nVimeo link: [LINK]\n\nInstructions:\n\n1. Itong cut sa project file is v4 na (latest cut). Get context from the v3 timecodes (31:37 - 51:47), tapos hanapin kung saan 'yun sa latest v4 cut.\n2. Export from the latest cut, making sure not to go over 20 minutes. If over 20 minutes, let us know agad.\n3. Apply required watermark upon export.",
     "deadline_raw": "August 21 / Friday 5:00 AM",
-    "assignees_raw": "Jade",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Mira",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1747,8 +1747,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "August 20, 3PM",
-    "assignees_raw": "ate Debbie thank u!",
-    "cc_raw": "@leizette",
+    "assignees_raw": "ate Nina thank u!",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1760,7 +1760,7 @@
     "project_raw": "PTG",
     "department_raw": "AE",
     "header_date_raw": "August 18 / Tuesday",
-    "title": "Patay Gutom",
+    "title": "Show Charlie",
     "task": "Consolidate Animation Prep with drt for oniel",
     "purpose": "for online",
     "source": "PTG OFFLINE 1",
@@ -1772,8 +1772,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "August 18, Tuesday, 8PM",
-    "assignees_raw": "ate Debbie thank you!",
-    "cc_raw": "@leizette",
+    "assignees_raw": "ate Nina thank you!",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1797,7 +1797,7 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "Tonight if keri or tom",
-    "assignees_raw": "@alecgaba @mclb22",
+    "assignees_raw": "@user_nine @user_seven",
     "cc_raw": null,
     "subtitle": null
    }
@@ -1810,7 +1810,7 @@
     "project_raw": "PTG",
     "department_raw": "AE",
     "header_date_raw": "August 17 / Monday",
-    "title": "Patay Gutom",
+    "title": "Show Charlie",
     "task": "PREP FF FOR ANIMATION:\n- all sementeryo scenes na di nagamit\n- stills sa unahan ng film",
     "purpose": "for animation",
     "source": "PTG OFFLINE 1",
@@ -1822,8 +1822,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "August 15, Tuesday, 3PM",
-    "assignees_raw": "ate Debbie thank you!",
-    "cc_raw": "@leizette",
+    "assignees_raw": "ate Nina thank you!",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1847,8 +1847,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "Aug 17, 1pm",
-    "assignees_raw": "Piolo",
-    "cc_raw": "@leizette, @mclb22",
+    "assignees_raw": "Ramon",
+    "cc_raw": "@priya, @user_seven",
     "subtitle": "None"
    }
   },
@@ -1860,10 +1860,10 @@
     "project_raw": "PP EP 2 (APC)",
     "department_raw": "TOC",
     "header_date_raw": "August 17 / Monday",
-    "title": "Paskong Pinoy EP 2: A Perfect Christmas",
-    "task": "dl EXR files from kuya ogie, zip per EXR file and upload to frame io (yung VFX na folder sa paskong pinoy project sa fio)",
+    "title": "Show Juliet EP 2: A Perfect Christmas",
+    "task": "dl EXR files from kuya ogie, zip per EXR file and upload to frame io (yung VFX na folder sa show juliet project sa fio)",
     "purpose": "for turnover of VFX files to bb",
-    "source": "Paskong Pinoy from Kuya Ogie\nLink: [LINK]\nPW: [password withheld – see Telegram message]",
+    "source": "Show Juliet from Kuya Ogie\nLink: [LINK]\nPW: [password withheld – see Telegram message]",
     "watermark": null,
     "link_settings": null,
     "mode_of_transfer": "frame.io, me na mag generate ng link",
@@ -1872,8 +1872,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "August 17, 11AM if keri",
-    "assignees_raw": "for @raedsss / Piolo kung sino man ang walang gawaa thank you!",
-    "cc_raw": "@leizette",
+    "assignees_raw": "for @user_two / Ramon kung sino man ang walang gawaa thank you!",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1897,8 +1897,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "Aug 15,  end of shift",
-    "assignees_raw": "@joshua0826",
-    "cc_raw": "@leizette",
+    "assignees_raw": "@user_one",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -1922,8 +1922,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "Aug 15, 5pm",
-    "assignees_raw": "ate Debbie",
-    "cc_raw": "@leizette",
+    "assignees_raw": "ate Nina",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   }

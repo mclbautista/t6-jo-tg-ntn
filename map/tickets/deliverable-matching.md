@@ -12,11 +12,11 @@ blocked_by: [Job Order field mapping into Notion, Resolving people and projects 
 The field-mapping ticket left the Deliverable relation blank in v1 and named matching an open gap and a goal. How does the watchdog link a captured JO to the Deliverable pages it belongs to, without inventing links?
 
 Facts from the live Notion data (fetched 2026-09-28):
-- Deliverables (`collection://0a4ff084-3138-429c-8dbe-4d802aded74f`) has 9 rows; 3 are dated Sept 2026, the rest 2024-2025. Names follow project + cut tag + purpose or week (`Moonglow FTR SCR`, `Mag-Iina FTR SCR`, `Someone Someday WK11 VFX`, `Mainpic DCP`).
+- Deliverables (`collection://0a4ff084-3138-429c-8dbe-4d802aded74f`) has 9 rows; 3 are dated Sept 2026, the rest 2024-2025. Names follow project + cut tag + purpose or week (`Moonglow FTR SCR`, `Mag-Iina FTR SCR`, `Show Hotel WK11 VFX`, `Mainpic DCP`).
 - Each Deliverable has a `🗺️ Projects` relation. Its `Job Orders` relation is the two-way counterpart of the JO's `Deliverable` relation, so writing from the JO side is enough.
 - Status is a lifecycle (Staged, Waiting for Lock, In Progress, Blocked, Waiting for Comments, Mastering, Delivered, QC, QC Passed, Distributed, Archived); Deliverable Class is Master or Archival.
 - `OCP Intake ID` and `OCP Intake Source` exist but are empty on all 9 rows, so they are not usable as keys.
-- 6 JO rows have a Deliverable link; 3 are obvious test rows, leaving 3 real pairs: Moonglow JO #32 to `Moonglow FTR SCR`, SOMSOM #0155 to `Someone Someday WK11 VFX`, Mag-Iina JO 30 to `Mag-Iina FTR SCR`. Two are derivable from the message text; the Moonglow link (Purpose "For London FF video library") rests on coordinator knowledge, not words.
+- 6 JO rows have a Deliverable link; 3 are obvious test rows, leaving 3 real pairs: Moonglow JO #32 to `Moonglow FTR SCR`, SOMSOM #0155 to `Show Hotel WK11 VFX`, Mag-Iina JO 30 to `Mag-Iina FTR SCR`. Two are derivable from the message text; the Moonglow link (Purpose "For London FF video library") rests on coordinator knowledge, not words.
 - Deliverables appear to be created by the coordinator in batches, close to when JOs reference them.
 
 ## Resolution
@@ -29,7 +29,7 @@ Resolved 2026-09-28 in a grilling session with the owner. Every question taken a
 
 **Candidate set.** If the JO has a resolved Project, the candidates are the Deliverables whose `🗺️ Projects` relation contains that project's page id. If the Project is unresolved, there is no match attempt and the relation is blank (the unresolved project is already reported by the people-and-projects rules). Candidates come from a live query per JO (filter `relation_contains` on the project id, paginated), never from the 6-hour cache, because Deliverables are created close to the JOs that reference them and a stale cache would miss them. If the project has zero Deliverables, the matcher call is skipped and the outcome is `none`. Principle: **Scope at the filter, not the grant**.
 
-**No status or class filter in v1.** Archived and Distributed Deliverables stay in the candidate set, because archive-purpose JOs (for example "[ARCHIVE] 2 VALID IDs") plausibly point at them. Status and Class are not passed to the model either, so any accuracy gain from adding them can be measured in the eval first. Principle: **Never drop silently**.
+**No status or class filter in v1.** Archived and Distributed Deliverables stay in the candidate set, because archive-purpose JOs (for example "[ARCHIVE] Show Golf") plausibly point at them. Status and Class are not passed to the model either, so any accuracy gain from adding them can be measured in the eval first. Principle: **Never drop silently**.
 
 **Who decides: a separate Jev call over the shortlist.** The classify/extract call stays roster-blind, exactly as the classifier ticket decided. The matcher is a second, separate structured call to Jev, run after extraction and project resolution. The owner chose Jev on purpose as a way to learn it; acceptance is still decided by the eval below. This is a deliberate, bounded exception to "the model never sees the roster": the list is short, project-scoped, and the model may only choose from it. Principle: **Resolve, don't generate** (the model proposes text; code resolves identity).
 

@@ -12,7 +12,7 @@
      "index": 0,
      "message": {
       "role": "assistant",
-      "content": "{\"verdict\": \"jo\", \"confidence\": \"high\", \"reasons\": \"Has a JO header, a task and an assignee.\", \"multiple_jo_suspected\": false, \"header_raw\": \"MFG - TOC - JO #74\", \"jo_number_raw\": \"JO #74\", \"project_raw\": \"MFG\", \"department_raw\": \"TOC\", \"header_date_raw\": \"September 28 / Monday\", \"title\": \"My Father's Girlfriend FTR\", \"task\": \"D14-15 Upload synced dailies\", \"purpose\": null, \"source\": null, \"watermark\": null, \"link_settings\": null, \"mode_of_transfer\": null, \"platform\": null, \"blocker\": null, \"pending\": null, \"notes\": null, \"deadline_raw\": \"September 29 / Tues 5AM\", \"assignees_raw\": \"Majo\", \"cc_raw\": \"@leizette\", \"subtitle\": null}"
+      "content": "{\"verdict\": \"jo\", \"confidence\": \"high\", \"reasons\": \"Has a JO header, a task and an assignee.\", \"multiple_jo_suspected\": false, \"header_raw\": \"MFG - TOC - JO #74\", \"jo_number_raw\": \"JO #74\", \"project_raw\": \"MFG\", \"department_raw\": \"TOC\", \"header_date_raw\": \"September 28 / Monday\", \"title\": \"Show Alpha FTR\", \"task\": \"D14-15 Upload synced dailies\", \"purpose\": null, \"source\": null, \"watermark\": null, \"link_settings\": null, \"mode_of_transfer\": null, \"platform\": null, \"blocker\": null, \"pending\": null, \"notes\": null, \"deadline_raw\": \"September 29 / Tues 5AM\", \"assignees_raw\": \"Lena\", \"cc_raw\": \"@priya\", \"subtitle\": null}"
      },
      "finish_reason": "stop"
     }
@@ -132,7 +132,7 @@
      "index": 0,
      "message": {
       "role": "assistant",
-      "content": "{\"verdict\": \"maybe\", \"confidence\": \"high\", \"reasons\": \"Has a JO header, a task and an assignee.\", \"multiple_jo_suspected\": false, \"header_raw\": \"MFG - TOC - JO #74\", \"jo_number_raw\": \"JO #74\", \"project_raw\": \"MFG\", \"department_raw\": \"TOC\", \"header_date_raw\": \"September 28 / Monday\", \"title\": \"My Father's Girlfriend FTR\", \"task\": \"D14-15 Upload synced dailies\", \"purpose\": null, \"source\": null, \"watermark\": null, \"link_settings\": null, \"mode_of_transfer\": null, \"platform\": null, \"blocker\": null, \"pending\": null, \"notes\": null, \"deadline_raw\": \"September 29 / Tues 5AM\", \"assignees_raw\": \"Majo\", \"cc_raw\": \"@leizette\", \"subtitle\": null, \"page_id\": \"abc\"}"
+      "content": "{\"verdict\": \"maybe\", \"confidence\": \"high\", \"reasons\": \"Has a JO header, a task and an assignee.\", \"multiple_jo_suspected\": false, \"header_raw\": \"MFG - TOC - JO #74\", \"jo_number_raw\": \"JO #74\", \"project_raw\": \"MFG\", \"department_raw\": \"TOC\", \"header_date_raw\": \"September 28 / Monday\", \"title\": \"Show Alpha FTR\", \"task\": \"D14-15 Upload synced dailies\", \"purpose\": null, \"source\": null, \"watermark\": null, \"link_settings\": null, \"mode_of_transfer\": null, \"platform\": null, \"blocker\": null, \"pending\": null, \"notes\": null, \"deadline_raw\": \"September 29 / Tues 5AM\", \"assignees_raw\": \"Lena\", \"cc_raw\": \"@priya\", \"subtitle\": null, \"page_id\": \"abc\"}"
      },
      "finish_reason": "stop"
     }

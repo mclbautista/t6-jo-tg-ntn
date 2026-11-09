@@ -4,7 +4,7 @@
  "examples": [
   {
    "id": "corpus-0",
-   "input": "MFG - TOC - JO #74\nSeptember 28 / Monday\n\nTitle: My Father's Girlfriend FTR\nTask: D14-15 Upload synced dailies\nPurpose: For prod and NF review\nSource Drive: Offline Coby\nWatermark: Follow netflix guidelines\nMode of Transfer: Contenthub, share thru PIX\nLink Settings: N/A\nDeadline: September 29 / Tues 5AM\nStatus:\nPending:\nNote: \n\nAssigned: Majo \ncc: @leizette",
+   "input": "MFG - TOC - JO #74\nSeptember 28 / Monday\n\nTitle: Show Alpha FTR\nTask: D14-15 Upload synced dailies\nPurpose: For prod and NF review\nSource Drive: Offline Owen\nWatermark: Follow netflix guidelines\nMode of Transfer: Contenthub, share thru PIX\nLink Settings: N/A\nDeadline: September 29 / Tues 5AM\nStatus:\nPending:\nNote: \n\nAssigned: Lena \ncc: @priya",
    "output": {
     "verdict": "jo",
     "confidence": "high",
@@ -15,10 +15,10 @@
     "project_raw": "MFG",
     "department_raw": "TOC",
     "header_date_raw": "September 28 / Monday",
-    "title": "My Father's Girlfriend FTR",
+    "title": "Show Alpha FTR",
     "task": "D14-15 Upload synced dailies",
     "purpose": "For prod and NF review",
-    "source": "Offline Coby",
+    "source": "Offline Owen",
     "watermark": "Follow netflix guidelines",
     "link_settings": "N/A",
     "mode_of_transfer": "Contenthub, share thru PIX",
@@ -27,14 +27,14 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "September 29 / Tues 5AM",
-    "assignees_raw": "Majo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Lena",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
   {
    "id": "corpus-2",
-   "input": "TWBTY - TOC - JO No. 15\nSeptember 26 / Saturday \n\n\nTasks:  export synced day 4 rushes (one latag, magkasunod sequences)\n\nPurpose:  offline reference \nWatermark:  COPY FOR REIN ENTERTAINMENT \nSubtitle:\nMode of Transfer:  rushes frameio master link \nLink Settings: \nSource Material:  TWB2U OFFLINE 03 \nNotes: \n\nStatus: \nPending: \nProject File: \nLocpath: \n\nDeadline: within shift \nAssigned to: Paul / Piolo  \ncc: @leizette",
+   "input": "TWBTY - TOC - JO No. 15\nSeptember 26 / Saturday \n\n\nTasks:  export synced day 4 rushes (one latag, magkasunod sequences)\n\nPurpose:  offline reference \nWatermark:  COPY FOR REIN ENTERTAINMENT \nSubtitle:\nMode of Transfer:  rushes frameio master link \nLink Settings: \nSource Material:  TWB2U OFFLINE 03 \nNotes: \n\nStatus: \nPending: \nProject File: \nLocpath: \n\nDeadline: within shift \nAssigned to: Paul / Ramon  \ncc: @priya",
    "output": {
     "verdict": "jo",
     "confidence": "high",
@@ -57,14 +57,14 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "within shift",
-    "assignees_raw": "Paul / Piolo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Paul / Ramon",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
   {
    "id": "corpus-5",
-   "input": "MP-TOC-JO01\nSept 25 / Fri\n\nTitle: Maybe in Another Universe (look test mats)\nTask/s: process prores \nPurpose: for test grade and LUT creation\nWatermark: -\nSubtitle: -\nMode of Transfer: smash\nLink Settings: downloadable with pw\nSource Material: look test mats HD\nNotes:\n\nStatus:\nPending: \nProject File: \nLocpath: \n\nDeadline: Sept 28 / Mon / within the day",
+   "input": "MP-TOC-JO01\nSept 25 / Fri\n\nTitle: Show Lima (look test mats)\nTask/s: process prores \nPurpose: for test grade and LUT creation\nWatermark: -\nSubtitle: -\nMode of Transfer: smash\nLink Settings: downloadable with pw\nSource Material: look test mats HD\nNotes:\n\nStatus:\nPending: \nProject File: \nLocpath: \n\nDeadline: Sept 28 / Mon / within the day",
    "output": {
     "verdict": "jo",
     "confidence": "high",
@@ -75,7 +75,7 @@
     "project_raw": "MP",
     "department_raw": "TOC",
     "header_date_raw": "Sept 25 / Fri",
-    "title": "Maybe in Another Universe (look test mats)",
+    "title": "Show Lima (look test mats)",
     "task": "process prores",
     "purpose": "for test grade and LUT creation",
     "source": "look test mats HD",
@@ -94,7 +94,7 @@
   },
   {
    "id": "corpus-6",
-   "input": "MC7 - AE - #008\nSeptember 25 / Friday\n\nTitle: 2nd Miracle in Cell No. 7\nTasks: sync day5\nPurpose: for offline \n\nWatermark: none\nMode of Transfer: copy to offline 1\n\nSource material: MC7 offline 2\n\nDeadline: September 26, 4PM\nStatus as of 7pm:\nPending:\nNotes: pa apply nalang here yung tinuro ni ate debs na pag sort \n\nAssigned: @joshua0826  thank you!\n\ncc: @leizette",
+   "input": "MC7 - AE - #008\nSeptember 25 / Friday\n\nTitle: 2nd Show Echo\nTasks: sync day5\nPurpose: for offline \n\nWatermark: none\nMode of Transfer: copy to offline 1\n\nSource material: MC7 offline 2\n\nDeadline: September 26, 4PM\nStatus as of 7pm:\nPending:\nNotes: pa apply nalang here yung tinuro ni ate debs na pag sort \n\nAssigned: @user_one  thank you!\n\ncc: @priya",
    "output": {
     "verdict": "jo",
     "confidence": "high",
@@ -105,7 +105,7 @@
     "project_raw": "MC7",
     "department_raw": "AE",
     "header_date_raw": "September 25 / Friday",
-    "title": "2nd Miracle in Cell No. 7",
+    "title": "2nd Show Echo",
     "task": "sync day5",
     "purpose": "for offline",
     "source": "MC7 offline 2",
@@ -117,14 +117,14 @@
     "pending": null,
     "notes": "pa apply nalang here yung tinuro ni ate debs na pag sort",
     "deadline_raw": "September 26, 4PM",
-    "assignees_raw": "@joshua0826  thank you!",
-    "cc_raw": "@leizette",
+    "assignees_raw": "@user_one  thank you!",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
   {
    "id": "corpus-12",
-   "input": "TOC - Job Order\nSeptember 24 / Thursday \n\nTitle: I Have a Name\nTask/s: process unencrypted DCP\nPurpose: \nWatermark: \nSubtitle:\nMode of Transfer: fromsmash\nLink Settings: \nSource Material: waiting for gdrive link \nNotes: \n\nStatus:\nPending: \nProject File: \nLocpath: \n\nDeadline: \nAssigned to: Paul / Piolo \ncc: @leizette",
+   "input": "TOC - Job Order\nSeptember 24 / Thursday \n\nTitle: Show Quebec\nTask/s: process unencrypted DCP\nPurpose: \nWatermark: \nSubtitle:\nMode of Transfer: fromsmash\nLink Settings: \nSource Material: waiting for gdrive link \nNotes: \n\nStatus:\nPending: \nProject File: \nLocpath: \n\nDeadline: \nAssigned to: Paul / Ramon \ncc: @priya",
    "output": {
     "verdict": "jo",
     "confidence": "high",
@@ -135,7 +135,7 @@
     "project_raw": null,
     "department_raw": "TOC",
     "header_date_raw": "September 24 / Thursday",
-    "title": "I Have a Name",
+    "title": "Show Quebec",
     "task": "process unencrypted DCP",
     "purpose": null,
     "source": "waiting for gdrive link",
@@ -147,14 +147,14 @@
     "pending": null,
     "notes": null,
     "deadline_raw": null,
-    "assignees_raw": "Paul / Piolo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Paul / Ramon",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
   {
    "id": "corpus-13",
-   "input": "SOY - TOC - JOB ORDER 31\nSeptember 25 / Thursday \n\nTask: export clips for nomination videos from captionless MP4 master\n\nWatermark: none\nSubtitle:\nMode of Transfer: gdrive link below\nLink Settings: \nSource Material: '/Volumes/SIMBAHAN TMP MASTERS/STUCK ON YOU/__DELIVERABLES'\nNotes: \n\n\n- Panalong Aktres (Xyriel Manabat)\n- Panalong Aktor (River Joseph)\n- Panalong Pangalawang Aktor (Roger Naldo)\n- Panalo sa Cinematography (Rommel Sales, LPS)\n- Panalo sa Production Design (Jeric delos Angeles)\n\n\nPlease upload to your respective film folders here: \n[LINK]\n\nClips should be labeled accordingly: Category_Name\n\nE.g. Panalong Aktres_Juanita Dela Cruz\n\nStatus:\nPending: \nProject File: \nLocpath: \n\nDeadline: September 25, 3pm\nAssigned to: Paul / Piolo     \ncc: @leizette",
+   "input": "SOY - TOC - JOB ORDER 31\nSeptember 25 / Thursday \n\nTask: export clips for nomination videos from captionless MP4 master\n\nWatermark: none\nSubtitle:\nMode of Transfer: gdrive link below\nLink Settings: \nSource Material: '/Volumes/SIMBAHAN TMP MASTERS/SHOW BRAVO/__DELIVERABLES'\nNotes: \n\n\n- Panalong Aktres (Yara Manabat)\n- Panalong Aktor (River Joseph)\n- Panalong Pangalawang Aktor (Roger Naldo)\n- Panalo sa Cinematography (Rommel Sales, LPS)\n- Panalo sa Production Design (Jeric delos Angeles)\n\n\nPlease upload to your respective film folders here: \n[LINK]\n\nClips should be labeled accordingly: Category_Name\n\nE.g. Panalong Aktres_Juanita Dela Cruz\n\nStatus:\nPending: \nProject File: \nLocpath: \n\nDeadline: September 25, 3pm\nAssigned to: Paul / Ramon     \ncc: @priya",
    "output": {
     "verdict": "jo",
     "confidence": "high",
@@ -168,17 +168,17 @@
     "title": null,
     "task": "export clips for nomination videos from captionless MP4 master",
     "purpose": null,
-    "source": "'/Volumes/SIMBAHAN TMP MASTERS/STUCK ON YOU/__DELIVERABLES'",
+    "source": "'/Volumes/SIMBAHAN TMP MASTERS/SHOW BRAVO/__DELIVERABLES'",
     "watermark": "none",
     "link_settings": null,
     "mode_of_transfer": "gdrive link below",
     "platform": null,
     "blocker": null,
     "pending": null,
-    "notes": "- Panalong Aktres (Xyriel Manabat)\n- Panalong Aktor (River Joseph)\n- Panalong Pangalawang Aktor (Roger Naldo)\n- Panalo sa Cinematography (Rommel Sales, LPS)\n- Panalo sa Production Design (Jeric delos Angeles)\n\n\nPlease upload to your respective film folders here:\n[LINK]\n\nClips should be labeled accordingly: Category_Name\n\nE.g. Panalong Aktres_Juanita Dela Cruz",
+    "notes": "- Panalong Aktres (Yara Manabat)\n- Panalong Aktor (River Joseph)\n- Panalong Pangalawang Aktor (Roger Naldo)\n- Panalo sa Cinematography (Rommel Sales, LPS)\n- Panalo sa Production Design (Jeric delos Angeles)\n\n\nPlease upload to your respective film folders here:\n[LINK]\n\nClips should be labeled accordingly: Category_Name\n\nE.g. Panalong Aktres_Juanita Dela Cruz",
     "deadline_raw": "September 25, 3pm",
-    "assignees_raw": "Paul / Piolo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Paul / Ramon",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
@@ -214,7 +214,7 @@
   },
   {
    "id": "corpus-20",
-   "input": "LSB-TOC-020\nDate:  Sep 23 / WEDNESDAY           \n\nTitle: [OFFLINE] LOS SALVAJES BRAVOS\nTask: Export Hires copy for promo \n\nPurpose: For Promo   \nWatermark: \nMode of Transfer: fio / smash \nLink Settings: DL with password \nSource material: T6 Drive \nDeadline: end of shift \n\nProject File: \nLocpath:\nStatus:\nPending:\nStatus: \nPending:\nNote:\n\nassigned to: Piolo    \ncc: @leizette",
+   "input": "LSB-TOC-020\nDate:  Sep 23 / WEDNESDAY           \n\nTitle: [OFFLINE] SHOW FOXTROT\nTask: Export Hires copy for promo \n\nPurpose: For Promo   \nWatermark: \nMode of Transfer: fio / smash \nLink Settings: DL with password \nSource material: T6 Drive \nDeadline: end of shift \n\nProject File: \nLocpath:\nStatus:\nPending:\nStatus: \nPending:\nNote:\n\nassigned to: Ramon    \ncc: @priya",
    "output": {
     "verdict": "jo",
     "confidence": "high",
@@ -225,7 +225,7 @@
     "project_raw": "LSB",
     "department_raw": "TOC",
     "header_date_raw": "Sep 23 / WEDNESDAY",
-    "title": "[OFFLINE] LOS SALVAJES BRAVOS",
+    "title": "[OFFLINE] SHOW FOXTROT",
     "task": "Export Hires copy for promo",
     "purpose": "For Promo",
     "source": "T6 Drive",
@@ -237,14 +237,14 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "end of shift",
-    "assignees_raw": "Piolo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Ramon",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
   {
    "id": "corpus-23",
-   "input": "R23 - OE - JO #35\nSeptember 22 / Tuesday\n\nTitle: Race to 23 FTR\nTask: Export FTR in ProRes 4444\nPurpose: Jade  creates the DCP from this ProRes\nSource Drive: R23 Online\nMode of Transfer: none\nDeadline: September 23 / Wednesday 12:00 AM\nStatus:\nPending:\n\nAssigned: @Direkjson \ncc: @leizette",
+   "input": "R23 - OE - JO #35\nSeptember 22 / Tuesday\n\nTitle: Show Romeo FTR\nTask: Export FTR in ProRes 4444\nPurpose: Mira  creates the DCP from this ProRes\nSource Drive: R23 Online\nMode of Transfer: none\nDeadline: September 23 / Wednesday 12:00 AM\nStatus:\nPending:\n\nAssigned: @user_five \ncc: @priya",
    "output": {
     "verdict": "jo",
     "confidence": "high",
@@ -255,9 +255,9 @@
     "project_raw": "R23",
     "department_raw": "OE",
     "header_date_raw": "September 22 / Tuesday",
-    "title": "Race to 23 FTR",
+    "title": "Show Romeo FTR",
     "task": "Export FTR in ProRes 4444",
-    "purpose": "Jade  creates the DCP from this ProRes",
+    "purpose": "Mira  creates the DCP from this ProRes",
     "source": "R23 Online",
     "watermark": null,
     "link_settings": null,
@@ -267,14 +267,14 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "September 23 / Wednesday 12:00 AM",
-    "assignees_raw": "@Direkjson",
-    "cc_raw": "@leizette",
+    "assignees_raw": "@user_five",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
   {
    "id": "corpus-28",
-   "input": "SOY - COOR - JOB ORDER - 30\nSeptember 22 / Tuesday\n\nTask: Delete files on frameio\nCurrent file storage: 628.93 GB\n\nDeadline: Sep 24\nStatus: \n\nAssigned to: @alecgaba thanks thanks!",
+   "input": "SOY - COOR - JOB ORDER - 30\nSeptember 22 / Tuesday\n\nTask: Delete files on frameio\nCurrent file storage: 628.93 GB\n\nDeadline: Sep 24\nStatus: \n\nAssigned to: @user_nine thanks thanks!",
    "output": {
     "verdict": "jo",
     "confidence": "high",
@@ -297,14 +297,14 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "Sep 24",
-    "assignees_raw": "@alecgaba thanks thanks!",
+    "assignees_raw": "@user_nine thanks thanks!",
     "cc_raw": null,
     "subtitle": null
    }
   },
   {
    "id": "corpus-45",
-   "input": "JO CODE: INA-TOC-30\nDate / Day: Sep 10 / Thu\n\nTitle: Mag-iina\nTask/s: Upload screener to fio\nPurpose: For screener\nWatermark: Embedded na sa export\nSubtitle: Embedded na sa export\nMode of Transfer: Frameio\nLink Settings: DL w pw\nSource Material: T6\nNotes: \n\nStatus:\nPending: \nProject File: \nLocpath: '/Volumes/MAG-IINA ONLINE 01/MAG IINA ONLINE/02_EXPORTS /FULL FILM/H264/WITH VIOLATOR/FOR ACFM/INA_FTR_MP4 STEREO_20260909_FOR ACFM.mp4'\n\nDeadline: Sep 10 / Thu\nAssigned to: Jade Majo \ncc: @leizette",
+   "input": "JO CODE: INA-TOC-30\nDate / Day: Sep 10 / Thu\n\nTitle: Mag-iina\nTask/s: Upload screener to fio\nPurpose: For screener\nWatermark: Embedded na sa export\nSubtitle: Embedded na sa export\nMode of Transfer: Frameio\nLink Settings: DL w pw\nSource Material: T6\nNotes: \n\nStatus:\nPending: \nProject File: \nLocpath: '/Volumes/MAG-IINA ONLINE 01/MAG IINA ONLINE/02_EXPORTS /FULL FILM/H264/WITH VIOLATOR/FOR ACFM/INA_FTR_MP4 STEREO_20260909_FOR ACFM.mp4'\n\nDeadline: Sep 10 / Thu\nAssigned to: Mira Lena \ncc: @priya",
    "output": {
     "verdict": "jo",
     "confidence": "high",
@@ -327,14 +327,14 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "Sep 10 / Thu",
-    "assignees_raw": "Jade Majo",
-    "cc_raw": "@leizette",
+    "assignees_raw": "Mira Lena",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
   {
    "id": "corpus-51",
-   "input": "KB - AE - JOB ORDER 14\nSeptember 9 / Monday\n\nTask:  export guides for PICLOCK\n\n- COPY FOR SOUND (with AAF)\n- COPY FOR MUSIC (with and without music)\n- COPY FOR SUBS\n- COPY FOR COLOR (Color mats)\n-  VFX Plates + Guides (pawait nalang markings nito ate, gawin ko today)\n\nPurpose: for online prep\nWatermark:  as noted above\nSubtitle: \nMode of Transfer:  frameio\nLink settings: dl with pw\nSource material: KB offline 02 / KB Offline 01\nStatus as of 7pm:\nPending:\nNotes:\n\nassigned to ate Debbie  cc @leizette",
+   "input": "KB - AE - JOB ORDER 14\nSeptember 9 / Monday\n\nTask:  export guides for PICLOCK\n\n- COPY FOR SOUND (with AAF)\n- COPY FOR MUSIC (with and without music)\n- COPY FOR SUBS\n- COPY FOR COLOR (Color mats)\n-  VFX Plates + Guides (pawait nalang markings nito ate, gawin ko today)\n\nPurpose: for online prep\nWatermark:  as noted above\nSubtitle: \nMode of Transfer:  frameio\nLink settings: dl with pw\nSource material: KB offline 02 / KB Offline 01\nStatus as of 7pm:\nPending:\nNotes:\n\nassigned to ate Nina  cc @priya",
    "output": {
     "verdict": "jo",
     "confidence": "high",
@@ -357,14 +357,14 @@
     "pending": null,
     "notes": null,
     "deadline_raw": null,
-    "assignees_raw": "ate Debbie",
-    "cc_raw": "@leizette",
+    "assignees_raw": "ate Nina",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
   {
    "id": "corpus-70",
-   "input": "[LATE JO]\nPTG - AE - #040\nAugust 18 / Tuesday\n\nTitle: Patay Gutom \nTasks: Consolidate Animation Prep with drt for oniel\n\nPurpose: for online\n\nMode of Transfer: swing drive na lamang\n\nSource material: PTG OFFLINE 1\n\nDeadline: August 18, Tuesday, 8PM\nStatus as of 7pm:\nPending:\nNotes: \n\nAssigned: ate Debbie thank you!\n\ncc: @leizette",
+   "input": "[LATE JO]\nPTG - AE - #040\nAugust 18 / Tuesday\n\nTitle: Show Charlie \nTasks: Consolidate Animation Prep with drt for oniel\n\nPurpose: for online\n\nMode of Transfer: swing drive na lamang\n\nSource material: PTG OFFLINE 1\n\nDeadline: August 18, Tuesday, 8PM\nStatus as of 7pm:\nPending:\nNotes: \n\nAssigned: ate Nina thank you!\n\ncc: @priya",
    "output": {
     "verdict": "jo",
     "confidence": "high",
@@ -375,7 +375,7 @@
     "project_raw": "PTG",
     "department_raw": "AE",
     "header_date_raw": "August 18 / Tuesday",
-    "title": "Patay Gutom",
+    "title": "Show Charlie",
     "task": "Consolidate Animation Prep with drt for oniel",
     "purpose": "for online",
     "source": "PTG OFFLINE 1",
@@ -387,14 +387,14 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "August 18, Tuesday, 8PM",
-    "assignees_raw": "ate Debbie thank you!",
-    "cc_raw": "@leizette",
+    "assignees_raw": "ate Nina thank you!",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
   {
    "id": "corpus-71",
-   "input": "JAG -COOR-JO#68\nAugust 18 / Tuesday\n\nTitle: JAGUAR FRAMEIO\nTask/s: Delete files on frameio\nCurrent folder storage: 831.05 GB\n\nDeadline: Tonight if keri or tom \nAssigned to: @alecgaba @mclb22",
+   "input": "JAG -COOR-JO#68\nAugust 18 / Tuesday\n\nTitle: JAGUAR FRAMEIO\nTask/s: Delete files on frameio\nCurrent folder storage: 831.05 GB\n\nDeadline: Tonight if keri or tom \nAssigned to: @user_nine @user_seven",
    "output": {
     "verdict": "jo",
     "confidence": "high",
@@ -417,14 +417,14 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "Tonight if keri or tom",
-    "assignees_raw": "@alecgaba @mclb22",
+    "assignees_raw": "@user_nine @user_seven",
     "cc_raw": null,
     "subtitle": null
    }
   },
   {
    "id": "corpus-74",
-   "input": "PP EP 2 (APC) - TOC - #0004\nAugust 17 / Monday\n\nTitle: Paskong Pinoy EP 2: A Perfect Christmas\nTask: dl EXR files from kuya ogie, zip per EXR file and upload to frame io (yung VFX na folder sa paskong pinoy project sa fio)\n\nPurpose: for turnover of VFX files to bb\nMode of Transfer: frame.io, me na mag generate ng link\n\nSource material: \n\nPaskong Pinoy from Kuya Ogie\nLink: [LINK]\nPW: [password withheld – see Telegram message]\n\nDeadline: August 17, 11AM if keri\nStatus as of 11am: \nPending:\n\nAssigned: for @raedsss / Piolo kung sino man ang walang gawaa thank you!\n\ncc: @leizette",
+   "input": "PP EP 2 (APC) - TOC - #0004\nAugust 17 / Monday\n\nTitle: Show Juliet EP 2: A Perfect Christmas\nTask: dl EXR files from kuya ogie, zip per EXR file and upload to frame io (yung VFX na folder sa show juliet project sa fio)\n\nPurpose: for turnover of VFX files to bb\nMode of Transfer: frame.io, me na mag generate ng link\n\nSource material: \n\nPaskong Pinoy from Kuya Ogie\nLink: [LINK]\nPW: [password withheld – see Telegram message]\n\nDeadline: August 17, 11AM if keri\nStatus as of 11am: \nPending:\n\nAssigned: for @user_two / Ramon kung sino man ang walang gawaa thank you!\n\ncc: @priya",
    "output": {
     "verdict": "jo",
     "confidence": "high",
@@ -435,10 +435,10 @@
     "project_raw": "PP EP 2 (APC)",
     "department_raw": "TOC",
     "header_date_raw": "August 17 / Monday",
-    "title": "Paskong Pinoy EP 2: A Perfect Christmas",
-    "task": "dl EXR files from kuya ogie, zip per EXR file and upload to frame io (yung VFX na folder sa paskong pinoy project sa fio)",
+    "title": "Show Juliet EP 2: A Perfect Christmas",
+    "task": "dl EXR files from kuya ogie, zip per EXR file and upload to frame io (yung VFX na folder sa show juliet project sa fio)",
     "purpose": "for turnover of VFX files to bb",
-    "source": "Paskong Pinoy from Kuya Ogie\nLink: [LINK]\nPW: [password withheld – see Telegram message]",
+    "source": "Show Juliet from Kuya Ogie\nLink: [LINK]\nPW: [password withheld – see Telegram message]",
     "watermark": null,
     "link_settings": null,
     "mode_of_transfer": "frame.io, me na mag generate ng link",
@@ -447,14 +447,14 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "August 17, 11AM if keri",
-    "assignees_raw": "for @raedsss / Piolo kung sino man ang walang gawaa thank you!",
-    "cc_raw": "@leizette",
+    "assignees_raw": "for @user_two / Ramon kung sino man ang walang gawaa thank you!",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },
   {
    "id": "corpus-75",
-   "input": "\\LS - AE - JOB ORDER 91\nAug 15 / Saturday \n\nTask: export  guides for ep 19 and ep 20\n\nEP17 & EP18\n- COPY FOR SOUND (with AAF)\n- COPY FOR MUSIC (with and without music)\n- COPY FOR SUBS\n- COPY FOR COLOR (color mats)\n- VFX plates (ongoing pa sila sa vfx list)\n\nPurpose: for online prep\nWatermark: as noted above\nSubtitle: \nMode of Transfer: color and vfx, frameio, the rest, fromsmash \nLink Settings: dl with pw\nSource material: proj file attached\n\n\nAssets:\n[LINK]\n\nLove, Siargao VIDGUIDES\n\nEP19 V4\nLink: [LINK]\n\n\nEP20 V4\nLink: [LINK]\n\n\nDeadline: Aug 15,  end of shift\nStatus as of 7pm:\nPending:\nNotes: \n\nAssigned to @joshua0826 cc @leizette",
+   "input": "\\LS - AE - JOB ORDER 91\nAug 15 / Saturday \n\nTask: export  guides for ep 19 and ep 20\n\nEP17 & EP18\n- COPY FOR SOUND (with AAF)\n- COPY FOR MUSIC (with and without music)\n- COPY FOR SUBS\n- COPY FOR COLOR (color mats)\n- VFX plates (ongoing pa sila sa vfx list)\n\nPurpose: for online prep\nWatermark: as noted above\nSubtitle: \nMode of Transfer: color and vfx, frameio, the rest, fromsmash \nLink Settings: dl with pw\nSource material: proj file attached\n\n\nAssets:\n[LINK]\n\nLove, Siargao VIDGUIDES\n\nEP19 V4\nLink: [LINK]\n\n\nEP20 V4\nLink: [LINK]\n\n\nDeadline: Aug 15,  end of shift\nStatus as of 7pm:\nPending:\nNotes: \n\nAssigned to @user_one cc @priya",
    "output": {
     "verdict": "jo",
     "confidence": "high",
@@ -477,8 +477,8 @@
     "pending": null,
     "notes": null,
     "deadline_raw": "Aug 15,  end of shift",
-    "assignees_raw": "@joshua0826",
-    "cc_raw": "@leizette",
+    "assignees_raw": "@user_one",
+    "cc_raw": "@priya",
     "subtitle": null
    }
   },

@@ -75,7 +75,7 @@ The watchdog will:
 33. As a coordinator, I want `@handle` mentions to require exact matching, so that fuzzy matching cannot redirect a real Telegram identity.
 34. As a coordinator, I want every resolvable assignee added to Assigned, so that multi-person Job Orders retain all named assignees.
 35. As a coordinator, I want per-task assignment wording preserved in Task even when Assigned cannot represent the split, so that the operational detail remains readable.
-36. As a coordinator, I want Leizette included in cc on every Job Order, so that the standing traffic-coordinator rule is consistently applied.
+36. As a coordinator, I want Priya included in cc on every Job Order, so that the standing traffic-coordinator rule is consistently applied.
 37. As a coordinator, I want Coordinator left blank, so that poster identity is not incorrectly treated as workflow ownership.
 38. As a coordinator, I want Projects resolved against the live Project Code vocabulary, so that relation values are backed by existing Project pages.
 39. As a coordinator, I want longer Project Codes matched before shorter codes, so that substring collisions do not select the wrong Project.
@@ -244,7 +244,7 @@ The watchdog will:
    - Write Blocker only from an explicit blocker.
    - Notes holds the poster's own notes, then, only when needed, a `— added by the watchdog —` block with `Deadline as posted: …`, `ASAP — deprioritize other JOs`, and `Earlier row: <url> (…)` lines in that order (#21, #24).
    - Fill Projects, Assigned, cc, and Deliverable only with resolved Notion page IDs.
-   - Always add Leizette to cc.
+   - Always add Priya to cc.
    - Leave Coordinator blank.
    - Never write Health because it is a formula.
    - Write `Telegram Key` as `<chat_id>:<message_id>`.
@@ -330,7 +330,7 @@ The watchdog will:
     - Add an original-message link only for channel-origin forwards with sufficient Telegram metadata.
     - Do not include the full raw message in an ops report.
     - Tag no one by default.
-    - Tag Leizette for unresolved People or Projects, unknown Department, and suspected multiple Job Orders.
+    - Tag Priya for unresolved People or Projects, unknown Department, and suspected multiple Job Orders.
     - Tag the owner only on true outage alerts after retry exhaustion.
     - Show Deliverable hints with match probability rather than a generated reason.
     - Use a durable outbox. Insert pending ops posts in the same transaction that moves a message to `written`.
@@ -386,7 +386,7 @@ The watchdog will:
 
 14. **Configuration and observability**
     - Validate all non-secret configuration at startup and fail boot on invalid values.
-    - Configure intake and ops chat/topic IDs, Leizette’s Contacts page ID, the owner’s Telegram handle, Deliverable thresholds, fuzzy thresholds, heartbeat schedule, timezone, cache interval, retry schedule, `deliverable_link_enabled`, and dry-run behavior.
+    - Configure intake and ops chat/topic IDs, Priya’s Contacts page ID, the owner’s Telegram handle, Deliverable thresholds, fuzzy thresholds, heartbeat schedule, timezone, cache interval, retry schedule, `deliverable_link_enabled`, and dry-run behavior.
     - Inject Telegram, Notion, DeepSeek, and Jev credentials through deployment environment secrets.
     - Emit masked structured logs to stdout and a rotated persistent log.
     - Include message key, state, stage, attempt, duration, and returned model ID in structured logs.
@@ -524,7 +524,7 @@ The watchdog will:
 - The End of Shift 23:59 fallback is a deliberate exception for a derived deadline, not permission to fabricate a poster-stated value. It must always be surfaced to ops.
 - Straight-to-live applies to the capture pipeline; it does not override the Deliverable matcher’s separate shadow-mode safeguard.
 - Outages longer than 24 hours are an accepted gap. The private ops topic’s human members noticing a missing 07:00 heartbeat is the chosen detector.
-- Build-time values include the real intake and ops chat/topic IDs, Leizette’s Contacts page ID, the owner’s real Telegram handle, and the captured reaction supported by the real group.
+- Build-time values include the real intake and ops chat/topic IDs, Priya’s Contacts page ID, the owner’s real Telegram handle, and the captured reaction supported by the real group.
 
 ## Owner decisions (2026-10-21)
 

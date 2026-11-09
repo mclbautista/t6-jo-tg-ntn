@@ -33,7 +33,7 @@ def telegram_update(message_id=3121, *, topic_id=5, chat_id=-100123, text="JO-TO
             "chat": {"id": chat_id, "type": "supergroup"},
             "message_thread_id": topic_id,
             "is_topic_message": True,
-            "from": {"id": 929048561, "is_bot": False, "username": "hmmkayy"},
+            "from": {"id": 929048561, "is_bot": False, "username": "user_eight"},
             "date": POSTED_AT_UNIX,
             "text": text,
             "entities": [{"type": "mention", "offset": 0, "length": 3}],
@@ -78,7 +78,7 @@ class PayloadTests(unittest.TestCase):
             message_id=3121,
             chat_id=-100123,
             topic_id=5,
-            from_user="@hmmkayy",
+            from_user="@user_eight",
             date=POSTED_AT_UNIX,
             by="ops",
             at="t",
@@ -86,7 +86,7 @@ class PayloadTests(unittest.TestCase):
         message = backfill.raw["message"]
         self.assertEqual(message["chat"]["id"], -100123)
         self.assertEqual(message["message_thread_id"], 5)
-        self.assertEqual(message["from"], {"username": "hmmkayy", "is_bot": False})
+        self.assertEqual(message["from"], {"username": "user_eight", "is_bot": False})
         self.assertEqual(message["date"], POSTED_AT_UNIX)
         numeric = from_text(
             "x",
@@ -189,7 +189,7 @@ class IngestCommandTests(unittest.TestCase):
             "--message-id",
             "3121",
             "--from-user",
-            "@hmmkayy",
+            "@user_eight",
             "--date",
             "2026-11-04T11:39:00",
         )

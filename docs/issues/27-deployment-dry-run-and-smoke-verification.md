@@ -14,7 +14,7 @@ Package the complete watchdog for its always-on host, retain an off-by-default d
 
 - [ ] The production image uses Python 3.12 slim and runs as a non-root user.
 - [ ] Compose injects secrets through the deployment environment, bind-mounts owner-only persistent data, uses `restart: unless-stopped`, and exposes a meaningful health check.
-- [ ] Configuration validates at startup and includes intake/ops chat and topic IDs, Leizette’s page ID, owner handle, timezone, cache/retry/heartbeat values, fuzzy and Deliverable thresholds, `dry_run`, and `deliverable_link_enabled`.
+- [ ] Configuration validates at startup and includes intake/ops chat and topic IDs, Priya’s page ID, owner handle, timezone, cache/retry/heartbeat values, fuzzy and Deliverable thresholds, `dry_run`, and `deliverable_link_enabled`.
 - [ ] Migrations are forward-only and remain backward-compatible for one release so the prior image can read the current ledger during rollback.
 - [ ] Dry-run defaults off; when enabled it stops at the exact stored `planned` payload, posts that plan to ops through the masker, and performs no Notion create or captured reaction.
 - [ ] Straight-to-live deployment is documented and does not introduce a mandatory dry-run day.
@@ -44,8 +44,8 @@ Every key below is validated at startup; a bad value fails the boot.
 | `intake_chat_id`, `intake_topic_id`, `captured_reaction`, `poll_timeout`, `poll_interval`, `job_orders_data_source_id`, `notion_version`, `ledger_path` | as today | #18 |
 | `deepseek_base_url`, `deepseek_model`, `deepseek_timeout_seconds` | `https://api.deepseek.com`, latest alias, 60 | #20 |
 | `department_aliases` | `{TO: TOC}` | #21 |
-| `contacts_data_source_id`, `projects_data_source_id`, `leizette_contact_page_id`, `cache_refresh_hours`, `cache_stale_alert_hours`, `fuzzy_min_score`, `fuzzy_min_lead`, `honorifics` | —, —, —, 6, 24, 90, 8, `[ate, kuya, sir]` | #22 |
-| `ops_chat_id`, `ops_topic_id`, `leizette_telegram_handle`, `header_date_tolerance_days` | —, —, —, 1 | #23 |
+| `contacts_data_source_id`, `projects_data_source_id`, `standing_cc_contact_page_id`, `cache_refresh_hours`, `cache_stale_alert_hours`, `fuzzy_min_score`, `fuzzy_min_lead`, `honorifics` | —, —, —, 6, 24, 90, 8, `[ate, kuya, sir]` | #22 |
+| `ops_chat_id`, `ops_topic_id`, `standing_cc_telegram_handle`, `header_date_tolerance_days` | —, —, —, 1 | #23 |
 | `owner_telegram_handle`, `retry_schedule_seconds`, `deadman_stale_minutes`, `heartbeat_time`, `timezone` | —, `[30,120,300,600]`, 10, `07:00`, `Asia/Manila` | #25 |
 | `deliverables_data_source_id`, `jev_url`, `jev_model`, `jev_timeout_seconds`, `t_link`, `t_hint`, `deliverable_link_enabled` | —, `https://openrouter.ai/api/alpha/decisions`, `~typesafe/jev-latest`, 30, 0.90, 0.50, false | #26 |
 | `dry_run` | false | #27 |
@@ -68,7 +68,7 @@ With `dry_run: true`, messages stop at `planned`; one `dry_run_plan` outbox mess
 2. Make the bot an admin of the intake group only; add it as a member with posting rights to the ops group.
 3. Read the intake and ops chat and topic ids and fill them into `config.yaml`.
 4. Create the Notion internal integration with Read content and Insert content; share Job Orders, Contacts, Projects and Deliverables with it.
-5. Fill Leizette's Contacts page id and both Telegram handles.
+5. Fill Priya's Contacts page id and both Telegram handles.
 6. Run `smoke.py`, pick `captured_reaction` from the printed list, re-run until it passes.
 7. Start the container and watch for the first capture and the next 07:00 heartbeat.
 
