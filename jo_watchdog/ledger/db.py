@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sqlite3
+import tempfile
 import time
 from collections.abc import Callable, Sequence
 from contextlib import contextmanager
@@ -102,8 +104,68 @@ def _forward_origin_type(raw_source: str) -> str | None:
     return origin.get("type") if isinstance(origin, dict) else None
 
 
+class LedgerNotReady(RuntimeError):
+    """A ledger that cannot be opened read-only: missing, unreadable, or not yet upgraded."""
+
+
 class Ledger:
     """A single connection to the ledger database."""
+
+    @classmethod
+    def open_read_only(cls, path: str | Path) -> Ledger:
+        """A read-only view of an existing, fully upgraded ledger (#120).
+
+        Opens a private copy of the database and its WAL, so the real files, their SQLite
+        companions and their permissions are never touched: not even a ``mode=ro`` connection
+        is safe, because it creates ``-shm``/``-wal`` files next to a WAL database. Nothing is
+        migrated or repaired; a missing or out-of-date ledger raises ``LedgerNotReady``.
+        """
+        source = Path(path)
+        if not source.is_file():
+            raise LedgerNotReady(f"no ledger at {source}")
+        tmp = tempfile.mkdtemp(prefix="jo-ledger-ro-")
+        try:
+            copy = Path(tmp) / "ledger.db"
+            shutil.copyfile(source, copy)
+            wal = Path(f"{source}-wal")
+            if wal.is_file():
+                shutil.copyfile(wal, Path(f"{copy}-wal"))
+            self = cls.__new__(cls)
+            self._gateway_mode = True
+            self._path = str(copy)
+            self._snapshot_dir = tmp
+            self._conn = sqlite3.connect(self._path, isolation_level=None)
+            self._conn.row_factory = sqlite3.Row
+            self._conn.execute("PRAGMA query_only=ON")
+            self._require_upgraded()
+            return self
+        except BaseException as exc:
+            shutil.rmtree(tmp, ignore_errors=True)
+            if isinstance(exc, sqlite3.Error):
+                raise LedgerNotReady(f"cannot read the ledger at {source}: {exc}") from exc
+            raise
+
+    def _require_upgraded(self) -> None:
+        applied = (
+            {r["version"] for r in self._conn.execute("SELECT version FROM schema_version")}
+            if self._table_exists("schema_version")
+            else set()
+        )
+        pending = sorted(set(MIGRATIONS) - applied)
+        if pending:
+            raise LedgerNotReady(
+                f"the ledger is out of date (migrations pending: {pending}); "
+                "start the watchdog once to upgrade it, then dry-run again"
+            )
+        stale = self._conn.execute(
+            "SELECT 1 FROM messages WHERE masked_text IS NULL OR masker_version IS NULL"
+            " OR masked_count IS NULL LIMIT 1"
+        ).fetchone()
+        if stale:
+            raise LedgerNotReady(
+                "the ledger is out of date (masking metadata missing); "
+                "start the watchdog once to upgrade it, then dry-run again"
+            )
 
     def __init__(
         self,
@@ -1256,3 +1318,6 @@ class Ledger:
 
     def close(self) -> None:
         self._conn.close()
+        snapshot = getattr(self, "_snapshot_dir", None)
+        if snapshot:
+            shutil.rmtree(snapshot, ignore_errors=True)

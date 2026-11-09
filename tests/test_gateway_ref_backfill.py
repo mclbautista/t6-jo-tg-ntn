@@ -101,6 +101,94 @@ class DryRunTests(unittest.TestCase):
         self.assertEqual(rig.dump(), before)
 
 
+def files_state(directory: Path) -> dict:
+    """Name, bytes, mode and mtime of every ledger file: any change at all shows up.
+
+    The command's own ``jo-watchdog.jsonl`` audit log is not ledger state and is left out.
+    """
+    return {
+        f.name: (f.read_bytes(), f.stat().st_mode, f.stat().st_mtime_ns)
+        for f in sorted(directory.iterdir())
+        if f.name.startswith("ledger.db") and f.is_file()
+    }
+
+
+class DryRunReadOnlyTests(unittest.TestCase):
+    """#120: a dry run opens a ledger it never writes, migrates, repairs or chmods."""
+
+    def test_compatible_ledger_files_are_untouched_while_open_elsewhere(self):
+        rig = BackfillRig(self)  # the rig's own connection keeps the WAL and sidecars alive
+        rig.legacy_row(ref=5530)
+        rig.ledger._conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
+        os.chmod(rig.dir / "ledger.db", 0o640)
+        before = files_state(rig.dir)
+        code, out, _ = rig.run()
+        self.assertEqual(code, 0)
+        self.assertIn("5530", out)
+        self.assertEqual(files_state(rig.dir), before)
+
+    def test_closed_ledger_gets_no_sidecars_and_keeps_its_permissions(self):
+        rig = BackfillRig(self)
+        rig.legacy_row(ref=5530)
+        rig.ledger.close()
+        for sidecar in rig.dir.glob("ledger.db-*"):
+            sidecar.unlink()
+        os.chmod(rig.dir / "ledger.db", 0o644)
+        before = files_state(rig.dir)
+        code, out, _ = rig.run()
+        self.assertEqual(code, 0)
+        self.assertIn("5530", out)
+        self.assertEqual(files_state(rig.dir), before)
+        self.assertEqual(sorted(files_state(rig.dir)), ["ledger.db"])
+
+    def test_older_ledger_is_refused_and_left_exactly_as_it_was(self):
+        rig = BackfillRig(self)
+        rig.legacy_row(ref=5530)
+        conn = rig.ledger._conn
+        conn.execute(
+            "DELETE FROM schema_version WHERE version = (SELECT MAX(version) FROM schema_version)"
+        )
+        conn.execute(
+            "INSERT INTO messages (chat_id, message_id, telegram_key, update_id, raw_source,"
+            " text, first_line, state, created_at, updated_at)"
+            " VALUES (-100, 1, '-100:1', 1, '{}', 'PW: old-secret', 'PW: old-secret',"
+            " 'received', 't', 't')"
+        )
+        before = files_state(rig.dir)
+        code, out, err = rig.run()
+        self.assertEqual(code, 2)
+        self.assertIn("out of date", err)
+        self.assertEqual(out, "")
+        self.assertEqual(files_state(rig.dir), before)
+
+    def test_missing_mask_metadata_alone_is_refused_and_not_repaired(self):
+        rig = BackfillRig(self)
+        rig.ledger._conn.execute(
+            "INSERT INTO messages (chat_id, message_id, telegram_key, update_id, raw_source,"
+            " text, first_line, state, created_at, updated_at)"
+            " VALUES (-100, 1, '-100:1', 1, '{}', 'PW: old-secret', 'PW: old-secret',"
+            " 'received', 't', 't')"
+        )
+        before = files_state(rig.dir)
+        code, _, err = rig.run()
+        self.assertEqual(code, 2)
+        self.assertIn("masking metadata", err)
+        self.assertEqual(files_state(rig.dir), before)
+        row = rig.ledger._conn.execute("SELECT masked_text FROM messages").fetchone()
+        self.assertIsNone(row["masked_text"])
+
+    def test_missing_ledger_is_an_error_and_creates_nothing(self):
+        rig = BackfillRig(self)
+        rig.ledger.close()
+        for f in rig.dir.glob("ledger.db*"):
+            f.unlink()
+        code, out, err = rig.run()
+        self.assertEqual(code, 2)
+        self.assertIn("no ledger", err)
+        self.assertEqual(out, "")
+        self.assertEqual(files_state(rig.dir), {})
+
+
 class DryRunOutcomeTests(unittest.TestCase):
     def test_failed_unknown_and_incomplete_answers_are_reported_and_not_written(self):
         rig = BackfillRig(self)
