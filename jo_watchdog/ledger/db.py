@@ -193,8 +193,12 @@ class Ledger:
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         if apply_migrations:
-            self._migrate()
-            self._backfill_mask_metadata()
+            try:
+                self._migrate()
+                self._backfill_mask_metadata()
+            except BaseException:
+                self._conn.close()
+                raise
         self._protect_files()
 
     def _protect_files(self) -> None:
@@ -213,6 +217,12 @@ class Ledger:
             row["version"]
             for row in self._conn.execute("SELECT version FROM schema_version")
         } if self._table_exists("schema_version") else set()
+        if self._conn.execute("PRAGMA foreign_key_check").fetchone():
+            raise sqlite3.IntegrityError(
+                "pre-existing foreign-key violations; startup stopped before migrations; "
+                "use offline jo_watchdog.ledger.reconciliation preview for operator review "
+                "(unsupported relationships remain blockers)"
+            )
         for version in sorted(MIGRATIONS):
             if version in applied:
                 continue
@@ -223,6 +233,11 @@ class Ledger:
                 self._conn.execute("PRAGMA foreign_keys=OFF")
             try:
                 with self._transaction():
+                    if self._conn.execute("PRAGMA foreign_key_check").fetchone():
+                        raise sqlite3.IntegrityError(
+                            "pre-existing foreign-key violations; "
+                            "use offline reconciliation preview"
+                        )
                     if callable(migration):
                         migration(self._conn)
                     else:
@@ -230,7 +245,7 @@ class Ledger:
                             self._conn.execute(statement)
                     if version == 10 and self._gateway_mode:
                         self._conn.execute(MIGRATION_10_GATEWAY_ROWS)
-                    if rebuild and self._conn.execute("PRAGMA foreign_key_check").fetchone():
+                    if self._conn.execute("PRAGMA foreign_key_check").fetchone():
                         raise sqlite3.IntegrityError(
                             f"migration {version} left dangling foreign keys"
                         )
