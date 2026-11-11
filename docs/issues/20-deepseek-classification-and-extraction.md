@@ -1,4 +1,4 @@
-<!-- Mirror of https://github.com/mclbautista/t6-jo-tg-ntn/issues/20. Keep identical: change the issue and this file together. -->
+<!-- Mirror of https://github.com/mclbautista/t6-jo-watchdog/issues/20. Keep identical: change the issue and this file together. -->
 
 # 3. DeepSeek classification and extraction
 

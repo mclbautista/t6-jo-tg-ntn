@@ -1,4 +1,4 @@
-<!-- Mirror of https://github.com/mclbautista/t6-jo-tg-ntn/issues/39. Keep identical: change the issue and this file together. -->
+<!-- Mirror of https://github.com/mclbautista/t6-jo-watchdog/issues/39. Keep identical: change the issue and this file together. -->
 
 # Wire planner and resolver into the worker
 

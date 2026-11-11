@@ -1,20 +1,20 @@
 # Issue mirrors
 
-Each file here is a copy of an open GitHub issue, so the plan can be read, diffed and reviewed in the repo.
+Each file here is a copy of a GitHub issue (all now closed), so the plan can be read, diffed and reviewed in the repo.
 
 | File | Issue |
 |---|---|
-| [28-prd.md](28-prd.md) | [#28](https://github.com/mclbautista/t6-jo-tg-ntn/issues/28) PRD |
-| [20-deepseek-classification-and-extraction.md](20-deepseek-classification-and-extraction.md) | [#20](https://github.com/mclbautista/t6-jo-tg-ntn/issues/20) |
-| [21-deterministic-job-order-planning.md](21-deterministic-job-order-planning.md) | [#21](https://github.com/mclbautista/t6-jo-tg-ntn/issues/21) |
-| [22-live-notion-resolution-and-persisted-caches.md](22-live-notion-resolution-and-persisted-caches.md) | [#22](https://github.com/mclbautista/t6-jo-tg-ntn/issues/22) |
-| [23-verification-and-durable-ops-reporting.md](23-verification-and-durable-ops-reporting.md) | [#23](https://github.com/mclbautista/t6-jo-tg-ntn/issues/23) |
-| [24-forwards-edits-reposts-and-jo-number-reuse.md](24-forwards-edits-reposts-and-jo-number-reuse.md) | [#24](https://github.com/mclbautista/t6-jo-tg-ntn/issues/24) |
-| [39-wire-planner-and-resolver-into-the-worker.md](39-wire-planner-and-resolver-into-the-worker.md) | [#39](https://github.com/mclbautista/t6-jo-tg-ntn/issues/39) |
-| [25-crash-safe-reliability-and-heartbeat.md](25-crash-safe-reliability-and-heartbeat.md) | [#25](https://github.com/mclbautista/t6-jo-tg-ntn/issues/25) |
-| [26-jev-deliverable-matching-in-shadow-mode.md](26-jev-deliverable-matching-in-shadow-mode.md) | [#26](https://github.com/mclbautista/t6-jo-tg-ntn/issues/26) |
-| [27-deployment-dry-run-and-smoke-verification.md](27-deployment-dry-run-and-smoke-verification.md) | [#27](https://github.com/mclbautista/t6-jo-tg-ntn/issues/27) |
-| [99-split-notes-and-watchdog-notes.md](99-split-notes-and-watchdog-notes.md) | [#99](https://github.com/mclbautista/t6-jo-tg-ntn/issues/99) |
+| [28-prd.md](28-prd.md) | [#28](https://github.com/mclbautista/t6-jo-watchdog/issues/28) PRD |
+| [20-deepseek-classification-and-extraction.md](20-deepseek-classification-and-extraction.md) | [#20](https://github.com/mclbautista/t6-jo-watchdog/issues/20) |
+| [21-deterministic-job-order-planning.md](21-deterministic-job-order-planning.md) | [#21](https://github.com/mclbautista/t6-jo-watchdog/issues/21) |
+| [22-live-notion-resolution-and-persisted-caches.md](22-live-notion-resolution-and-persisted-caches.md) | [#22](https://github.com/mclbautista/t6-jo-watchdog/issues/22) |
+| [23-verification-and-durable-ops-reporting.md](23-verification-and-durable-ops-reporting.md) | [#23](https://github.com/mclbautista/t6-jo-watchdog/issues/23) |
+| [24-forwards-edits-reposts-and-jo-number-reuse.md](24-forwards-edits-reposts-and-jo-number-reuse.md) | [#24](https://github.com/mclbautista/t6-jo-watchdog/issues/24) |
+| [39-wire-planner-and-resolver-into-the-worker.md](39-wire-planner-and-resolver-into-the-worker.md) | [#39](https://github.com/mclbautista/t6-jo-watchdog/issues/39) |
+| [25-crash-safe-reliability-and-heartbeat.md](25-crash-safe-reliability-and-heartbeat.md) | [#25](https://github.com/mclbautista/t6-jo-watchdog/issues/25) |
+| [26-jev-deliverable-matching-in-shadow-mode.md](26-jev-deliverable-matching-in-shadow-mode.md) | [#26](https://github.com/mclbautista/t6-jo-watchdog/issues/26) |
+| [27-deployment-dry-run-and-smoke-verification.md](27-deployment-dry-run-and-smoke-verification.md) | [#27](https://github.com/mclbautista/t6-jo-watchdog/issues/27) |
+| [99-split-notes-and-watchdog-notes.md](99-split-notes-and-watchdog-notes.md) | [#99](https://github.com/mclbautista/t6-jo-watchdog/issues/99) |
 
 ## Keeping them in sync
 

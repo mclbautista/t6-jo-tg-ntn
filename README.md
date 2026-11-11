@@ -6,10 +6,11 @@ to a SQLite ledger before advancing the polling offset, plans the exact Notion
 payload, writes it once, reads it back, and acknowledges with a fixed-meaning
 "captured" reaction.
 
-This repository is being built ticket-by-ticket. The walking skeleton (this
-slice) proves the ledger, the commit-before-offset ordering, and the Notion
-adapter's shape; DeepSeek classification and credential masking are in. Resolution,
-verification, reliability, and Deliverable matching arrive in later tickets.
+Status: the build tickets (#20 to #27, #39) are closed. Classification and
+extraction (DeepSeek), credential masking, people and project resolution,
+verification with ops reports, retries and the heartbeat, gateway mode and
+Deliverable matching (shadow mode) are all in. The one open issue is #103, the
+planned rename to t6-sixto-watchdog and the move onto t6.
 
 ## This repo is public
 
@@ -46,7 +47,9 @@ jo_watchdog/
 tests/        unittest (runs under pytest too); real SQLite + fake adapters
 smoke.py      manual real-account smoke verification (never in CI)
 Dockerfile, compose.yaml   production image and always-on deployment
-docs/         ledger schema contract
+docs/         ledger schema contract, runbooks, issue mirrors
+map/          design sources (mirrors of the closed design issues)
+tools/        orphan-call reconciliation rehearsal
 ```
 
 ## Run locally
@@ -328,6 +331,7 @@ Notion rows. They are also covered offline by `tests/test_smoke_scenarios.py`. A
 hand); that is the only opt-in, and the only thing they leave behind.
 
 See `docs/ledger-schema.md` for the versioned ledger contract and
-`docs/adr/` (once added) for decision records. Design sources live in `map/`
-(mirrors of the closed design issues #1–#17). The PRD and open build tickets
-are mirrored in `docs/issues/` (issues #20–#28).
+`docs/runbooks/orphan-call-reconciliation.md` for the orphan-call runbook.
+There are no ADRs yet (`docs/adr/` does not exist). Design sources live in `map/`
+(mirrors of the closed design issues #1–#17). The PRD (#28) and the build
+tickets (#20–#27, #39, #99), all closed, are mirrored in `docs/issues/`.

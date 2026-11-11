@@ -1,4 +1,4 @@
-<!-- Mirror of https://github.com/mclbautista/t6-jo-tg-ntn/issues/99. Keep identical: change the issue and this file together. -->
+<!-- Mirror of https://github.com/mclbautista/t6-jo-watchdog/issues/99. Keep identical: change the issue and this file together. -->
 
 # Split coordinator notes and watchdog notes into separate Notion columns
 
