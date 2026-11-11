@@ -1,4 +1,4 @@
-<!-- Mirror of https://github.com/mclbautista/t6-jo-tg-ntn/issues/27. Keep identical: change the issue and this file together. -->
+<!-- Mirror of https://github.com/mclbautista/t6-jo-watchdog/issues/27. Keep identical: change the issue and this file together. -->
 
 # 10. Deployment, dry-run, and real-account smoke verification
 

@@ -1,4 +1,4 @@
-<!-- Mirror of https://github.com/mclbautista/t6-jo-tg-ntn/issues/28. Keep identical: change the issue and this file together. -->
+<!-- Mirror of https://github.com/mclbautista/t6-jo-watchdog/issues/28. Keep identical: change the issue and this file together. -->
 
 # Build the JO Telegram Watchdog for durable Telegram-to-Notion capture
 

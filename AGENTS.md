@@ -2,7 +2,7 @@
 
 ### Issue tracker
 
-Issues and specs live in GitHub Issues for `mclbautista/t6-jo-tg-ntn`; use `gh`. See `docs/agents/issue-tracker.md`.
+Issues and specs live in GitHub Issues for `mclbautista/t6-jo-watchdog`; use `gh`. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
