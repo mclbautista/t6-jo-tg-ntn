@@ -21,6 +21,10 @@ when the cursor moves from Telegram update ids to the gateway's sequence numbers
 gateway what each ref became; a dry run (the default) prints a redacted table and writes
 nothing, ``--apply`` stores real IDs and clears the ones the gateway failed or forgot.
 
+``backup <dest>`` writes a consistent copy of the ledger to a new file with SQLite's online
+backup API (#131). It is safe while the watchdog runs, as long as it runs in the watchdog's
+container: ``docker compose exec watchdog python -m jo_watchdog.app backup /tmp/ledger.db``.
+
 ``healthcheck`` exits 0 when the poller's liveness stamp is fresh and 1
 otherwise; the container's ``HEALTHCHECK`` runs it.
 """
@@ -61,7 +65,7 @@ from jo_watchdog.core.backfill import (
 )
 from jo_watchdog.core.payload import page_url_for
 from jo_watchdog.core.plan import first_line_of
-from jo_watchdog.ledger.db import Ledger, LedgerNotReady, fmt_utc
+from jo_watchdog.ledger.db import Ledger, LedgerCorrupt, LedgerNotReady, backup, fmt_utc
 from jo_watchdog.ledger.states import State
 
 log = logging.getLogger("jo_watchdog.backfill_gateway_refs")
@@ -198,6 +202,24 @@ def run_backfill_gateway_refs(config_path: str, apply: bool) -> int:
     else:
         print(f"dry run, nothing written: {fixable} would change, {left} would stay; use --apply")
     return 1 if errors else 0
+
+
+def run_backup(config_path: str, dest: str) -> int:
+    """Write a consistent copy of the ledger to the new file ``dest``."""
+    config = load_config(config_path)
+    try:
+        result = backup(config.ledger_path, dest)
+    except FileExistsError:
+        print(f"backup: {dest} already exists; nothing written", file=sys.stderr)
+        return 2
+    except OSError as exc:
+        print(f"backup: {exc}", file=sys.stderr)
+        return 2
+    if result != "ok":
+        print(f"backup: {dest} was written but failed integrity_check: {result}", file=sys.stderr)
+        return 1
+    print(f"backup written to {dest} (integrity_check ok)")
+    return 0
 
 
 def run_healthcheck(config_path: str) -> int:
@@ -340,15 +362,29 @@ def main(argv: list[str] | None = None) -> int:
         "command",
         nargs="?",
         default="run",
-        choices=["run", "healthcheck", "retry", "reset-offset", "ingest", "backfill-gateway-refs"],
+        choices=[
+            "run",
+            "healthcheck",
+            "retry",
+            "reset-offset",
+            "ingest",
+            "backfill-gateway-refs",
+            "backup",
+        ],
         help="run the watchdog (default), check the poller's liveness, retry exhausted "
-        "messages, reset the polling offset, backfill a missed intake message, or "
-        "reconcile pre-#109 gateway refs (backfill-gateway-refs)",
+        "messages, reset the polling offset, backfill a missed intake message, "
+        "reconcile pre-#109 gateway refs (backfill-gateway-refs), or copy the ledger to a "
+        "new file while the watchdog runs (backup)",
     )
     parser.add_argument(
         "--to", type=int, help="for reset-offset: the offset to set (0 at the gateway cutover)"
     )
-    parser.add_argument("telegram_key", nargs="?", help="for retry: the message's Telegram Key")
+    parser.add_argument(
+        "telegram_key",
+        nargs="?",
+        metavar="telegram_key|dest",
+        help="for retry: the message's Telegram Key; for backup: the file to write",
+    )
     parser.add_argument(
         "--all-exhausted", action="store_true", help="for retry: every exhausted message"
     )
@@ -390,6 +426,10 @@ def main(argv: list[str] | None = None) -> int:
         return run_reset_offset(args.config, args.to)
     if args.command == "backfill-gateway-refs":
         return run_backfill_gateway_refs(args.config, args.apply)
+    if args.command == "backup":
+        if not args.telegram_key:
+            parser.error("backup needs a destination file")
+        return run_backup(args.config, args.telegram_key)
     if args.command == "retry":
         return run_retry(args.config, args.telegram_key, args.all_exhausted)
     if args.command == "ingest":
@@ -402,6 +442,10 @@ def main(argv: list[str] | None = None) -> int:
         asyncio.run(run(args.config))
     except KeyboardInterrupt:
         pass
+    except LedgerCorrupt as exc:
+        # Still non-zero: the container restarts and repeats this line until someone acts.
+        print(f"ledger: {exc}", file=sys.stderr)
+        return 1
     except DeadmanExit as exc:
         # Non-zero, so the container's restart policy brings the process back.
         print(f"deadman: {exc}", file=sys.stderr)

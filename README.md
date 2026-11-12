@@ -100,10 +100,11 @@ seams. The real-account checks live in `smoke.py` and are run by hand.
 5. Fill `standing_cc_contact_page_id` (Priya's page in Contacts),
    `standing_cc_telegram_handle` and `owner_telegram_handle`. Add
    `DEEPSEEK_API_KEY` and `OPENROUTER_API_KEY` to `.env`.
-6. Prepare the data directory and run the smoke check until it passes:
+6. Prepare a local data directory and run the smoke check until it passes (the
+   container does not use this directory; it keeps its ledger in a named volume):
 
    ```sh
-   mkdir -p data && chmod 700 data && sudo chown 1000:1000 data   # the container's user
+   mkdir -p data && chmod 700 data
    set -a; . ./.env; set +a
    python smoke.py --config config.yaml
    ```
@@ -113,10 +114,11 @@ seams. The real-account checks live in `smoke.py` and are run by hand.
    the intake topic and run once more with `--live-telegram --live-message-id <its
    Telegram message id>` (watchdog stopped) to capture that one real message end
    to end. Delete the smoke rows it creates in Notion by hand.
-7. Start the container and watch for the first capture in Notion and the next
-   07:00 heartbeat in the ops topic:
+7. Create the ledger's volume, start the container and watch for the first capture
+   in Notion and the next 07:00 heartbeat in the ops topic:
 
    ```sh
+   docker volume create jo-watchdog-data   # once per host; compose refuses to start without it
    docker compose up -d --build
    docker compose ps          # STATUS shows (healthy) once the poller is stamping
    docker compose logs -f
@@ -133,8 +135,8 @@ git pull && docker compose up -d --build
 
 The container runs `python:3.12-slim` as a non-root user (uid 1000), restarts
 `unless-stopped`, reads secrets from `.env`, keeps the ledger and logs in the
-bind-mounted `./data` (directory 0700, files 0600), and mounts `config.yaml`
-read-only. Its health check runs `python -m jo_watchdog.app healthcheck` every
+`jo-watchdog-data` named volume at `/app/data` (directory 0700, files 0600), and
+mounts `config.yaml` read-only. Its health check runs `python -m jo_watchdog.app healthcheck` every
 60 seconds and turns unhealthy after 3 failures; it fails when
 `runtime_state.poller_alive_at` is older than 120 seconds.
 
@@ -186,6 +188,31 @@ Only messages in the intake chat and topic are accepted, and a message already i
 the ledger is never queued twice. `--wait N` waits up to N seconds, prints the
 final state and Notion URL, and exits 3 if the capture has not finished by then.
 
+### Ledger storage and backups (#131)
+
+The ledger must stay inside the Docker VM. On 2026-11-12 the production ledger was
+found corrupt after living on a bind mount from macOS into the Colima VM, where
+SQLite's file locks do not hold. The rules, the one-time move of an existing
+`./data` into the volume and the restore steps are in
+[`docs/runbooks/ledger-storage.md`](docs/runbooks/ledger-storage.md). In short:
+
+- Never open the live ledger from macOS, and never `cp` it while the watchdog runs.
+- Take a copy with the `backup` command, which uses SQLite's online backup API
+  inside the watchdog's container, then copy that file out:
+
+  ```sh
+  docker compose exec watchdog python -m jo_watchdog.app backup /tmp/ledger-backup.db
+  docker compose cp watchdog:/tmp/ledger-backup.db "./ledger-backup-$(date +%F).db"
+  docker compose exec watchdog rm /tmp/ledger-backup.db
+  chmod 600 ledger-backup-*.db    # raw JO text: keep it private, never commit it
+  ```
+
+- At startup the watchdog runs `PRAGMA quick_check` before any migration. A damaged
+  ledger stops the boot with one line that names the file and the reason, and
+  nothing is written to it.
+- The log file is in the same volume:
+  `docker compose exec watchdog tail -n 50 /app/data/jo-watchdog.jsonl`.
+
 ### Rollback
 
 Start the previous image against the same ledger:
@@ -235,7 +262,7 @@ python -m jo_watchdog.app reset-offset --to 0 --config config.yaml
 
 The gateway re-delivers its items from the start; the ledger's unique
 `telegram_key` and edit checks skip anything already captured. The full runbook
-(deploying the gateway, copying `data/`) is section 12 of the gateway spec,
+(deploying the gateway, copying the ledger) is section 12 of the gateway spec,
 mclbautista/t6-sixto-gateway#1.
 
 **Backfilling refs stored before #109 (once).** Rows written in gateway mode before

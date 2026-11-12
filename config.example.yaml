@@ -25,7 +25,7 @@ job_orders_data_source_id: "3d8fb4d5-9e59-8073-a0d0-000b77632947"
 notion_version: "2026-03-11"        # pinned API version (do not change casually)
 
 # --- Ledger (#18) ---
-ledger_path: "./data/ledger.db"     # the container uses /app/data (bind-mounted)
+ledger_path: "./data/ledger.db"     # the container uses /app/data (a named volume)
 
 # --- DeepSeek classify/extract (#20) ---
 deepseek_base_url: "https://api.deepseek.com"

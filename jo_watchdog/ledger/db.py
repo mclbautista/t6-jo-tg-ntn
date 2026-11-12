@@ -108,6 +108,33 @@ class LedgerNotReady(RuntimeError):
     """A ledger that cannot be opened read-only: missing, unreadable, or not yet upgraded."""
 
 
+class LedgerCorrupt(RuntimeError):
+    """The ledger file failed SQLite's integrity check at startup (#131)."""
+
+
+def backup(source: str | Path, dest: str | Path) -> str:
+    """Copy a ledger, live or not, to a new file ``dest`` and return its ``integrity_check``.
+
+    Uses SQLite's online backup API, so the copy is consistent while the watchdog keeps
+    writing. Run it where the watchdog runs (inside its container): SQLite's locks do not
+    hold across a macOS bind mount (#131). ``dest`` must not exist; it ends up as a single
+    file, with no ``-wal`` or ``-shm`` next to it, that is safe to copy anywhere.
+    """
+    source = Path(source)
+    if not source.is_file():
+        raise FileNotFoundError(f"no ledger at {source}")
+    os.close(os.open(dest, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
+    src = sqlite3.connect(source)
+    dst = sqlite3.connect(dest)
+    try:
+        src.backup(dst)
+        dst.execute("PRAGMA journal_mode=DELETE")
+        return dst.execute("PRAGMA integrity_check").fetchone()[0]
+    finally:
+        dst.close()
+        src.close()
+
+
 class Ledger:
     """A single connection to the ledger database."""
 
@@ -189,6 +216,18 @@ class Ledger:
         finally:
             os.umask(previous_umask)
         self._conn.row_factory = sqlite3.Row
+        # Before anything is written or migrated: a damaged file must not be opened (#131).
+        try:
+            problem = self._conn.execute("PRAGMA quick_check(1)").fetchone()[0]
+        except sqlite3.DatabaseError as exc:
+            problem = str(exc)
+        if problem != "ok":
+            self._conn.close()
+            raise LedgerCorrupt(
+                f"the ledger at {self._path} failed its startup integrity check ({problem}); "
+                "nothing was changed. Keep the watchdog stopped, keep the file, and restore "
+                "the last good backup: see docs/runbooks/ledger-storage.md"
+            )
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
