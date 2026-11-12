@@ -8,7 +8,10 @@ services:
     restart: unless-stopped
     env_file: .env
     volumes:
-      - ./data:/app/data            # host dir 0700, ledger 0600, owned by uid 1000
+      # A named volume, inside the Docker VM. Never bind-mount a host folder here: SQLite's
+      # locks do not hold across a macOS bind mount and the ledger was corrupted that way
+      # (#131, docs/runbooks/ledger-storage.md).
+      - watchdog-data:/app/data
       - ./config.yaml:/app/config.yaml:ro
     healthcheck:
       test: ["CMD", "python", "-m", "jo_watchdog.app", "healthcheck", "--config", "/app/config.yaml"]
@@ -16,3 +19,11 @@ services:
       timeout: 10s
       start_period: 60s
       retries: 3
+
+volumes:
+  # External on purpose: `docker compose up` fails until the volume exists, so a deploy can
+  # never start on a silently empty ledger, and `docker compose down -v` cannot delete it.
+  # Create it once: `docker volume create jo-watchdog-data`.
+  watchdog-data:
+    external: true
+    name: jo-watchdog-data
