@@ -140,6 +140,9 @@ class Config(BaseModel):
     t_hint: float = Field(default=0.50, ge=0, le=1)
     deliverable_link_enabled: bool = False
 
+    # Shadow lookups against t6-core (#136, #137)
+    project_registry_path: str = ""
+
     # Rollback control (#27)
     dry_run: bool = False
 

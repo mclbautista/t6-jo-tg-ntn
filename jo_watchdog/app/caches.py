@@ -21,6 +21,12 @@ from t6.domain import Contact, Project
 
 from jo_watchdog.adapters.protocols import StudioReader
 from jo_watchdog.app.config import Config, resolve_settings
+from jo_watchdog.app.shadow import (
+    Difference,
+    compare_people,
+    compare_project,
+    log_differences,
+)
 from jo_watchdog.core.resolve import (
     DepartmentResolution,
     MentionEntity,
@@ -109,6 +115,9 @@ class CacheManager:
         self.fetched_at: dict[str, str] = {}
         self.last_attempt: datetime | None = None
         self._people_index: PeopleIndex | None = None
+        # The t6.domain entities of the last live refresh, for the shadow lookups only.
+        self._core_contacts: tuple[Contact, ...] = ()
+        self._core_projects: tuple[Project, ...] = ()
         self._stale_reported: set[str] = set()
 
     # -- loading -------------------------------------------------------------
@@ -136,9 +145,11 @@ class CacheManager:
     async def _fetch(self, kind: str) -> list:
         if kind == "people":
             contacts = await self.studio.contacts(self.config.contacts_data_source_id)
+            self._core_contacts = tuple(contacts)
             return [person_from_contact(c).model_dump() for c in contacts]
         if kind == "projects":
             projects = await self.studio.projects(self.config.projects_data_source_id)
+            self._core_projects = self._with_rotation(projects)
             return [project_entry(p).model_dump() for p in projects]
         return await self.studio.department_names(self.config.job_orders_data_source_id)
 
@@ -243,3 +254,44 @@ class CacheManager:
         if self.departments is None:
             raise RuntimeError("Department options have not loaded; hold planning")
         return resolve_department(token, self.departments, self.settings.department_aliases)
+
+    # -- shadow lookups (#136, #137) ---------------------------------------------
+
+    def _with_rotation(self, projects: list[Project]) -> tuple[Project, ...]:
+        """The Projects with t6-core's registry rotation, when a registry is configured."""
+        path = self.config.project_registry_path
+        if not path:
+            return tuple(projects)
+        try:
+            from t6.registry import ProjectRefs, SqliteProjectRegistry
+
+            refs = ProjectRefs(SqliteProjectRegistry(path))
+            return tuple(refs.identified(p) for p in projects)
+        except Exception:
+            log.warning("project registry unavailable; shadow lookup has no rotation")
+            return tuple(projects)
+
+    def shadow_differences(
+        self,
+        *,
+        project_raw: str | None,
+        project: ProjectResolution,
+        people: PeopleResolution,
+        entities: list[MentionEntity],
+    ) -> list[Difference]:
+        """Where t6-core's lookups disagree with the ones that decided. Never raises.
+
+        Logged without any name; the app's own resolution still decides (#136, #137).
+        """
+        if not self._core_projects and not self._core_contacts:
+            return []
+        try:
+            found = [
+                *compare_project(project_raw, project, self._core_projects),
+                *compare_people(people, entities, self._core_contacts),
+            ]
+        except Exception:
+            log.exception("shadow lookup failed")
+            return []
+        log_differences(found)
+        return found

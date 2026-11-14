@@ -502,6 +502,12 @@ class Worker:
             )
             project = caches.resolve_project(project_raw)
             department = caches.resolve_department(department_token)
+            caches.shadow_differences(
+                project_raw=project_raw,
+                project=project,
+                people=people,
+                entities=mention_entities(message),
+            )
 
         plan = plan_job_order(
             extraction,

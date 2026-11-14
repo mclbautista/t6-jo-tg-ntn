@@ -270,6 +270,7 @@ class RetryScheduleTests(unittest.IsolatedAsyncioTestCase):
         caches.resolve_people = lambda *a: PeopleResolution()
         caches.resolve_project = lambda raw: ProjectResolution(page_id="proj")
         caches.resolve_department = lambda raw: DepartmentResolution(department="TOC")
+        caches.shadow_differences = lambda **kw: []
         await p.worker.run_once()
         self.assertEqual(p.message()["state"], "done")
 
