@@ -16,7 +16,7 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from t6.domain.job_order_rules import parse_header
+from t6.domain.job_order_rules import jo_key, parse_header
 from t6.notion.writes import Ambiguous, Rejected
 
 from jo_watchdog.adapters.protocols import (
@@ -34,7 +34,6 @@ from jo_watchdog.core.duplicates import (
     EarlierCapture,
     add_earlier_row_line,
     find_duplicate,
-    jo_key,
     notes_line,
 )
 from jo_watchdog.core.edits import EditAction, decide_edit

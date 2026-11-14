@@ -3,13 +3,12 @@
 import unittest
 from datetime import UTC, datetime, timedelta
 
-from t6.domain.job_order_rules import parse_header, parse_number
+from t6.domain.job_order_rules import jo_key, parse_header, parse_number
 
 from jo_watchdog.core.duplicates import (
     EarlierCapture,
     append_watchdog_line,
     find_duplicate,
-    jo_key,
     notes_line,
     text_sha256,
 )
