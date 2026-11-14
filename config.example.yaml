@@ -70,6 +70,7 @@ t_hint: 0.50
 deliverable_link_enabled: false     # shadow mode until the owner turns it on
 
 # --- Shadow lookups against t6-core (#136, #137) ---
+llm_shadow_masking: false           # true = also extract from name-masked text and log which fields differ (one more DeepSeek call per message)
 project_registry_path: ""          # t6-core's Project registry file; gives the shadow Project lookup each code's rotation
 
 # --- Rollback control (#27) ---

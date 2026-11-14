@@ -27,9 +27,11 @@ from jo_watchdog.adapters.protocols import (
     JobOrderStore,
     TelegramClient,
 )
+from jo_watchdog.adapters.t6_llm import MaskedExtractor
 from jo_watchdog.app.caches import CacheManager
 from jo_watchdog.app.config import Config
 from jo_watchdog.app.matching import ResolvedProject, run_match_stage, with_deliverable
+from jo_watchdog.app.shadow import compare_extraction, log_differences
 from jo_watchdog.core.duplicates import (
     EarlierCapture,
     add_earlier_row_line,
@@ -155,6 +157,7 @@ class Worker:
         config: Config,
         caches: CacheManager | None = None,
         matcher: DeliverableMatcher | None = None,
+        masked_extractor: MaskedExtractor | None = None,
         deliverables: DeliverableSource | None = None,
         clock: Callable[[], datetime] = _utcnow,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
@@ -167,6 +170,7 @@ class Worker:
         self.config = config
         self.caches = caches
         self.matcher = matcher
+        self.masked_extractor = masked_extractor
         self.deliverables = deliverables
         self.clock = clock
         self.sleep = sleep
@@ -357,6 +361,7 @@ class Worker:
             return State.RECEIVED
 
         extraction = result.extraction
+        await self._shadow_masked_extraction(msg, raw_message, extraction)
         findings: list[dict] = []
         if extraction.verdict == "unsure":
             findings.append({"code": "unsure", "reasons": extraction.reasons})
@@ -370,6 +375,30 @@ class Worker:
             | {"masker_version": msg["masker_version"]},
         }
         return self.ledger.record_extraction(key, call=call, result=stage_result)
+
+    async def _shadow_masked_extraction(
+        self, msg: dict, raw_message: dict, extraction: Extraction
+    ) -> None:
+        """Extract again from name-masked text and log which fields differ (#138).
+
+        Only when `llm_shadow_masking` is on. The unmasked extraction still decides,
+        and nothing here can fail the message.
+        """
+        if not self.config.llm_shadow_masking or self.masked_extractor is None:
+            return
+        registry = self.caches.privacy_registry() if self.caches is not None else None
+        if registry is None:
+            return
+        try:
+            masked = await self.masked_extractor.extract(
+                msg["masked_text"], forward_origin_lines(raw_message), registry
+            )
+            if masked.extraction is None:
+                log.info("shadow_difference kind=extraction legacy=%s core=failed", masked.outcome)
+                return
+            log_differences(compare_extraction(extraction, masked.extraction))
+        except Exception:
+            log.exception("masked extraction shadow failed")
 
     async def process(self, key: str) -> None:
         try:

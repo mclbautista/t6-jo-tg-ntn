@@ -142,6 +142,7 @@ class Config(BaseModel):
 
     # Shadow lookups against t6-core (#136, #137)
     project_registry_path: str = ""
+    llm_shadow_masking: bool = False  # a second, masked extraction per message, to compare (#138)
 
     # Rollback control (#27)
     dry_run: bool = False

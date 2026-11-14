@@ -17,6 +17,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 from pydantic import BaseModel
+from t6 import privacy
 from t6.domain import Contact, Project
 
 from jo_watchdog.adapters.protocols import StudioReader
@@ -295,3 +296,19 @@ class CacheManager:
             return []
         log_differences(found)
         return found
+
+    def privacy_registry(self) -> privacy.Registry | None:
+        """The names to mask before text goes to a model, or None before the first live refresh."""
+        if not self._core_contacts and not self._core_projects:
+            return None
+        return privacy.Registry(
+            people=[
+                privacy.Person(
+                    c.name,
+                    aliases=c.aliases,
+                    handles=(c.telegram_handle,) if c.telegram_handle else (),
+                )
+                for c in self._core_contacts
+            ],
+            projects=[privacy.Project(p.name, p.project_code) for p in self._core_projects],
+        )

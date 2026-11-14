@@ -32,6 +32,7 @@ class Adapters:
     studio: object
     classifier: object
     matcher: object | None
+    masked_extractor: object | None = None
     closers: list = field(default_factory=list)
 
     def with_(self, **replacements) -> Adapters:
@@ -63,6 +64,17 @@ def build_adapters(config: Config) -> Adapters:
         timeout=config.jev_timeout_seconds,
     )
 
+    masked_extractor = None
+    if config.llm_shadow_masking:
+        from jo_watchdog.adapters.t6_llm import MaskedExtractor
+
+        masked_extractor = MaskedExtractor(
+            deepseek_token(),
+            base_url=config.deepseek_base_url,
+            model=config.deepseek_model,
+            timeout_seconds=config.deepseek_timeout_seconds,
+        )
+
     telegram, close_telegram = _build_telegram(config)
     return Adapters(
         telegram=telegram,
@@ -70,7 +82,14 @@ def build_adapters(config: Config) -> Adapters:
         studio=studio,
         classifier=classifier,
         matcher=matcher,
-        closers=[studio.close, classifier.close, matcher.close, close_telegram],
+        masked_extractor=masked_extractor,
+        closers=[
+            studio.close,
+            classifier.close,
+            matcher.close,
+            close_telegram,
+            *([masked_extractor.close] if masked_extractor else []),
+        ],
     )
 
 
@@ -106,6 +125,7 @@ def build_worker(config: Config, ledger: Ledger, adapters: Adapters, **worker_op
         config=config,
         caches=caches,
         matcher=adapters.matcher,
+        masked_extractor=adapters.masked_extractor,
         deliverables=adapters.studio,
         **worker_options,
     )

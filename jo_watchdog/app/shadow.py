@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from t6.domain import Contact, Project
 from t6.lookup import Index, Lookup
 
+from jo_watchdog.core.extraction import EXTRACTED_FIELDS, Extraction, normalize_ws
 from jo_watchdog.core.resolve import (
     MentionEntity,
     MentionResult,
@@ -106,6 +107,27 @@ def compare_people(
             continue  # t6-core offers candidates for a person; the app leaves it unresolved
         out.append(Difference("person", part.status, core))
     return out
+
+
+def compare_extraction(unmasked: Extraction, masked: Extraction) -> list[Difference]:
+    """Where extraction from masked text (names restored) differs from the unmasked one.
+
+    A difference names the field only, never its value.
+    """
+    out = [
+        Difference("extraction", field, "masked_differs")
+        for field in ("verdict", "multiple_jo_suspected", *EXTRACTED_FIELDS)
+        if not _same(getattr(unmasked, field, None), getattr(masked, field, None))
+    ]
+    return out
+
+
+def _same(a: object, b: object) -> bool:
+    if isinstance(a, str) or isinstance(b, str) or a is None or b is None:
+        return normalize_ws(a if isinstance(a, str) else None) == normalize_ws(
+            b if isinstance(b, str) else None
+        )
+    return a == b
 
 
 def log_differences(differences: Sequence[Difference]) -> None:
