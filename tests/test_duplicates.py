@@ -3,6 +3,8 @@
 import unittest
 from datetime import UTC, datetime, timedelta
 
+from t6.domain.job_order_rules import parse_header, parse_number
+
 from jo_watchdog.core.duplicates import (
     EarlierCapture,
     append_watchdog_line,
@@ -12,7 +14,6 @@ from jo_watchdog.core.duplicates import (
     text_sha256,
 )
 from jo_watchdog.core.edits import EditAction, decide_edit
-from jo_watchdog.core.header import parse_header, parse_number
 
 NOW = datetime(2026, 9, 20, 4, 0, tzinfo=UTC)
 KEY = "proj-page|74"

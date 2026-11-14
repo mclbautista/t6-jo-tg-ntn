@@ -17,17 +17,20 @@ from datetime import date, datetime, time
 from typing import Any, Protocol
 
 from pydantic import BaseModel, Field
-from t6.domain import JobOrderStatus
-
-from jo_watchdog.core.deadline import MANILA, DeadlineSource, resolve_deadline
-from jo_watchdog.core.extraction import is_subtitle_value
-from jo_watchdog.core.findings import ASAP, Finding
-from jo_watchdog.core.header import (
+from t6.domain import Contact, JobOrderStatus
+from t6.domain.deadlines import ASAP, DeadlineSource
+from t6.domain.deadlines import deadline as resolve_deadline
+from t6.domain.job_order_rules import (
     canonical_name,
     normalize_department,
     parse_header,
     parse_number,
 )
+from t6.domain.studio_time import MANILA
+from t6.notion.reads import parse_end_of_shift
+
+from jo_watchdog.core.extraction import is_subtitle_value
+from jo_watchdog.core.findings import Finding
 from jo_watchdog.core.masker import mask_text, outbound_text
 from jo_watchdog.core.plan import header_line_of, split_blocks
 from jo_watchdog.core.resolve import (
@@ -171,6 +174,18 @@ def build_watchdog_notes(deadline_raw: str | None, asap: bool) -> str:
     return "\n".join(added)
 
 
+def _assignees(shifts: Sequence[tuple[str, str | time | None]]) -> list[Contact]:
+    """The resolved assignees as Contacts, for t6-core's deadline rules: a name and an end of shift."""
+    return [
+        Contact(
+            page_id=f"assignee-{i}",
+            name=name,
+            end_of_shift=shift if isinstance(shift, time) else parse_end_of_shift(shift),
+        )
+        for i, (name, shift) in enumerate(shifts)
+    ]
+
+
 def plan_job_order(
     extraction: Extraction,
     *,
@@ -211,7 +226,7 @@ def plan_job_order(
         name_header = header
     name = outbound_text(canonical_name(name_header, header_raw, department)).text
 
-    deadline = resolve_deadline(extraction.deadline_raw, posted_at, assignee_shifts)
+    deadline = resolve_deadline(extraction.deadline_raw, posted_at, _assignees(assignee_shifts))
     asap = any(f.code == ASAP for f in deadline.findings)
 
     fields: dict[str, Any] = {
@@ -253,7 +268,7 @@ def plan_job_order(
         body_blocks=body,
         jo_number_int=int(digits) if digits is not None else None,
         deadline_source=deadline.source,
-        findings=deadline.findings,
+        findings=[Finding(code=f.code, params=dict(f.params)) for f in deadline.findings],
     )
 
 

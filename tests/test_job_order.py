@@ -4,8 +4,9 @@ import unittest
 from datetime import datetime
 from types import SimpleNamespace
 
-from jo_watchdog.core.deadline import MANILA
-from jo_watchdog.core.header import canonical_name, parse_header
+from t6.domain.job_order_rules import canonical_name, parse_header
+from t6.domain.studio_time import MANILA
+
 from jo_watchdog.core.job_order import (
     ASAP_NOTE,
     build_notes,

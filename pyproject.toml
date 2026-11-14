@@ -10,7 +10,7 @@ dependencies = [
     "PyYAML>=6.0",
     "tzdata>=2024.1",
     "rapidfuzz>=3.9",
-    "t6[notion] @ git+https://github.com/mclbautista/t6-core.git@v0.3.4",
+    "t6[notion] @ git+https://github.com/mclbautista/t6-core.git@c28eacd",
 ]
 
 [project.optional-dependencies]

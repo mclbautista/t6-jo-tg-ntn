@@ -17,6 +17,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from pydantic import BaseModel, Field
+from t6.domain.studio_people import tags_standing_cc as core_tags_standing_cc
 
 MANILA = timezone(timedelta(hours=8), "Asia/Manila")
 
@@ -45,16 +46,6 @@ FINDING_ORDER = [
     "duplicate_key",
 ]
 
-# The only findings Priya has to act on herself (verification ticket).
-TAGS_standing_cc = frozenset(
-    {
-        "multiple_jo",
-        "unresolved_person",
-        "ambiguous_person",
-        "unresolved_project",
-        "unknown_department",
-    }
-)
 
 # Codes that appear at most once per capture. When a stage already recorded
 # one (e.g. the planner's `deadline_past`), its copy wins over a recomputed one.
@@ -342,4 +333,4 @@ def verify(facts: CaptureFacts, *, header_date_tolerance_days: int = 1) -> list[
 
 
 def tags_standing_cc(findings: list[Finding]) -> bool:
-    return any(f.code in TAGS_standing_cc for f in findings)
+    return core_tags_standing_cc(f.code for f in findings)

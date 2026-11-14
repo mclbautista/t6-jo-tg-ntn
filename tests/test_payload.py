@@ -3,7 +3,8 @@
 import unittest
 from datetime import UTC, datetime
 
-from jo_watchdog.core.deadline import MANILA
+from t6.domain.studio_time import MANILA
+
 from jo_watchdog.core.job_order import JobOrderPlan, job_order_fields
 from jo_watchdog.core.payload import page_url_for
 from jo_watchdog.core.verify import readback_properties

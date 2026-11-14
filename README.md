@@ -97,7 +97,7 @@ seams. The real-account checks live in `smoke.py` and are run by hand.
    content**. Put its token in `.env` as `NOTION_API_KEY`, then share Job
    Orders, Contacts, Projects and Deliverables with it (each database's `•••`
    menu, Connections).
-5. Fill `standing_cc_contact_page_id` (Priya's page in Contacts),
+5. Fill `standing_cc_contact_page_id` (the standing cc's page in Contacts, or set `T6_STANDING_CC`),
    `standing_cc_telegram_handle` and `owner_telegram_handle`. Add
    `DEEPSEEK_API_KEY` and `OPENROUTER_API_KEY` to `.env`.
 6. Prepare a local data directory and run the smoke check until it passes (the

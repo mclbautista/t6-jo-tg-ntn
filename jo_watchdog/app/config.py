@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import os
 import re
-import warnings
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
@@ -28,6 +27,8 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from t6.domain.job_order_rules import DEPARTMENT_ALIASES
+from t6.domain.studio_people import standing_cc
 
 from jo_watchdog.adapters.deepseek import DEFAULT_BASE_URL, DEFAULT_MODEL
 from jo_watchdog.adapters.jev import JEV_MODEL, JEV_URL
@@ -121,7 +122,7 @@ class Config(BaseModel):
     ledger_path: str = "./data/ledger.db"
 
     # Planning: header Department token -> Department option (validated live in #22)
-    department_aliases: dict[str, str] = Field(default_factory=lambda: {"TO": "TOC"})
+    department_aliases: dict[str, str] = Field(default_factory=lambda: dict(DEPARTMENT_ALIASES))
 
     # Reliability and heartbeat (#25)
     owner_telegram_handle: str | None = None
@@ -218,7 +219,7 @@ def resolve_settings(config: Config) -> ResolveSettings:
         fuzzy_min_lead=config.fuzzy_min_lead,
         honorifics=tuple(config.honorifics),
         department_aliases=config.department_aliases,
-        standing_cc_contact_page_id=config.standing_cc_contact_page_id,
+        standing_cc_contact_page_id=standing_cc() or config.standing_cc_contact_page_id,
     )
 
 
@@ -279,31 +280,11 @@ def placeholder_keys(config: Config) -> list[str]:
     return placeholders
 
 
-# Keys renamed to role names (the standing cc person). Old files still load, with a warning.
-_RENAMED_KEYS = {
-    "leizette_contact_page_id": "standing_cc_contact_page_id",
-    "leizette_telegram_handle": "standing_cc_telegram_handle",
-}
-
-
-def _apply_renamed_keys(data: dict) -> dict:
-    for old, new in _RENAMED_KEYS.items():
-        if old in data:
-            warnings.warn(
-                f"config key {old!r} is renamed to {new!r}; update config.yaml",
-                DeprecationWarning,
-                stacklevel=3,
-            )
-            value = data.pop(old)
-            data.setdefault(new, value)
-    return data
-
-
 def load_config(path: str | Path) -> Config:
     """Load non-secret config from a YAML file."""
     with open(path, encoding="utf-8") as fh:
         data = yaml.safe_load(fh) or {}
-    return Config(**_apply_renamed_keys(data))
+    return Config(**data)
 
 
 def _secret(name: str) -> str:

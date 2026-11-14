@@ -26,6 +26,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import NamedTuple
 
+from t6.domain.job_order_rules import telegram_key
+
 from jo_watchdog.core.duplicates import text_sha256
 from jo_watchdog.core.masker import outbound_text
 from jo_watchdog.core.plan import build_plan
@@ -87,10 +89,6 @@ class FailureResult(NamedTuple):
     attempts: int
     exhausted: bool
     next_attempt_at: str | None
-
-
-def telegram_key(chat_id: int, message_id: int) -> str:
-    return f"{chat_id}:{message_id}"
 
 
 def _forward_origin_type(raw_source: str) -> str | None:

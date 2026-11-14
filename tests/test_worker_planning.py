@@ -6,12 +6,12 @@ import unittest
 from datetime import UTC, datetime
 from pathlib import Path
 
+from t6.domain.studio_time import MANILA
 from t6.notion.errors import NotionError
 
 from jo_watchdog.app.caches import CacheManager
 from jo_watchdog.app.config import Config
 from jo_watchdog.app.worker import Worker
-from jo_watchdog.core.deadline import MANILA
 from jo_watchdog.ledger.db import Ledger
 from tests.fakes import FakeClassifier, FakeNotion, FakeTelegram, ok_result, update
 

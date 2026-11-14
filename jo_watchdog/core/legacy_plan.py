@@ -13,7 +13,8 @@ from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from jo_watchdog.core.deadline import MANILA
+from t6.domain.studio_time import MANILA
+
 from jo_watchdog.core.job_order import manila_iso
 
 # Plans stored before #99 carried the watchdog block inside ``Notes`` behind this marker.
