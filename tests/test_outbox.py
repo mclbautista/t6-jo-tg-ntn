@@ -153,7 +153,7 @@ class CaptureReportTests(unittest.IsolatedAsyncioTestCase):
             "\n"
             "Forwarded from a channel: Studio\n"
             "\n"
-            '<a href="https://notion.example/page-1">Notion row</a>\n'
+            '<a href="https://www.notion.so/page1">Notion row</a>\n'
             '<a href="https://t.me/c/123/5/42">Telegram message</a>\n'
             '<a href="https://t.me/studio/88">Original message</a>',
         )

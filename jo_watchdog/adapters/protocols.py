@@ -8,9 +8,12 @@ maps an aiogram ``Update`` into.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any, Literal, Protocol, runtime_checkable
 
 from pydantic import BaseModel
+from t6.domain import Contact, JobOrder, Project
+from t6.notion.writes import Ambiguous, Rejected
 
 from jo_watchdog.core.extraction import Extraction
 from jo_watchdog.core.matching import Candidate, MatchResult
@@ -52,13 +55,6 @@ class NotifyStatus(BaseModel):
     error: str | None = None
 
 
-class PageRef(BaseModel):
-    """The reference Notion returns after creating a page."""
-
-    id: str
-    url: str
-
-
 ClassifierOutcome = Literal[
     "ok", "invalid_json", "schema_violation", "empty_content", "timeout", "api_error"
 ]
@@ -96,29 +92,41 @@ class TelegramClient(Protocol):
 
 
 @runtime_checkable
-class NotionClient(Protocol):
-    async def create_page(self, payload: dict) -> PageRef: ...
+class JobOrderStore(Protocol):
+    """Job Order writes through t6-core: domain fields in, the saved Job Order or a typed failure out."""
 
-    async def retrieve_page(self, page_id: str) -> dict: ...
+    async def create(
+        self, data_source_id: str, fields: Mapping[str, Any]
+    ) -> JobOrder | Rejected | Ambiguous:
+        """Create a Job Order, read it back and return it as saved.
 
-    async def find_pages_by_telegram_key(
+        ``Rejected``: nothing was written. ``Ambiguous``: the write may have
+        happened; ``page_id`` is set when a page exists.
+        """
+        ...
+
+    async def get(self, data_source_id: str, page_id: str) -> JobOrder: ...
+
+    async def find_all_by_telegram_key(
         self, data_source_id: str, telegram_key: str
-    ) -> list[PageRef]:
-        """Pages whose ``Telegram Key`` equals ``telegram_key``, oldest first.
+    ) -> list[JobOrder]:
+        """Job Orders whose ``telegram_key`` equals the key, oldest first.
 
         Reserved for recovering from an uncertain write; normal success reads
-        back by id.
+        back inside ``create``.
         """
         ...
 
 
 @runtime_checkable
-class NotionReader(Protocol):
-    """The read side the six-hour caches need."""
+class StudioReader(Protocol):
+    """The read side the six-hour caches need, as ``t6.domain`` entities."""
 
-    async def query_all(self, data_source_id: str) -> list[dict[str, Any]]: ...
+    async def contacts(self, data_source_id: str) -> list[Contact]: ...
 
-    async def retrieve_data_source(self, data_source_id: str) -> dict: ...
+    async def projects(self, data_source_id: str) -> list[Project]: ...
+
+    async def department_names(self, job_orders_data_source_id: str) -> list[str]: ...
 
 
 @runtime_checkable

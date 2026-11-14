@@ -109,7 +109,7 @@ class Harness:
         self.config = make_config()
         self.caches = None
         if caches:
-            self.caches = CacheManager(ledger=self.ledger, notion=None, config=self.config)
+            self.caches = CacheManager(ledger=self.ledger, studio=None, config=self.config)
             self.caches._apply(
                 "people",
                 [{"page_id": "c-ben", "name": "Benjamin Cruz", "telegram_user_id": "222"}],
@@ -147,14 +147,10 @@ class Harness:
         return self.notion.created[n]
 
     def notes(self, n) -> str | None:
-        notes = self.payload(n)["properties"].get("Watchdog Notes")
-        return "".join(i["text"]["content"] for i in notes["rich_text"]) if notes else None
+        return self.payload(n).get("watchdog_notes")
 
     def body(self, n) -> str:
-        return "\n".join(
-            "".join(i["text"]["content"] for i in b["paragraph"]["rich_text"])
-            for b in self.payload(n)["children"]
-        )
+        return self.payload(n).get("source_text", "")
 
     def posts(self) -> list[str]:
         return [text for _, _, text in self.telegram.sent]
@@ -370,10 +366,7 @@ class RepostAndReuseTests(unittest.IsolatedAsyncioTestCase):
         h = Harness(self)
         await h.feed(message_update(1, 10, "JO 5\nTask: wrong"))
         await h.feed(message_update(2, 11, "JO 5\nTask: right"))
-        keys = [
-            p["properties"]["Telegram Key"]["rich_text"][0]["text"]["content"]
-            for p in h.notion.created
-        ]
+        keys = [fields["telegram_key"] for fields in h.notion.created]
         self.assertEqual(keys, [f"{CHAT}:10", f"{CHAT}:11"])
 
 
@@ -414,7 +407,7 @@ class EditTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("changed", h.body(0))
         edit_posts = [p for p in h.posts() if p.startswith("✏️")]
         self.assertEqual(len(edit_posts), 1)
-        self.assertIn("https://notion.example/page-1", edit_posts[0])
+        self.assertIn("https://www.notion.so/page1", edit_posts[0])
         self.assertEqual([e["outcome"] for e in h.edits(10)], ["reported"] * 2)
 
     async def test_edit_to_ignored_message_is_recorded_only(self):
@@ -511,7 +504,7 @@ class ProvenanceTests(unittest.IsolatedAsyncioTestCase):
         await h.feed(fixture_update("forward_user", 1, 10))
         self.assertIn("Originally from: Ben Cruz (@bencruz) [Benjamin Cruz]", h.body(0))
         # The match never becomes a relation.
-        self.assertNotIn("c-ben", json.dumps(h.payload(0)["properties"]))
+        self.assertNotIn("c-ben", json.dumps(h.payload(0), default=str))
 
 
 if __name__ == "__main__":

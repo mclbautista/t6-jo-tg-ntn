@@ -19,10 +19,6 @@ from jo_watchdog.core.masker import outbound_text
 # Notion text items cap at 2000 characters (write-path research, §2).
 BLOCK_LIMIT = 2000
 
-# Poster notes go to ``Notes``; everything the watchdog adds goes to ``Watchdog Notes`` (#99).
-NOTES_PROPERTY = "JO Notes"
-WATCHDOG_NOTES_PROPERTY = "Watchdog Notes"
-
 
 class Plan(BaseModel):
     """The exact payload to store locally before the external Notion create call."""

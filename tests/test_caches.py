@@ -8,7 +8,7 @@ from pathlib import Path
 
 import httpx
 
-from jo_watchdog.adapters.notion import NotionAdapter
+from jo_watchdog.adapters.t6_studio import T6Studio
 from jo_watchdog.app.caches import FORMAT_VERSION, CacheManager
 from jo_watchdog.app.config import Config
 from jo_watchdog.app.worker import Worker
@@ -77,8 +77,8 @@ class RecordedNotion:
             return httpx.Response(200, json=_load("job_orders_data_source.json"))
         return httpx.Response(404, json={"code": "object_not_found", "message": path})
 
-    def adapter(self) -> NotionAdapter:
-        return NotionAdapter("test-token", transport=httpx.MockTransport(self.handler))
+    def studio(self) -> T6Studio:
+        return T6Studio("test-token", transport=httpx.MockTransport(self.handler))
 
 
 class CacheTestCase(unittest.IsolatedAsyncioTestCase):
@@ -87,18 +87,18 @@ class CacheTestCase(unittest.IsolatedAsyncioTestCase):
         self.path = Path(self.tmp.name) / "ledger.db"
         self.ledger = Ledger(self.path)
         self.server = RecordedNotion()
-        self.notion = self.server.adapter()
+        self.studio = self.server.studio()
         self.clock = Clock()
 
     async def asyncTearDown(self):
-        await self.notion.close()
+        await self.studio.close()
         self.ledger.close()
         self.tmp.cleanup()
 
     def manager(self, ledger=None, **overrides) -> CacheManager:
         return CacheManager(
             ledger=ledger or self.ledger,
-            notion=self.notion,
+            studio=self.studio,
             config=config(**overrides),
             clock=self.clock,
         )

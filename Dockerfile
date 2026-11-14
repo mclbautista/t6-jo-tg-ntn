@@ -11,6 +11,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN groupadd --system --gid 1000 watchdog \
     && useradd --system --uid 1000 --gid watchdog --home-dir /app --shell /usr/sbin/nologin watchdog
 
+# git installs the pinned t6-core release tag (pyproject.toml).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY pyproject.toml README.md ./

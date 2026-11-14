@@ -35,6 +35,7 @@ async def verify_capture(
     key: str,
     *,
     notion,
+    data_source_id: str,
     expect_dry_run: bool = False,
     recorded_reactions: list[tuple[int, int, str]] | None = None,
 ) -> Result:
@@ -78,11 +79,8 @@ async def verify_capture(
         return Result(FAIL, f"{key} read-back mismatch: {msg['readback_mismatch']}")
     if not msg["notion_page_id"]:
         return Result(FAIL, f"{key} has no Notion page id")
-    page = await notion.retrieve_page(msg["notion_page_id"])
-    stored_key = "".join(
-        part.get("plain_text", "")
-        for part in page["properties"]["Telegram Key"]["rich_text"]
-    )
+    page = await notion.get(data_source_id, msg["notion_page_id"])
+    stored_key = page.telegram_key
     if stored_key != key:
         return Result(FAIL, f"Notion page carries Telegram Key {stored_key!r}, want {key!r}")
     reports = [r for r in outbox if r["kind"] == "capture_report"]

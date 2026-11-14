@@ -97,7 +97,6 @@ from pathlib import Path
 
 from jo_watchdog.adapters.notion import NotionAdapter, NotionError, QueryRequest
 from jo_watchdog.adapters.protocols import ClassifyResult, IncomingUpdate
-from jo_watchdog.app.caches import person_from_page
 from jo_watchdog.app.config import (
     SECRET_KEYS,
     Config,
@@ -144,8 +143,10 @@ from jo_watchdog.app.tuning import (
 from jo_watchdog.app.wiring import build_adapters, build_worker, missing_wiring
 from jo_watchdog.core.extraction import EXTRACTED_FIELDS, PROMPT_TAG, Extraction
 from jo_watchdog.core.masker import WITHHELD, outbound_text
+from jo_watchdog.core.payload import page_url_for
 from jo_watchdog.core.report import DRY_RUN_HEADER
 from jo_watchdog.ledger.db import Ledger
+from tests.recorded import recorded_people
 
 ROOT = Path(__file__).resolve().parent
 SMOKE_MARK = "SMOKE TEST — delete this row"
@@ -255,9 +256,7 @@ class Smoke:
 
     async def schema(self, data_source_id: str) -> dict:
         if data_source_id not in self.schemas:
-            self.schemas[data_source_id] = await self.notion._request(
-                "GET", f"/data_sources/{data_source_id}"
-            )
+            self.schemas[data_source_id] = await self.notion.retrieve_data_source(data_source_id)
         return self.schemas[data_source_id]
 
 
@@ -558,10 +557,10 @@ class ReadOnlyNotion:
     def __getattr__(self, name):
         return getattr(self._notion, name)
 
-    async def create_page(self, payload):
+    async def create(self, data_source_id, fields):
         raise AssertionError("dry run called Notion create")
 
-    async def retrieve_page(self, page_id):
+    async def get(self, data_source_id, page_id):
         raise AssertionError("dry run called Notion retrieve")
 
 
@@ -598,15 +597,18 @@ async def synthetic_capture(s: Smoke, text: str, *, dry_run: bool) -> tuple[Resu
                 ledger,
                 key,
                 notion=adapters.notion,
+                data_source_id=config.job_orders_data_source_id,
                 expect_dry_run=dry_run,
                 recorded_reactions=telegram.reactions,
             )
             msg = ledger.get_message(key)
             s.smoke_page_key = key if msg and msg["notion_page_id"] else None
             if msg and msg["notion_page_id"]:
-                page = await adapters.notion.retrieve_page(msg["notion_page_id"])
-                print(f"    created {page.get('url')} — delete it by hand")
-                if "smoke-secret" in json.dumps(page):
+                page = await adapters.notion.get(
+                    config.job_orders_data_source_id, msg["notion_page_id"]
+                )
+                print(f"    created {page_url_for(page.page_id)} — delete it by hand")
+                if "smoke-secret" in repr(page):
                     return fail("credential reached Notion properties"), telegram
         finally:
             await adapters.close()
@@ -724,11 +726,8 @@ async def step_threshold_tuning(s: Smoke) -> Result:
     """Score the corpus offline, retain the results, and leave the review to the owner."""
     fixtures = ROOT / "tests/fixtures"
     corpus = json.loads((fixtures / "redacted_corpus.json").read_text(encoding="utf-8"))
-    pages = []
-    for name in ("contacts_query_page1.json", "contacts_query_page2.json"):
-        pages += json.loads((fixtures / "notion" / name).read_text(encoding="utf-8"))["results"]
     settings = resolve_settings(s.config)
-    cases = fuzzy_cases(assignee_mentions(corpus), [person_from_page(p) for p in pages], settings)
+    cases = fuzzy_cases(assignee_mentions(corpus), recorded_people(), settings)
     pairs = json.loads((fixtures / "jev/regression_pairs.json").read_text(encoding="utf-8"))
     out = ROOT / "docs/tuning/threshold-results.json"
     report = build_report(
@@ -804,7 +803,11 @@ async def step_live_telegram(s: Smoke) -> Result:
             if msg["state"] == "ignored":
                 return manual(f"{key} was classified not-a-JO; post a real JO and re-run")
             result = await verify_capture(
-                ledger, key, notion=adapters.notion, expect_dry_run=s.config.dry_run
+                ledger,
+                key,
+                notion=adapters.notion,
+                data_source_id=s.config.job_orders_data_source_id,
+                expect_dry_run=s.config.dry_run,
             )
         finally:
             await adapters.close()

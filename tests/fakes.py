@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from zoneinfo import ZoneInfo
+from collections.abc import Mapping
+from dataclasses import replace
+from typing import Any
 
-from jo_watchdog.adapters.protocols import ClassifyResult, IncomingUpdate, PageRef
+from t6.domain import JobOrder
+from t6.notion.writes import Ambiguous
+
+from jo_watchdog.adapters.protocols import ClassifyResult, IncomingUpdate
 from jo_watchdog.core.extraction import EXTRACTED_FIELDS, PROMPT_TAG, Extraction
 
 # 2026-09-28 03:00:00 UTC = 11:00 in Manila.
@@ -113,23 +117,8 @@ class FakeTelegram:
         return 9000 + len(self.sent)
 
 
-def live_date(date: dict | None) -> dict | None:
-    """A Date as the live Notion API returned it in the #85 trial.
-
-    With ``time_zone`` Notion takes the wall clock of ``start`` in that zone and drops
-    the offset; seconds are dropped either way and ``time_zone`` reads back null.
-    """
-    if not date:
-        return None
-    start = datetime.fromisoformat(date["start"])
-    if date.get("time_zone"):
-        start = start.replace(tzinfo=ZoneInfo(date["time_zone"]))
-    start = start.astimezone(ZoneInfo("Asia/Manila")).replace(second=0, microsecond=0)
-    return {"start": start.isoformat(), "end": None, "time_zone": None}
-
-
 class FakeNotion:
-    """Echoes written properties back so read-back comparison can run."""
+    """Stands in for t6-core's Job Order writes: saves what it is sent and reads it back."""
 
     def __init__(
         self,
@@ -139,57 +128,53 @@ class FakeNotion:
         fail_retrieve: int = 0,
         fail_find: int = 0,
         create_error: Exception | None = None,
+        ambiguous: Ambiguous | None = None,
     ):
         self.fail_create = fail_create
-        self.wrong_name = wrong_name
-        self.fail_retrieve = fail_retrieve  # fail this many retrieve calls first
+        self.wrong_name = wrong_name  # the page reads back with another name: `Ambiguous` mismatch
+        self.fail_retrieve = fail_retrieve  # fail this many reads: the create's own, then `get`
         self.fail_find = fail_find  # fail this many Telegram-Key queries first
         self.find_calls = 0
         self.create_calls = 0
         self.create_error = create_error  # raised instead of the default failure
-        self.created: list[dict] = []
-        self.pages: dict[str, dict] = {}
+        self.ambiguous = ambiguous  # returned (after saving the page) instead of the JobOrder
+        self.created: list[dict] = []  # the fields each create was sent
+        self.pages: dict[str, JobOrder] = {}
         self._counter = 0
 
-    async def create_page(self, payload: dict):
+    async def create(self, data_source_id: str, fields: Mapping[str, Any]):
         self.create_calls += 1
         if self.fail_create:
             raise self.create_error or RuntimeError("notion create failed")
         self._counter += 1
         page_id = f"page-{self._counter}"
-        name = payload["properties"]["Name"]["title"][0]["text"]["content"]
-        key = payload["properties"]["Telegram Key"]["rich_text"][0]["text"]["content"]
+        name = "WRONG NAME" if self.wrong_name else fields["name"]
+        saved = JobOrder(
+            page_id=page_id,
+            name=name,
+            telegram_key=fields["telegram_key"],
+            source_text=fields.get("source_text"),
+        )
+        self.pages[page_id] = saved
+        self.created.append(dict(fields))
+        if self.ambiguous is not None:
+            return replace(self.ambiguous, page_id=self.ambiguous.page_id or page_id)
         if self.wrong_name:
-            name = "WRONG NAME"
-        self.pages[page_id] = {
-            "id": page_id,
-            "url": f"https://notion.example/{page_id}",
-            "properties": {
-                "Name": {"title": [{"plain_text": name}]},
-                "Telegram Key": {"rich_text": [{"plain_text": key}]},
-                **{
-                    field: {"type": "date", "date": live_date(payload["properties"][field]["date"])}
-                    for field in ("Date", "Deadline")
-                    if field in payload["properties"]
-                },
-            },
-        }
-        self.created.append(payload)
-        return PageRef(id=page_id, url=f"https://notion.example/{page_id}")
+            return Ambiguous("mismatch", "saved values differ for: name", page_id, ("name",))
+        if self.fail_retrieve:  # t6-core's own read-back failing is the first failed read
+            self.fail_retrieve -= 1
+            return Ambiguous("readback_failed", "read-back failed", page_id)
+        return saved
 
-    async def retrieve_page(self, page_id: str) -> dict:
+    async def get(self, data_source_id: str, page_id: str) -> JobOrder:
         if self.fail_retrieve:
             self.fail_retrieve -= 1
             raise RuntimeError("notion retrieve failed")
         return self.pages[page_id]
 
-    async def find_pages_by_telegram_key(self, data_source_id: str, telegram_key: str):
+    async def find_all_by_telegram_key(self, data_source_id: str, telegram_key: str):
         self.find_calls += 1
         if self.fail_find:
             self.fail_find -= 1
             raise RuntimeError("notion query failed")
-        return [
-            PageRef(id=page["id"], url=page["url"])
-            for page in self.pages.values()
-            if page["properties"]["Telegram Key"]["rich_text"][0]["plain_text"] == telegram_key
-        ]
+        return [page for page in self.pages.values() if page.telegram_key == telegram_key]

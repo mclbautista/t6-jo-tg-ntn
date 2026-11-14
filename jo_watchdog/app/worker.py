@@ -16,43 +16,41 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from t6.domain.job_order_rules import jo_key, parse_header
+from t6.notion.writes import Ambiguous, Rejected
+
 from jo_watchdog.adapters.protocols import (
     Classifier,
     DeliverableMatcher,
     DeliverableSource,
     GatewayRef,
-    NotionClient,
-    PageRef,
+    JobOrderStore,
     TelegramClient,
 )
+from jo_watchdog.adapters.t6_llm import MaskedExtractor
 from jo_watchdog.app.caches import CacheManager
 from jo_watchdog.app.config import Config
 from jo_watchdog.app.matching import ResolvedProject, run_match_stage, with_deliverable
+from jo_watchdog.app.shadow import compare_extraction, log_differences
 from jo_watchdog.core.duplicates import (
     EarlierCapture,
     add_earlier_row_line,
     find_duplicate,
-    jo_key,
     notes_line,
 )
 from jo_watchdog.core.edits import EditAction, decide_edit
 from jo_watchdog.core.extraction import Extraction, forward_origin_lines
 from jo_watchdog.core.findings import Finding as PlanFinding
-from jo_watchdog.core.header import parse_header
 from jo_watchdog.core.heartbeat import heartbeat_window
 from jo_watchdog.core.job_order import (
     JobOrderPlan,
     apply_resolution,
-    build_job_order_payload,
+    job_order_fields,
     load_plan,
     plan_job_order,
 )
 from jo_watchdog.core.masker import outbound_text
-from jo_watchdog.core.payload import (
-    extract_readback_fields,
-    page_url_for,
-    verify_readback,
-)
+from jo_watchdog.core.payload import page_url_for
 from jo_watchdog.core.plan import first_line_of, header_line_of
 from jo_watchdog.core.provenance import parse_forward_origin, source_block
 from jo_watchdog.core.report import (
@@ -154,11 +152,12 @@ class Worker:
         *,
         ledger: Ledger,
         telegram: TelegramClient,
-        notion: NotionClient,
+        notion: JobOrderStore,
         classifier: Classifier,
         config: Config,
         caches: CacheManager | None = None,
         matcher: DeliverableMatcher | None = None,
+        masked_extractor: MaskedExtractor | None = None,
         deliverables: DeliverableSource | None = None,
         clock: Callable[[], datetime] = _utcnow,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
@@ -171,6 +170,7 @@ class Worker:
         self.config = config
         self.caches = caches
         self.matcher = matcher
+        self.masked_extractor = masked_extractor
         self.deliverables = deliverables
         self.clock = clock
         self.sleep = sleep
@@ -361,6 +361,7 @@ class Worker:
             return State.RECEIVED
 
         extraction = result.extraction
+        await self._shadow_masked_extraction(msg, raw_message, extraction)
         findings: list[dict] = []
         if extraction.verdict == "unsure":
             findings.append({"code": "unsure", "reasons": extraction.reasons})
@@ -374,6 +375,30 @@ class Worker:
             | {"masker_version": msg["masker_version"]},
         }
         return self.ledger.record_extraction(key, call=call, result=stage_result)
+
+    async def _shadow_masked_extraction(
+        self, msg: dict, raw_message: dict, extraction: Extraction
+    ) -> None:
+        """Extract again from name-masked text and log which fields differ (#138).
+
+        Only when `llm_shadow_masking` is on. The unmasked extraction still decides,
+        and nothing here can fail the message.
+        """
+        if not self.config.llm_shadow_masking or self.masked_extractor is None:
+            return
+        registry = self.caches.privacy_registry() if self.caches is not None else None
+        if registry is None:
+            return
+        try:
+            masked = await self.masked_extractor.extract(
+                msg["masked_text"], forward_origin_lines(raw_message), registry
+            )
+            if masked.extraction is None:
+                log.info("shadow_difference kind=extraction legacy=%s core=failed", masked.outcome)
+                return
+            log_differences(compare_extraction(extraction, masked.extraction))
+        except Exception:
+            log.exception("masked extraction shadow failed")
 
     async def process(self, key: str) -> None:
         try:
@@ -506,6 +531,12 @@ class Worker:
             )
             project = caches.resolve_project(project_raw)
             department = caches.resolve_department(department_token)
+            caches.shadow_differences(
+                project_raw=project_raw,
+                project=project,
+                people=people,
+                entities=mention_entities(message),
+            )
 
         plan = plan_job_order(
             extraction,
@@ -545,7 +576,7 @@ class Worker:
             project=project,
             sleep=self.sleep,
         )
-        plan.properties = with_deliverable({"properties": plan.properties}, stage)["properties"]
+        plan.fields = with_deliverable(plan.fields, stage)
         if stage.outcome == "skipped":
             plan.findings.append(PlanFinding(code="matcher_skipped"))
         for hint in stage.decision.hints if stage.decision else []:
@@ -560,23 +591,34 @@ class Worker:
 
     async def _create(self, msg: dict, plan: JobOrderPlan) -> None:
         key = msg["telegram_key"]
-        payload = build_job_order_payload(
-            plan, data_source_id=self.config.job_orders_data_source_id
-        )
         try:
-            page_ref = await self.notion.create_page(payload)  # failure -> stays `writing`
+            saved = await self.notion.create(
+                self.config.job_orders_data_source_id, job_order_fields(plan)
+            )
         except Exception as exc:
             raise StepFailure(NOTION_WRITE, exc) from exc
-        # The id is kept while still `writing`: a later read-back failure then
-        # retries only the retrieve, never a second create.
-        self.ledger.store_page_id(key, page_ref.id)
-        await self._read_back(msg, plan, page_ref)
+        if isinstance(saved, Rejected):
+            # Nothing was written: the row stays `writing` and the create is retried.
+            raise StepFailure(NOTION_WRITE, RuntimeError(f"Notion rejected the write: {saved.code}"))
+        if isinstance(saved, Ambiguous):
+            if saved.page_id is None:
+                # No answer: the next attempt asks Notion by Telegram Key before creating again.
+                raise StepFailure(NOTION_WRITE, RuntimeError(f"Notion write uncertain: {saved.reason}"))
+            # A page exists. Keep its id while still `writing`: a retry then only reads it
+            # back, never a second create.
+            self.ledger.store_page_id(key, saved.page_id)
+            if saved.reason != "mismatch":
+                raise StepFailure(NOTION_READ_BACK, RuntimeError(f"Notion read-back: {saved.reason}"))
+            await self._written(msg, plan, saved.page_id, list(saved.mismatched))
+            return
+        self.ledger.store_page_id(key, saved.page_id)
+        await self._written(msg, plan, saved.page_id, [])
 
     async def _resume_writing(self, msg: dict) -> None:
         """Recover a row left in `writing` (crash or failed attempt).
 
         With a stored page id only the read-back is outstanding. Without one the
-        create is uncertain, so ask Notion by `Telegram Key`: adopt the one match,
+        create is uncertain, so ask Notion by `Telegram Key`: adopt the oldest match,
         create only when there is none, and report (never merge or delete) more
         than one.
         """
@@ -585,11 +627,10 @@ class Worker:
             return
         plan = load_plan(msg["plan_json"])
         if msg["notion_page_id"]:
-            page_id = msg["notion_page_id"]
-            await self._read_back(msg, plan, PageRef(id=page_id, url=page_url_for(page_id)))
+            await self._read_back(msg, plan, msg["notion_page_id"])
             return
         try:
-            matches = await self.notion.find_pages_by_telegram_key(
+            matches = await self.notion.find_all_by_telegram_key(
                 self.config.job_orders_data_source_id, key
             )
         except Exception as exc:
@@ -599,40 +640,42 @@ class Worker:
             return
         if len(matches) > 1:
             self.ledger.record_stage_result(
-                key, "reconcile", {"duplicate_urls": [m.url for m in matches]}
+                key, "reconcile", {"duplicate_urls": [page_url_for(m.page_id) for m in matches]}
             )
-        self.ledger.store_page_id(key, matches[0].id)
-        await self._read_back(msg, plan, matches[0])
+        self.ledger.store_page_id(key, matches[0].page_id)
+        await self._read_back(msg, plan, matches[0].page_id)
 
-    async def _read_back(self, msg: dict, plan: JobOrderPlan, page_ref: PageRef) -> None:
-        key = msg["telegram_key"]
-        # Read back and compare; a mismatch is recorded, never rewritten.
+    async def _read_back(self, msg: dict, plan: JobOrderPlan, page_id: str) -> None:
+        """Fetch a page whose create was not confirmed, and note a body that was not saved."""
         try:
-            retrieved = await self.notion.retrieve_page(page_ref.id)
+            saved = await self.notion.get(self.config.job_orders_data_source_id, page_id)
         except Exception as exc:
             raise StepFailure(NOTION_READ_BACK, exc) from exc
-        fields = extract_readback_fields(retrieved)
-        mismatches = verify_readback(
-            plan,
-            retrieved_name=fields["name"],
-            retrieved_telegram_key=fields["telegram_key"],
-            retrieved_dates=fields["dates"],
-        )
+        mismatches = ["source_text"] if plan.body_blocks and not saved.source_text else []
+        await self._written(msg, plan, page_id, mismatches)
+
+    async def _written(
+        self, msg: dict, plan: JobOrderPlan, page_id: str, mismatches: list[str]
+    ) -> None:
+        """Mark the row written. ``mismatches`` names the fields t6-core found saved differently."""
+        key = msg["telegram_key"]
+        page_url = page_url_for(page_id)
 
         # Verification annotates, never gates: findings and their report are
-        # committed in the same transaction that marks the row written.
+        # committed in the same transaction that marks the row written. A mismatch
+        # is recorded, never rewritten.
         reconcile = self.ledger.stage_result(key, "reconcile") or {}
         facts = self._capture_facts(msg, plan, mismatches)
         facts.duplicate_key_urls = reconcile.get("duplicate_urls", [])
         findings = verify(facts, header_date_tolerance_days=self.config.header_date_tolerance_days)
-        reports = self._capture_reports(msg, plan, page_ref.url, findings)
+        reports = self._capture_reports(msg, plan, page_url, findings)
         if self.ledger.has_pending_edits(key):
             # Edited while still in the pipeline: the row holds the original
             # text, and the edit is reported once, now that it is captured.
-            reports.append(self._edit_report(msg, page_ref.url, name=plan.name))
+            reports.append(self._edit_report(msg, page_url, name=plan.name))
         self.ledger.mark_written(
             key,
-            page_ref.id,
+            page_id,
             findings=[f.model_dump() for f in findings],
             reports=reports,
         )
@@ -714,9 +757,7 @@ class Worker:
             return None, None
         resolved = plan.resolution
         key = jo_key(resolved.project_page_id, plan.jo_number_int)
-        shown = plan.properties.get("JO Number", {}).get("rich_text", [])
-        display = "".join(item["text"]["content"] for item in shown)
-        return key, display or f"#{plan.jo_number_int}"
+        return key, plan.fields.get("number") or f"#{plan.jo_number_int}"
 
     def _annotate_duplicate(self, msg: dict, plan: JobOrderPlan) -> str | None:
         """Look for an earlier exact re-post or reused JO Number; return the jo_key.

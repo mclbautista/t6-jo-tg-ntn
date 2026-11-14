@@ -6,7 +6,7 @@ import unittest
 from datetime import time
 from pathlib import Path
 
-from jo_watchdog.app.caches import department_options, person_from_page, project_from_page
+from jo_watchdog.core.job_order import JobOrderPlan, apply_resolution
 from jo_watchdog.core.resolve import (
     MentionEntity,
     PeopleIndex,
@@ -14,7 +14,6 @@ from jo_watchdog.core.resolve import (
     ResolveSettings,
     normalize_name,
     parse_end_of_shift,
-    relation_properties,
     resolve_department,
     resolve_mention,
     resolve_people,
@@ -22,6 +21,7 @@ from jo_watchdog.core.resolve import (
     split_aliases,
     split_mentions,
 )
+from tests.recorded import recorded_departments, recorded_people, recorded_project_entries
 
 FIXTURES = Path(__file__).parent / "fixtures"
 NOTION = FIXTURES / "notion"
@@ -38,23 +38,15 @@ JASON = "c0000000-0000-4000-8000-000000000009"
 LARA = "c0000000-0000-4000-8000-000000000013"
 
 
-def _load(name):
-    return json.loads((NOTION / name).read_text(encoding="utf-8"))
-
-
 def people():
-    pages = (
-        _load("contacts_query_page1.json")["results"]
-        + _load("contacts_query_page2.json")["results"]
-    )
-    return [person_from_page(p) for p in pages]
+    return recorded_people()
 
 
 def projects():
-    return [project_from_page(p) for p in _load("projects_query.json")["results"]]
+    return recorded_project_entries()
 
 
-DEPARTMENTS = department_options(_load("job_orders_data_source.json"))
+DEPARTMENTS = recorded_departments()
 SETTINGS = ResolveSettings(department_aliases={"TO": "TOC"}, standing_cc_contact_page_id=PRIYA)
 
 
@@ -280,7 +272,7 @@ class ResolvePeopleTests(unittest.TestCase):
             [
                 ("Ramon Reyes", "10:00 PM", time(22, 0)),
                 ("Mira Santos", "6:00 AM", time(6, 0)),
-                ("Lena Cruz", "Flexible / Variable", None),
+                ("Lena Cruz", "", None),
             ],
         )
 
@@ -325,21 +317,25 @@ class ProjectTests(unittest.TestCase):
         self.assertEqual(resolve_project("", projects()).findings, [])
 
 
-class RelationPropertyTests(unittest.TestCase):
-    def test_only_resolved_ids_and_no_coordinator(self):
+class RelationFieldTests(unittest.TestCase):
+    def fields(self, project_raw):
+        plan = JobOrderPlan(telegram_key="k", name="n", fields={})
         people_out = resolve_people("Ramon / @nobody", None, people(), SETTINGS)
-        props = relation_properties(people_out, resolve_project("NOPE", projects()))
-        self.assertEqual(
-            props,
-            {
-                "Assigned": {"relation": [{"id": RAMON}]},
-                "cc": {"relation": [{"id": PRIYA}]},
-                "Projects": {"relation": []},
-            },
+        apply_resolution(
+            plan,
+            people=people_out,
+            project=resolve_project(project_raw, projects()),
+            department=resolve_department("TO", DEPARTMENTS, {"TO": "TOC"}),
         )
-        self.assertNotIn("🗂️ Coordinator", props)
-        resolved = relation_properties(people_out, resolve_project("MFG", projects()))
-        self.assertEqual(len(resolved["Projects"]["relation"]), 1)
+        return plan.fields
+
+    def test_only_resolved_ids_and_no_coordinator(self):
+        fields = self.fields("NOPE")
+        self.assertEqual(fields, {"assigned_ids": [RAMON], "cc_ids": [PRIYA]})
+        self.assertNotIn("coordinator_ids", fields)
+
+    def test_a_resolved_project_is_written(self):
+        self.assertEqual(len(self.fields("MFG")["project_id"]), 36)
 
 
 class DepartmentTests(unittest.TestCase):

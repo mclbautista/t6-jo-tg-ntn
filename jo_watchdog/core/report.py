@@ -232,31 +232,29 @@ def render_stale_cache(
 DRY_RUN_HEADER = "🧪 Dry run — planned, not written to Notion"
 
 
-def _plain_property(prop: dict) -> str:
-    """A Notion property value as the text a person would read."""
-    if "title" in prop or "rich_text" in prop:
-        items = prop.get("title") or prop.get("rich_text") or []
-        return "".join(item["text"]["content"] for item in items)
-    if "select" in prop or "status" in prop:
-        return (prop.get("select") or prop.get("status") or {}).get("name", "")
-    if "date" in prop:
-        return (prop["date"] or {}).get("start", "")
-    if "relation" in prop:
-        return ", ".join(item["id"] for item in prop["relation"])
-    return str(prop)
+def _field_label(name: str) -> str:
+    """``assigned_ids`` as ``Assigned``, ``link_settings`` as ``Link Settings``."""
+    return name.removesuffix("_ids").removesuffix("_id").replace("_", " ").title()
+
+
+def _plain_field(value: object) -> str:
+    """A Job Order field value as the text a person would read."""
+    if isinstance(value, (list, tuple)):
+        return ", ".join(str(item) for item in value)
+    return str(value)
 
 
 def render_dry_run_plan(*, plan: dict, intake_url: str) -> str:
-    """The masked stored plan, one line per planned property (#27)."""
+    """The masked stored plan, one line per planned field (#27)."""
     lines = [DRY_RUN_HEADER, f"<code>{_field(plan.get('name', ''))}</code>", ""]
     for key, value in plan.items():
         if key in ("name", "telegram_key", "body_blocks") or value in (None, "", [], {}):
             continue
-        if key == "properties":
-            for prop, raw in value.items():
-                text = _plain_property(raw)
-                if prop not in ("Name", "Telegram Key") and text:
-                    lines.append(f"{_field(prop)}: {_field(text)}")
+        if key == "fields":
+            for name, raw in value.items():
+                text = _plain_field(raw)
+                if name not in ("name", "telegram_key") and text:
+                    lines.append(f"{_field(_field_label(name))}: {_field(text)}")
             continue
         lines.append(f"{_field(key)}: {_field(value)}")
     lines.append(f"Body: {len(plan.get('body_blocks') or [])} block(s)")

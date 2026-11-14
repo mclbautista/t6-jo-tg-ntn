@@ -8,7 +8,6 @@ from jo_watchdog.core.matching import (
     InvalidMatchResult,
     MatchResult,
     decide,
-    deliverable_property,
     hint_line,
     normalize_name,
     validate_result,
@@ -146,9 +145,6 @@ class OutputShapeTests(unittest.TestCase):
         self.assertEqual(line, "Possible Deliverable: Mainpic DCP (match probability 0.62)")
         self.assertNotIn("@", line)
         self.assertNotIn("Reason", line)
-
-    def test_deliverable_property(self):
-        self.assertEqual(deliverable_property(["a", "b"]), {"relation": [{"id": "a"}, {"id": "b"}]})
 
 
 if __name__ == "__main__":

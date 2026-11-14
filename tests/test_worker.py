@@ -12,8 +12,6 @@ from pathlib import Path
 
 from jo_watchdog.app.config import Config
 from jo_watchdog.ledger.db import Ledger
-from jo_watchdog.ledger.states import State
-
 from tests.fakes import FakeClassifier, FakeNotion, FakeTelegram, update
 
 
@@ -132,8 +130,8 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(plan["name"], "first line")
         self.assertEqual(plan["telegram_key"], key)
         self.assertGreater(len(plan["body_blocks"]), 0)
-        # The stored plan's body blocks are what reached Notion, masked.
-        self.assertEqual(notion.created[0]["parent"], {"data_source_id": "ds-1"})
+        # The stored plan's body blocks are what reached t6-core, masked, as source text.
+        self.assertEqual(notion.created[0]["source_text"], "\n".join(plan["body_blocks"]))
 
     async def test_reprocess_does_not_create_second_notion_row(self):
         worker, ledger, telegram, notion, cleanup = make_worker([update(7, message_id=42)])
@@ -167,7 +165,7 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
 
         msg = ledger.get_message("-100123:42")
         self.assertIsNotNone(msg["readback_mismatch"])
-        self.assertIn("Name", msg["readback_mismatch"])
+        self.assertEqual(msg["readback_mismatch"], "name")
         # The mismatch did not trigger a rewrite: still exactly one create.
         self.assertEqual(len(notion.created), 1)
         # Reaction still applied (capture confirmed); the mismatch is a finding, so 🤔.

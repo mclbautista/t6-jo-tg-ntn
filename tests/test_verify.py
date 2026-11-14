@@ -150,7 +150,7 @@ class AdditionalFindingTests(unittest.TestCase):
             shift_fallback=["Bea"],
             deliverable_hints=[DeliverableHint(name="Teaser v2", probability=0.72)],
             matcher_skipped=True,
-            readback_mismatches=["Name differs: planned 'a', read 'b'"],
+            readback_mismatches=["name"],
             duplicate_key_urls=["https://notion.so/1", "https://notion.so/2"],
         )
         found = verify(facts)

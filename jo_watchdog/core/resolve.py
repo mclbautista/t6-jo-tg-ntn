@@ -17,9 +17,9 @@ from datetime import time
 
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
+from t6.notion.reads import parse_end_of_shift
 
 DEFAULT_HONORIFICS = ("ate", "kuya", "sir")
-FLEXIBLE_SHIFT = "Flexible / Variable"
 
 # Mention separators: commas, slashes, ampersands, " and ", and line breaks.
 _SPLIT_RE = re.compile(r"\s*(?:,|/|&|\n|\band\b)\s*", re.IGNORECASE)
@@ -30,7 +30,6 @@ _COURTESY_TAIL_RE = re.compile(
     r"(?:[\s,!.]+|^)(?:thank\w*|ty(?:vm+)?|you+\w*|u|po)[\s,!.]*$", re.IGNORECASE
 )
 _HANDLE_RE = re.compile(r"@([A-Za-z0-9_]{3,})")
-_SHIFT_RE = re.compile(r"^\s*(\d{1,2}):(\d{2})\s*([AaPp][Mm])\s*$")
 
 
 # -- snapshot models ---------------------------------------------------------
@@ -157,19 +156,6 @@ def split_aliases(aliases: str, honorifics: Iterable[str] = DEFAULT_HONORIFICS) 
         if norm:
             out.append(norm)
     return out
-
-
-def parse_end_of_shift(value: str | None) -> time | None:
-    """Parse a Contacts ``End of Shift`` option (``10:00 PM``); None when blank or flexible."""
-    if not value or value.strip() == FLEXIBLE_SHIFT:
-        return None
-    m = _SHIFT_RE.match(value)
-    if not m:
-        return None
-    hour, minute, meridiem = int(m.group(1)) % 12, int(m.group(2)), m.group(3).lower()
-    if meridiem == "pm":
-        hour += 12
-    return time(hour, minute)
 
 
 def _strip_courtesy(segment: str) -> str:
@@ -413,7 +399,7 @@ def resolve_people(
     settings: ResolveSettings,
     entities: Sequence[MentionEntity] = (),
 ) -> PeopleResolution:
-    """Resolve Assigned and cc. Priya is always in cc; Coordinator stays blank."""
+    """Resolve Assigned and cc. The standing cc is always in cc; Coordinator stays blank."""
     index = people if isinstance(people, PeopleIndex) else PeopleIndex(people, settings.honorifics)
     out = PeopleResolution()
     for role, raw in (("assignee", assignees_raw), ("cc", cc_raw)):
@@ -507,19 +493,6 @@ def resolve_department(
             findings=[Finding(code="unknown_department", params={"token": token.strip()})],
         )
     return DepartmentResolution(department=match, token=token.strip())
-
-
-def relation_properties(people: PeopleResolution, project: ProjectResolution) -> dict[str, dict]:
-    """Notion relation values for Assigned, cc and Projects.
-
-    Only resolved page ids are written; an unresolved Project leaves Projects
-    empty. ``🗂️ Coordinator`` is never set in v1.
-    """
-    return {
-        "Assigned": {"relation": [{"id": page_id} for page_id in people.assigned]},
-        "cc": {"relation": [{"id": page_id} for page_id in people.cc]},
-        "Projects": {"relation": [{"id": project.page_id}] if project.page_id else []},
-    }
 
 
 # -- Telegram entities ------------------------------------------------------------

@@ -15,15 +15,19 @@ the manual run only repeats them against the deployed code and configuration.
 from __future__ import annotations
 
 import tempfile
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 from unittest import mock
 from zoneinfo import ZoneInfo
 
+from t6.domain import JobOrder
+from t6.notion.writes import Ambiguous
+
 from jo_watchdog.adapters.jev import MatcherError
-from jo_watchdog.adapters.protocols import ClassifyResult, IncomingUpdate, PageRef
+from jo_watchdog.adapters.protocols import ClassifyResult, IncomingUpdate
 from jo_watchdog.app.caches import CacheManager
 from jo_watchdog.app.config import Config
 from jo_watchdog.app.smoke_gate import FAIL, PASS, Result
@@ -105,35 +109,30 @@ class ScriptedTelegram:
 
 
 class ScriptedNotion:
-    """Echoes the written Name and Telegram Key back; optionally reads back a wrong Name."""
+    """Echoes the written name and Telegram Key back; optionally reads back a wrong name."""
 
     def __init__(self, *, wrong_name: bool = False):
         self.wrong_name = wrong_name
         self.created: list[dict] = []
         self.retrieved: list[str] = []
-        self.pages: dict[str, dict] = {}
+        self.pages: dict[str, JobOrder] = {}
 
-    async def create_page(self, payload: dict) -> PageRef:
+    async def create(self, data_source_id: str, fields: Mapping[str, Any]):
         page_id = f"page-{len(self.created) + 1}"
-        props = payload["properties"]
-        name = "WRONG NAME" if self.wrong_name else props["Name"]["title"][0]["text"]["content"]
-        key = props["Telegram Key"]["rich_text"][0]["text"]["content"]
-        self.pages[page_id] = {
-            "id": page_id,
-            "url": f"https://notion.example/{page_id}",
-            "properties": {
-                "Name": {"title": [{"plain_text": name}]},
-                "Telegram Key": {"rich_text": [{"plain_text": key}]},
-            },
-        }
-        self.created.append(payload)
-        return PageRef(id=page_id, url=f"https://notion.example/{page_id}")
+        name = "WRONG NAME" if self.wrong_name else fields["name"]
+        self.pages[page_id] = JobOrder(
+            page_id=page_id, name=name, telegram_key=fields["telegram_key"]
+        )
+        self.created.append(dict(fields))
+        if self.wrong_name:
+            return Ambiguous("mismatch", "saved values differ for: name", page_id, ("name",))
+        return self.pages[page_id]
 
-    async def retrieve_page(self, page_id: str) -> dict:
+    async def get(self, data_source_id: str, page_id: str) -> JobOrder:
         self.retrieved.append(page_id)
         return self.pages[page_id]
 
-    async def find_pages_by_telegram_key(self, data_source_id: str, telegram_key: str):
+    async def find_all_by_telegram_key(self, data_source_id: str, telegram_key: str):
         return []
 
     async def query_project_deliverables(self, data_source_id: str, project_page_id: str):
@@ -200,7 +199,8 @@ class Harness:
         self.matcher = matcher
         self.ledger = Ledger(Path(tmp) / "scenario.db")
         adapters = Adapters(
-            telegram=self.telegram, notion=self.notion, classifier=FixedClassifier(),
+            telegram=self.telegram, notion=self.notion, studio=self.notion,
+            classifier=FixedClassifier(),
             matcher=matcher,
         )
         self.worker = build_worker(
@@ -310,7 +310,7 @@ async def readback_mismatch(config: Config) -> ScenarioRun:
         await h.worker.run_once()
         msg = h.message()
         c.expect(
-            bool(msg["readback_mismatch"]) and "Name differs" in msg["readback_mismatch"],
+            bool(msg["readback_mismatch"]) and "name" in msg["readback_mismatch"],
             f"mismatch recorded ({msg['readback_mismatch']})",
             f"no read-back mismatch recorded: {msg['readback_mismatch']!r}",
         )
@@ -441,13 +441,13 @@ async def matcher_failure(config: Config) -> ScenarioRun:
     async def body(h: Harness, c: Checks) -> None:
         await h.worker.run_once()
         msg = h.message()
-        props = h.notion.created[0]["properties"] if h.notion.created else {}
+        props = h.notion.created[0] if h.notion.created else {}
         c.expect(h.matcher.calls >= 1, "the matcher was attempted",
                  "the matcher was never called, so nothing was tested")
         c.expect(msg["state"] == "done" and len(h.notion.created) == 1,
                  "capture finished with one Notion row",
                  f"matcher failure blocked the capture: {msg['state']}")
-        c.expect("Deliverable" not in props, "Deliverable left blank",
+        c.expect("deliverable_ids" not in props, "Deliverable left blank",
                  "a Deliverable relation was written despite the failure")
         reports = h.outbox("capture_report")
         lines = [ln for r in reports for ln in r["text"].splitlines()
@@ -467,12 +467,12 @@ async def shadow_mode(config: Config) -> ScenarioRun:
 
     async def body(h: Harness, c: Checks) -> None:
         await h.worker.run_once()
-        props = h.notion.created[0]["properties"] if h.notion.created else {}
+        props = h.notion.created[0] if h.notion.created else {}
         stage = h.ledger.stage_result(h.key, "match") or {}
         c.expect(h.matcher.calls == 1, "Jev was consulted once",
                  f"matcher called {h.matcher.calls} times, want 1")
-        c.expect("Deliverable" not in props, "no Deliverable relation written",
-                 f"shadow mode wrote Deliverable: {props.get('Deliverable')}")
+        c.expect("deliverable_ids" not in props, "no Deliverable relation written",
+                 f"shadow mode wrote Deliverable: {props.get('deliverable_ids')}")
         decision = stage.get("decision") or {}
         top = next((x for x in decision.get("outcomes", []) if x["page_id"] == "d-ftr"), {})
         c.expect(stage.get("outcome") == "hinted" and top.get("p_match") == 0.95
@@ -489,10 +489,10 @@ async def shadow_mode(config: Config) -> ScenarioRun:
 
     async def control(h: Harness, c: Checks) -> None:
         await h.worker.run_once()
-        props = h.notion.created[0]["properties"] if h.notion.created else {}
-        c.expect(props.get("Deliverable") == {"relation": [{"id": "d-ftr"}]},
+        props = h.notion.created[0] if h.notion.created else {}
+        c.expect(props.get("deliverable_ids") == ["d-ftr"],
                  "control: the same answer links once linking is enabled",
-                 f"control run did not link: {props.get('Deliverable')}")
+                 f"control run did not link: {props.get('deliverable_ids')}")
 
     second = await _scenario(
         config, control, matcher=ScriptedMatcher(), deliverable_link_enabled=True

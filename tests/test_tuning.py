@@ -7,7 +7,6 @@ from pathlib import Path
 
 import yaml
 
-from jo_watchdog.app.caches import person_from_page
 from jo_watchdog.app.config import Config
 from jo_watchdog.app.tuning import (
     FuzzyCase,
@@ -29,6 +28,7 @@ from jo_watchdog.core.resolve import (
     fuzzy_ranking,
     resolve_mention,
 )
+from tests.recorded import recorded_people
 
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -39,10 +39,7 @@ DEFAULTS = Config.model_fields
 
 
 def people() -> list[Person]:
-    pages = []
-    for name in ("contacts_query_page1.json", "contacts_query_page2.json"):
-        pages += json.loads((FIXTURES / "notion" / name).read_text(encoding="utf-8"))["results"]
-    return [person_from_page(p) for p in pages]
+    return recorded_people()
 
 
 def current() -> dict:

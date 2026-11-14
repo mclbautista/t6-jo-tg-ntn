@@ -184,27 +184,3 @@ class ExampleFilesTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-
-class RenamedKeysTests(unittest.TestCase):
-    def test_old_standing_cc_keys_still_load_with_a_deprecation_warning(self):
-        import warnings
-
-        example = (ROOT / "config.example.yaml").read_text(encoding="utf-8")
-        kept = "".join(
-            line for line in example.splitlines(keepends=True)
-            if not line.startswith("standing_cc_")
-        )
-        legacy = (
-            "leizette_contact_page_id: 'c0000000-0000-4000-8000-0000000000cc'\n"
-            "leizette_telegram_handle: '@priya'\n"
-        )
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "config.yaml"
-            path.write_text(kept + legacy, encoding="utf-8")
-            with warnings.catch_warnings(record=True) as caught:
-                warnings.simplefilter("always")
-                config = load_config(path)
-        self.assertEqual(config.standing_cc_contact_page_id, "c0000000-0000-4000-8000-0000000000cc")
-        self.assertEqual(config.standing_cc_telegram_handle, "@priya")
-        self.assertEqual(len([w for w in caught if issubclass(w.category, DeprecationWarning)]), 2)

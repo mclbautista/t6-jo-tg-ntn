@@ -27,7 +27,6 @@ from jo_watchdog.core.matching import (
     MatchDecision,
     MatchResult,
     decide,
-    deliverable_property,
     hint_line,
 )
 
@@ -84,15 +83,11 @@ class MatchStageResult(BaseModel):
         return self.model_dump_json(exclude={"llm_calls"})
 
 
-def with_deliverable(payload: dict, stage: MatchStageResult) -> dict:
-    """Add the ``Deliverable`` relation to a Notion payload only when links were decided."""
+def with_deliverable(fields: dict, stage: MatchStageResult) -> dict:
+    """Add ``deliverable_ids`` to the Job Order fields only when links were decided."""
     if not stage.linked_page_ids:
-        return payload
-    properties = {
-        **payload["properties"],
-        "Deliverable": deliverable_property(stage.linked_page_ids),
-    }
-    return {**payload, "properties": properties}
+        return fields
+    return {**fields, "deliverable_ids": list(stage.linked_page_ids)}
 
 
 async def run_match_stage(

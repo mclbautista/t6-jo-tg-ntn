@@ -6,6 +6,7 @@ Offline only: real SQLite, fake Telegram/Notion/Jev. The live run stays manual.
 import json
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -27,6 +28,7 @@ from jo_watchdog.app.smoke_gate import (
 from jo_watchdog.app.wiring import Adapters, build_worker, missing_wiring
 from jo_watchdog.ledger.db import Ledger
 from tests.fakes import FakeClassifier, FakeNotion, FakeTelegram, update
+from tests.recorded import RecordedStudio
 from tests.test_match_stage import CANDS, LINKABLE, FakeDeliverables, FakeMatcher
 from tests.test_worker import make_config, make_worker, no_sleep
 
@@ -34,29 +36,11 @@ KEY = "-100123:42"
 
 
 
-NOTION_FIXTURES = Path(__file__).parent / "fixtures" / "notion"
-
-
-def _fixture(name):
-    return json.loads((NOTION_FIXTURES / name).read_text(encoding="utf-8"))
-
-
-class CachedNotion(FakeNotion):
-    """FakeNotion that also serves the recorded cache refreshes the production worker makes."""
-
-    async def query_all(self, data_source_id):
-        if data_source_id == make_config().projects_data_source_id:
-            return _fixture("projects_query.json")["results"]
-        return _fixture("contacts_query_page1.json")["results"]
-
-    async def retrieve_data_source(self, data_source_id):
-        return _fixture("job_orders_data_source.json")
-
-
-def adapters(telegram=None, notion=None, matcher=None) -> Adapters:
+def adapters(telegram=None, notion=None, studio=None, matcher=None) -> Adapters:
     return Adapters(
         telegram=telegram or FakeTelegram(),
         notion=notion or FakeNotion(),
+        studio=studio or RecordedStudio(),
         classifier=FakeClassifier(),
         matcher=matcher,
     )
@@ -71,13 +55,13 @@ class WiringTests(unittest.IsolatedAsyncioTestCase):
         return ledger
 
     def test_build_worker_wires_caches_matcher_and_deliverable_source(self):
-        notion = FakeNotion()
+        studio = RecordedStudio()
         worker = build_worker(
-            make_config(), self._ledger(), adapters(notion=notion, matcher=FakeMatcher(LINKABLE))
+            make_config(), self._ledger(), adapters(studio=studio, matcher=FakeMatcher(LINKABLE))
         )
         self.assertEqual(missing_wiring(worker), [])
-        self.assertIs(worker.deliverables, notion)
-        self.assertIs(worker.caches.notion, notion)
+        self.assertIs(worker.deliverables, studio)
+        self.assertIs(worker.caches.studio, studio)
 
     def test_a_worker_without_the_matcher_is_reported_as_unwired(self):
         worker = build_worker(make_config(), self._ledger(), adapters(matcher=None))
@@ -123,9 +107,9 @@ class SyntheticCaptureTests(unittest.IsolatedAsyncioTestCase):
         s = smoke.Smoke(make_config(), self._args())
         s.bot = None
         built = adapters(
-            notion=notion or CachedNotion(), matcher=matcher or FakeMatcher(LINKABLE)
+            notion=notion or FakeNotion(), matcher=matcher or FakeMatcher(LINKABLE)
         )
-        built.notion.query_project_deliverables = FakeDeliverables(CANDS).query_project_deliverables
+        built.studio.query_project_deliverables = FakeDeliverables(CANDS).query_project_deliverables
         with (
             mock.patch.object(smoke, "missing_secrets", return_value=[]),
             mock.patch.object(smoke, "build_adapters", return_value=built),
@@ -139,7 +123,7 @@ class SyntheticCaptureTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(telegram.reactions[0][:2], (-100123, 42))
 
     async def test_dry_run_holds_at_planned_with_one_delivered_plan(self):
-        notion = CachedNotion()
+        notion = FakeNotion()
         result, telegram = await self._capture(dry_run=True, notion=notion)
         self.assertEqual(result.status, PASS, result.detail)
         self.assertEqual(notion.created, [])
@@ -177,7 +161,7 @@ class VerifyCaptureTests(unittest.IsolatedAsyncioTestCase):
         # The audited behavior: capture "passed" though the reaction never landed.
         _, ledger, _, notion = await self._run([update(7, message_id=42)], fail_reaction=True)
         self.assertEqual(ledger.get_message(KEY)["state"], "done")
-        result = await verify_capture(ledger, KEY, notion=notion)
+        result = await verify_capture(ledger, KEY, notion=notion, data_source_id="ds-1")
         self.assertEqual(result.status, FAIL)
         self.assertIn("reaction_state", result.detail)
 
@@ -187,14 +171,14 @@ class VerifyCaptureTests(unittest.IsolatedAsyncioTestCase):
             "UPDATE messages SET state = 'writing', last_error = ? WHERE telegram_key = ?",
             ("notion_write: NotionError: Notion 400 validation_error: time zone offsets", KEY),
         )
-        result = await verify_capture(ledger, KEY, notion=notion)
+        result = await verify_capture(ledger, KEY, notion=notion, data_source_id="ds-1")
         self.assertEqual(result.status, FAIL)
         self.assertIn("stopped at writing", result.detail)
         self.assertIn("400 validation_error", result.detail)
 
     async def test_an_undelivered_outbox_is_not_a_pass(self):
         _, ledger, _, notion = await self._run([update(7, message_id=42)], fail_send=99)
-        result = await verify_capture(ledger, KEY, notion=notion)
+        result = await verify_capture(ledger, KEY, notion=notion, data_source_id="ds-1")
         self.assertEqual(result.status, FAIL)
         self.assertIn("not delivered", result.detail)
 
@@ -202,21 +186,20 @@ class VerifyCaptureTests(unittest.IsolatedAsyncioTestCase):
         worker, ledger, telegram, notion = await self._run(
             [update(7, message_id=42), update(8, message_id=43)]
         )
-        self.assertEqual((await verify_capture(ledger, KEY, notion=notion)).status, PASS)
+        self.assertEqual((await verify_capture(ledger, KEY, notion=notion, data_source_id="ds-1")).status, PASS)
         ledger.set_reaction_state(KEY, "failed")  # only the first message is damaged
         self.assertEqual(ledger.get_message("-100123:43")["reaction_state"], "set")
-        self.assertEqual((await verify_capture(ledger, KEY, notion=notion)).status, FAIL)
-        self.assertEqual((await verify_capture(ledger, "-100123:99", notion=notion)).status, FAIL)
+        self.assertEqual((await verify_capture(ledger, KEY, notion=notion, data_source_id="ds-1")).status, FAIL)
+        self.assertEqual((await verify_capture(ledger, "-100123:99", notion=notion, data_source_id="ds-1")).status, FAIL)
 
     async def test_a_page_with_another_telegram_key_fails(self):
         _, ledger, _, notion = await self._run([update(7, message_id=42)])
-        page = notion.pages["page-1"]
-        page["properties"]["Telegram Key"]["rich_text"] = [{"plain_text": "-100123:999"}]
-        self.assertEqual((await verify_capture(ledger, KEY, notion=notion)).status, FAIL)
+        notion.pages["page-1"] = replace(notion.pages["page-1"], telegram_key="-100123:999")
+        self.assertEqual((await verify_capture(ledger, KEY, notion=notion, data_source_id="ds-1")).status, FAIL)
 
     async def test_a_missing_recorded_reaction_fails(self):
         _, ledger, _, notion = await self._run([update(7, message_id=42)])
-        result = await verify_capture(ledger, KEY, notion=notion, recorded_reactions=[])
+        result = await verify_capture(ledger, KEY, notion=notion, data_source_id="ds-1", recorded_reactions=[])
         self.assertEqual(result.status, FAIL)
 
 

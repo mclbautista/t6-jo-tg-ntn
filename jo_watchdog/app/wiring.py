@@ -29,8 +29,10 @@ class Adapters:
 
     telegram: object
     notion: object
+    studio: object
     classifier: object
     matcher: object | None
+    masked_extractor: object | None = None
     closers: list = field(default_factory=list)
 
     def with_(self, **replacements) -> Adapters:
@@ -46,9 +48,9 @@ def build_adapters(config: Config) -> Adapters:
     """The real aiogram, httpx, DeepSeek and Jev adapters, from the environment's secrets."""
     from jo_watchdog.adapters.deepseek import DeepSeekClassifier
     from jo_watchdog.adapters.jev import JevMatcher
-    from jo_watchdog.adapters.notion import NotionAdapter
+    from jo_watchdog.adapters.t6_studio import T6Studio
 
-    notion = NotionAdapter(notion_token())
+    studio = T6Studio(notion_token(), notion_version=config.notion_version)
     classifier = DeepSeekClassifier(
         deepseek_token(),
         base_url=config.deepseek_base_url,
@@ -62,13 +64,32 @@ def build_adapters(config: Config) -> Adapters:
         timeout=config.jev_timeout_seconds,
     )
 
+    masked_extractor = None
+    if config.llm_shadow_masking:
+        from jo_watchdog.adapters.t6_llm import MaskedExtractor
+
+        masked_extractor = MaskedExtractor(
+            deepseek_token(),
+            base_url=config.deepseek_base_url,
+            model=config.deepseek_model,
+            timeout_seconds=config.deepseek_timeout_seconds,
+        )
+
     telegram, close_telegram = _build_telegram(config)
     return Adapters(
         telegram=telegram,
-        notion=notion,
+        notion=studio,
+        studio=studio,
         classifier=classifier,
         matcher=matcher,
-        closers=[notion.close, classifier.close, matcher.close, close_telegram],
+        masked_extractor=masked_extractor,
+        closers=[
+            studio.close,
+            classifier.close,
+            matcher.close,
+            close_telegram,
+            *([masked_extractor.close] if masked_extractor else []),
+        ],
     )
 
 
@@ -93,8 +114,8 @@ def _build_telegram(config: Config):
 
 
 def build_worker(config: Config, ledger: Ledger, adapters: Adapters, **worker_options) -> Worker:
-    """The production worker: persisted caches loaded, Notion also the Deliverable source."""
-    caches = CacheManager(ledger=ledger, notion=adapters.notion, config=config)
+    """The production worker: persisted caches loaded; t6-core supplies caches and candidates."""
+    caches = CacheManager(ledger=ledger, studio=adapters.studio, config=config)
     caches.load_persisted()  # last good snapshots first, then the live refresh
     return Worker(
         ledger=ledger,
@@ -104,7 +125,8 @@ def build_worker(config: Config, ledger: Ledger, adapters: Adapters, **worker_op
         config=config,
         caches=caches,
         matcher=adapters.matcher,
-        deliverables=adapters.notion,
+        masked_extractor=adapters.masked_extractor,
+        deliverables=adapters.studio,
         **worker_options,
     )
 

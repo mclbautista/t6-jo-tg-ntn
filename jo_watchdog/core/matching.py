@@ -163,8 +163,3 @@ def hint_line(hint: CandidateOutcome) -> str:
 
 
 MATCHER_SKIPPED_LINE = "Deliverable match skipped: matcher unavailable"
-
-
-def deliverable_property(linked_page_ids: list[str]) -> dict:
-    """The Job Order ``Deliverable`` relation value for the Notion payload."""
-    return {"relation": [{"id": page_id} for page_id in linked_page_ids]}
