@@ -18,7 +18,7 @@ SHIFTS = [("Assignee", "7:00 PM")]
 
 
 def manila_local(date_start: str) -> str:
-    """The golden files hold Manila local time; the payload sends the same instant in UTC."""
+    """The golden files hold Manila local time."""
     return manila_iso(datetime.fromisoformat(date_start))
 
 
@@ -61,18 +61,16 @@ class CorpusPlanGoldenTests(unittest.TestCase):
                     department_aliases=ALIASES,
                     assignee_shifts=SHIFTS,
                 )
-                jo_number = plan.properties.get("JO Number")
-                deadline = plan.properties.get("Deadline")
+                jo_number = plan.fields.get("number")
+                deadline = plan.fields.get("deadline")
                 actual = {
                     "index": expected["index"],
                     "name": plan.name,
-                    "jo_number": jo_number["rich_text"][0]["text"]["content"]
-                    if jo_number
-                    else None,
+                    "jo_number": jo_number,
                     "jo_number_int": plan.jo_number_int,
                     "deadline_raw": ext.deadline_raw,
-                    "posted_at": manila_local(plan.properties["Date"]["date"]["start"]),
-                    "deadline": manila_local(deadline["date"]["start"]) if deadline else None,
+                    "posted_at": manila_local(plan.fields["date"]),
+                    "deadline": manila_local(deadline) if deadline else None,
                     "deadline_source": plan.deadline_source,
                     "findings": [f.code for f in plan.findings],
                 }
@@ -88,14 +86,14 @@ class CorpusPlanGoldenTests(unittest.TestCase):
                 source_block="",
                 department_aliases=ALIASES,
             )
-            deadline = plan.properties.get("Deadline")
+            deadline = plan.fields.get("deadline")
             with self.subTest(index=expected["index"]):
                 if expected["deadline_source"] != "shift":
                     self.assertEqual(plan.deadline_source, expected["deadline_source"])
                     continue
                 # Every corpus shift row resolves to 19:00 on its stated/posting day.
                 day = expected["deadline"][:10]
-                self.assertEqual(manila_local(deadline["date"]["start"]), f"{day}T23:59:00+08:00")
+                self.assertEqual(manila_local(deadline), f"{day}T23:59:00+08:00")
                 self.assertEqual(plan.deadline_source, "fallback")
                 self.assertIn("shift_fallback", [f.code for f in plan.findings])
 
@@ -115,10 +113,10 @@ class CorpusPlanGoldenTests(unittest.TestCase):
                     department_aliases=ALIASES,
                     assignee_shifts=[tuple(shift) for shift in case["shifts"]],
                 )
-                deadline = plan.properties.get("Deadline")
+                deadline = plan.fields.get("deadline")
                 self.assertEqual(
                     {
-                        "deadline": manila_local(deadline["date"]["start"]) if deadline else None,
+                        "deadline": manila_local(deadline) if deadline else None,
                         "source": plan.deadline_source,
                         "findings": [f.code for f in plan.findings],
                     },

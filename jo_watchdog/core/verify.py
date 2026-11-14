@@ -226,8 +226,8 @@ def parse_header_date(raw: str | None, posted: date) -> date | None:
 
 
 def readback_properties(mismatches: list[str]) -> list[str]:
-    """Property names from ``verify_readback`` sentences (``<Prop> differs: …``)."""
-    return [m.split(" differs", 1)[0] for m in mismatches]
+    """Display names of the Job Order fields t6-core found saved differently, as ``name`` or ``deadline``."""
+    return [m.replace("_", " ").title() for m in mismatches]
 
 
 def order_findings(findings: list[Finding]) -> list[Finding]:

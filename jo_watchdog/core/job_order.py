@@ -1,19 +1,23 @@
 """Pure core: the deterministic Job Order plan (#21).
 
-Turns a validated extraction into the exact Notion properties and body blocks
-for every Job Order field that needs no live relation resolution. The plan is
-stored before any write and replayed as-is: ``build_job_order_payload`` reads
-only the stored plan, never the extraction or the clock.
+Turns a validated extraction into the Job Order fields, in ``t6.domain.JobOrder``
+terms, and the source-text body blocks, for every field that needs no live
+relation resolution. The plan is stored before any write and replayed as-is:
+``job_order_fields`` reads only the stored plan, never the extraction or the
+clock. t6-core maps the fields to Notion (#134); nothing here names a Notion
+property. Plans stored before #134 held Notion-shaped properties and are upgraded
+on load by ``legacy_plan``.
 """
 
 from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from datetime import datetime, time
+from datetime import date, datetime, time
 from typing import Any, Protocol
 
 from pydantic import BaseModel, Field
+from t6.domain import JobOrderStatus
 
 from jo_watchdog.core.deadline import MANILA, DeadlineSource, resolve_deadline
 from jo_watchdog.core.extraction import is_subtitle_value
@@ -25,38 +29,29 @@ from jo_watchdog.core.header import (
     parse_number,
 )
 from jo_watchdog.core.masker import mask_text, outbound_text
-from jo_watchdog.core.payload import STATUS_NEEDS_INTAKE_REVIEW
-from jo_watchdog.core.plan import (
-    BLOCK_LIMIT,
-    NOTES_PROPERTY,
-    WATCHDOG_NOTES_PROPERTY,
-    header_line_of,
-    split_blocks,
-)
+from jo_watchdog.core.plan import header_line_of, split_blocks
 from jo_watchdog.core.resolve import (
     DepartmentResolution,
     PeopleResolution,
     ProjectResolution,
-    relation_properties,
 )
 
-# Plans stored before #99 carried the watchdog block inside ``Notes`` behind this marker.
-LEGACY_WATCHDOG_MARKER = "— added by the watchdog —"
 ASAP_NOTE = "ASAP — deprioritize other JOs"
 
-# Exact live property names, including the trailing space on `Blocker `.
-TEXT_PROPERTIES: dict[str, str] = {
-    "title": "Title",
-    "task": "Task",
-    "purpose": "Purpose",
-    "source": "Source / Source Drive",
-    "platform": "Platform",
-    "link_settings": "Link Settings",
-    "watermark": "Watermark",
-    "mode_of_transfer": "Mode of Transfer",
-    "blocker": "Blocker ",
-    "pending": "Pending",
-}
+# Verbatim text fields, by Job Order field name; each is also an extraction field.
+TEXT_FIELDS: tuple[str, ...] = (
+    "title",
+    "task",
+    "purpose",
+    "source",
+    "platform",
+    "link_settings",
+    "watermark",
+    "mode_of_transfer",
+    "blocker",
+    "pending",
+)
+STATUS_NEEDS_INTAKE_REVIEW = JobOrderStatus.NEEDS_INTAKE_REVIEW.value
 
 
 class Extraction(Protocol):
@@ -99,11 +94,16 @@ class PlanResolution(BaseModel):
 
 
 class JobOrderPlan(BaseModel):
-    """The exact Notion payload pieces, stored at ``planned`` and replayed unchanged."""
+    """The Job Order fields and body, stored at ``planned`` and replayed unchanged.
+
+    ``fields`` holds ``t6.domain.JobOrder`` field values that survive JSON: text,
+    ISO-8601 strings with the Manila offset for ``date`` and ``deadline``, and
+    lists of page IDs for the relations.
+    """
 
     telegram_key: str
     name: str
-    properties: dict[str, Any]
+    fields: dict[str, Any]
     body_blocks: list[str] = Field(default_factory=list)
     jo_number_int: int | None = None
     deadline_source: DeadlineSource = "blank"
@@ -118,78 +118,14 @@ class JobOrderPlan(BaseModel):
     match: dict | None = None
 
 
-def plain_text(prop: dict[str, Any] | None) -> str:
-    """The text of a stored rich-text property, items joined; empty when absent."""
-    return "".join(item["text"]["content"] for item in (prop or {}).get("rich_text") or [])
-
-
-def _split_legacy_block(notes: str) -> tuple[str, str] | None:
-    """Split pre-#99 ``<poster>\\n\\n<marker>\\n<lines>`` text into (poster, watchdog lines).
-
-    The block is always last, so only the final marker line counts: a marker quoted
-    inside the poster's own text is left alone. ``None`` when there is no block.
-    """
-    token = f"{LEGACY_WATCHDOG_MARKER}\n"
-    if notes.startswith(token):
-        return "", notes[len(token) :]
-    at = notes.rfind(f"\n\n{token}")
-    if at == -1:
-        return None
-    return notes[:at], notes[at + 2 + len(token) :]
-
-
-def split_legacy_notes(properties: dict[str, Any]) -> dict[str, Any]:
-    """Move a pre-#99 watchdog block out of ``Notes`` into ``Watchdog Notes``.
-
-    A plan stored before the split holds ``<poster notes>\\n\\n<marker>\\n<lines>`` in
-    ``Notes``. Replaying it must not write watchdog text to the coordinator's column.
-    A plan that already has ``Watchdog Notes`` is new-format and is returned unchanged.
-    """
-    if WATCHDOG_NOTES_PROPERTY in properties:
-        return properties
-    legacy_notes = properties.get(NOTES_PROPERTY) or properties.get("Notes")
-    legacy = _split_legacy_block(plain_text(legacy_notes))
-    if legacy is None:
-        if "Notes" in properties and NOTES_PROPERTY != "Notes":
-            split = {k: v for k, v in properties.items() if k != "Notes"}
-            split[NOTES_PROPERTY] = properties["Notes"]
-            return split
-        return properties
-    poster, block = legacy
-    split = {k: v for k, v in properties.items() if k not in (NOTES_PROPERTY, "Notes")}
-    if poster:
-        split[NOTES_PROPERTY] = {"rich_text": rich_text(poster)}
-    if block:
-        split[WATCHDOG_NOTES_PROPERTY] = {"rich_text": rich_text(block)}
-    return split
-
-
 def load_plan(stored: str | dict) -> JobOrderPlan:
-    """Read a stored plan; a pre-#39 skeleton plan (no ``properties``) is upgraded in place."""
+    """Read a stored plan; plans stored before #134 (Notion-shaped) are upgraded."""
     data = json.loads(stored) if isinstance(stored, str) else dict(stored)
-    if "properties" in data:
-        plan = JobOrderPlan.model_validate(data)
-        plan.properties = split_legacy_notes(plan.properties)
-        return plan
-    properties: dict[str, Any] = {
-        "Name": {"title": rich_text(data["name"])},
-        "Telegram Key": {"rich_text": rich_text(data["telegram_key"])},
-        "Status": {"status": {"name": STATUS_NEEDS_INTAKE_REVIEW}},
-    }
-    # A skeleton plan's notes were watchdog-only (the earlier-row reference).
-    skeleton_notes = data.get("notes") or ""
-    legacy = _split_legacy_block(skeleton_notes)
-    if legacy is not None:
-        skeleton_notes = "\n\n".join(part for part in legacy if part)
-    if skeleton_notes:
-        properties[WATCHDOG_NOTES_PROPERTY] = {"rich_text": rich_text(skeleton_notes)}
-    return JobOrderPlan(
-        telegram_key=data["telegram_key"],
-        name=data["name"],
-        properties=properties,
-        body_blocks=data.get("body_blocks", []),
-        duplicate=data.get("duplicate"),
-    )
+    if "fields" in data:
+        return JobOrderPlan.model_validate(data)
+    from jo_watchdog.core.legacy_plan import upgrade
+
+    return JobOrderPlan.model_validate(upgrade(data))
 
 
 def manila_iso(value: datetime) -> str:
@@ -197,58 +133,9 @@ def manila_iso(value: datetime) -> str:
     return value.astimezone(MANILA).isoformat()
 
 
-def notion_date(value: datetime) -> dict[str, Any]:
-    """A Notion Date value for ``value``: the instant at its Manila UTC offset, no ``time_zone``.
-
-    Notion rejects a ``time_zone`` next to a non-zero offset (#83), and with a
-    ``time_zone`` it reads the wall clock of ``start`` in that zone and ignores the
-    offset: a UTC start came back eight hours early (#85). A bare offset keeps the
-    exact instant, which is what the read-back compares.
-    """
-    return {"date": {"start": manila_iso(value)}}
-
-
-def _instant_date(date: dict[str, Any]) -> dict[str, Any]:
-    """Drop ``time_zone`` from a stored date, keeping each instant at its Manila offset."""
-    if "time_zone" not in date:
-        return date
-    fixed = {k: v for k, v in date.items() if k != "time_zone"}
-    for edge in ("start", "end"):
-        value = date.get(edge)
-        if not isinstance(value, str):
-            continue
-        try:
-            parsed = datetime.fromisoformat(value)
-        except ValueError:
-            continue
-        if parsed.tzinfo is not None:
-            fixed[edge] = manila_iso(parsed)
-    return fixed
-
-
-def normalize_date_properties(properties: dict[str, Any]) -> dict[str, Any]:
-    """Make every Date property Notion-safe, including ones in plans stored earlier.
-
-    Plans stored by earlier builds carry ``time_zone`` (with ``+08:00`` before #83, with
-    UTC after it). Each instant is kept and re-expressed at the Manila offset without
-    ``time_zone``, so a stuck row is replanned by replay and no second page is made.
-    """
-    return {
-        name: (
-            {**prop, "date": _instant_date(prop["date"])}
-            if isinstance(prop, dict) and isinstance(prop.get("date"), dict)
-            else prop
-        )
-        for name, prop in properties.items()
-    }
-
-
-def rich_text(value: str) -> list[dict]:
-    """Split a text value into Notion rich-text items of at most 2000 characters."""
-    return [
-        {"type": "text", "text": {"content": value[i : i + BLOCK_LIMIT]}}
-        for i in range(0, len(value), BLOCK_LIMIT)
-    ]
+def stored_instant(value: str) -> date | datetime:
+    """A stored ``date`` or ``deadline``: a datetime when it has a time, else a day."""
+    return datetime.fromisoformat(value) if "T" in value else date.fromisoformat(value)
 
 
 def _clean(value: str | None) -> str:
@@ -327,32 +214,32 @@ def plan_job_order(
     deadline = resolve_deadline(extraction.deadline_raw, posted_at, assignee_shifts)
     asap = any(f.code == ASAP for f in deadline.findings)
 
-    properties: dict[str, Any] = {
-        "Name": {"title": rich_text(name)},
-        "Telegram Key": {"rich_text": rich_text(telegram_key)},
-        "Status": {"status": {"name": STATUS_NEEDS_INTAKE_REVIEW}},
-        "Date": notion_date(posted_at),
+    fields: dict[str, Any] = {
+        "name": name,
+        "telegram_key": telegram_key,
+        "status": STATUS_NEEDS_INTAKE_REVIEW,
+        "date": manila_iso(posted_at),
     }
     if digits is not None:
-        properties["JO Number"] = {"rich_text": rich_text(f"#{digits}")}
+        fields["number"] = f"#{digits}"
     if department:
-        properties["Department"] = {"select": {"name": department}}
+        fields["department"] = department
     if deadline.deadline is not None:
-        properties["Deadline"] = notion_date(deadline.deadline)
-    for field, prop in TEXT_PROPERTIES.items():
+        fields["deadline"] = manila_iso(deadline.deadline)
+    for field in TEXT_FIELDS:
         raw_value = getattr(extraction, field)
         value = _verbatim(raw_value) if field == "title" else _clean(raw_value)
         if value:
-            properties[prop] = {"rich_text": rich_text(value)}
+            fields[field] = value
     subtitle = _clean(extraction.subtitle)
     if subtitle and is_subtitle_value(subtitle):
-        properties["Subtitle"] = {"rich_text": rich_text(subtitle)}
+        fields["subtitle"] = subtitle
     notes = build_notes(extraction.notes)
     if notes:
-        properties[NOTES_PROPERTY] = {"rich_text": rich_text(notes)}
+        fields["notes"] = notes
     watchdog_notes = build_watchdog_notes(extraction.deadline_raw, asap)
     if watchdog_notes:
-        properties[WATCHDOG_NOTES_PROPERTY] = {"rich_text": rich_text(watchdog_notes)}
+        fields["watchdog_notes"] = watchdog_notes
 
     body = [
         *split_blocks(outbound_text(source_block).text),
@@ -362,7 +249,7 @@ def plan_job_order(
     return JobOrderPlan(
         telegram_key=telegram_key,
         name=name,
-        properties=properties,
+        fields=fields,
         body_blocks=body,
         jo_number_int=int(digits) if digits is not None else None,
         deadline_source=deadline.source,
@@ -377,8 +264,14 @@ def apply_resolution(
     project: ProjectResolution,
     department: DepartmentResolution,
 ) -> None:
-    """Merge the #22 resolution into the plan: relations, findings and the stored decision."""
-    plan.properties.update(relation_properties(people, project))
+    """Merge the #22 resolution into the plan: relations, findings and the stored decision.
+
+    Only resolved page IDs are written; an unresolved Project leaves ``project_id`` out.
+    """
+    plan.fields["assigned_ids"] = list(people.assigned)
+    plan.fields["cc_ids"] = list(people.cc)
+    if project.page_id:
+        plan.fields["project_id"] = project.page_id
     plan.resolution = PlanResolution(
         project_page_id=project.page_id,
         department=department.department,
@@ -396,18 +289,16 @@ def apply_resolution(
     )
 
 
-def build_job_order_payload(plan: JobOrderPlan, *, data_source_id: str) -> dict:
-    """The exact create-page payload, built only from the stored plan."""
-    children = [
-        {
-            "object": "block",
-            "type": "paragraph",
-            "paragraph": {"rich_text": rich_text(mask_text(block))},
-        }
-        for block in plan.body_blocks
-    ]
-    return {
-        "parent": {"data_source_id": data_source_id},
-        "properties": normalize_date_properties(plan.properties),
-        "children": children,
-    }
+def job_order_fields(plan: JobOrderPlan) -> dict[str, Any]:
+    """The fields for ``t6.notion.job_orders.JobOrders.create``, built only from the stored plan.
+
+    Stored ISO dates become ``date`` or ``datetime`` values, and the body blocks
+    are masked once more at this exit boundary and joined into ``source_text``.
+    """
+    fields: dict[str, Any] = dict(plan.fields)
+    for name in ("date", "deadline"):
+        if isinstance(fields.get(name), str):
+            fields[name] = stored_instant(fields[name])
+    if plan.body_blocks:
+        fields["source_text"] = "\n".join(mask_text(block) for block in plan.body_blocks)
+    return fields

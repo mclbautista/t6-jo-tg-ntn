@@ -4,10 +4,10 @@ Real SQLite, fake Telegram/Notion/DeepSeek adapters and a fake clock.
 """
 
 import asyncio
-import json
 import sqlite3
 import tempfile
 import unittest
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -220,8 +220,8 @@ class RetryScheduleTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_reconciliation_failure_names_its_step(self):
         class CrashAfterCreate(FakeNotion):
-            async def create_page(self, payload):
-                await super().create_page(payload)
+            async def create(self, data_source_id, fields):
+                await super().create(data_source_id, fields)
                 raise Crash
 
         notion = CrashAfterCreate(fail_find=99)
@@ -394,8 +394,8 @@ class RetryCommandTests(unittest.TestCase):
 
 
 class CrashAfterCreateNotion(FakeNotion):
-    async def create_page(self, payload):
-        await super().create_page(payload)
+    async def create(self, data_source_id, fields):
+        await super().create(data_source_id, fields)
         raise Crash
 
 
@@ -429,7 +429,7 @@ class WritingRecoveryTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_recovery_creates_only_when_no_row_exists(self):
         class CrashBeforeCreate(FakeNotion):
-            async def create_page(self, payload):
+            async def create(self, data_source_id, fields):
                 self.create_calls += 1
                 raise Crash
 
@@ -448,9 +448,7 @@ class WritingRecoveryTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_multiple_matches_are_reported_and_never_merged_or_deleted(self):
         p, notion = await self.crashed_after_create()
-        duplicate = json.loads(json.dumps(notion.pages["page-1"]))
-        duplicate["id"], duplicate["url"] = "page-9", "https://notion.example/page-9"
-        notion.pages["page-9"] = duplicate
+        notion.pages["page-9"] = replace(notion.pages["page-1"], page_id="page-9")
         p.clock.advance(seconds=30)
         await p.worker.run_once()
         row = p.message()
@@ -458,8 +456,8 @@ class WritingRecoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sorted(notion.pages), ["page-1", "page-9"])  # nothing removed
         (report,) = p.outbox("capture_report")
         self.assertIn("More than one Notion row has this Telegram Key", report["text"])
-        self.assertIn("notion.example/page-1", report["text"])
-        self.assertIn("notion.example/page-9", report["text"])
+        self.assertIn("notion.so/page1", report["text"])
+        self.assertIn("notion.so/page9", report["text"])
 
 
 class LivenessTests(unittest.IsolatedAsyncioTestCase):

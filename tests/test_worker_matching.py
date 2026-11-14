@@ -81,7 +81,7 @@ class WorkerInvalidAnswerTests(unittest.IsolatedAsyncioTestCase):
     async def test_extra_reason_is_never_a_link_and_evidence_is_kept(self):
         h, seen = await self.run_with(jev_body(reason="clearly the FTR SCR"))
         self.assertEqual(len(seen), 2)  # one inline retry
-        self.assertNotIn("Deliverable", h.notion.created[0]["properties"])
+        self.assertNotIn("deliverable_ids", h.notion.created[0])
         self.assertEqual(h.stage()["outcome"], "skipped")
         self.assertEqual(h.codes().count("matcher_skipped"), 1)
         self.assertEqual(h.ledger.get_message(KEY)["state"], "done")
@@ -103,7 +103,7 @@ class WorkerInvalidAnswerTests(unittest.IsolatedAsyncioTestCase):
     async def test_extra_name_echo_is_rejected(self):
         h, _ = await self.run_with(jev_body(name="Moonglow FTR SCR"))
         self.assertEqual(h.stage()["outcome"], "skipped")
-        self.assertNotIn("Deliverable", h.notion.created[0]["properties"])
+        self.assertNotIn("deliverable_ids", h.notion.created[0])
 
     async def test_partial_response_keeps_available_probabilities(self):
         body = jev_body()
@@ -117,7 +117,7 @@ class WorkerInvalidAnswerTests(unittest.IsolatedAsyncioTestCase):
     async def test_valid_body_still_links(self):
         h, _ = await self.run_with(jev_body())
         self.assertEqual(
-            h.notion.created[0]["properties"]["Deliverable"], {"relation": [{"id": "d-ftr"}]}
+            h.notion.created[0]["deliverable_ids"], ["d-ftr"]
         )
         self.assertEqual([r["outcome"] for r in self.llm_rows(h)], ["ok"])
 
@@ -126,7 +126,7 @@ class WorkerMatchTests(unittest.IsolatedAsyncioTestCase):
     async def test_shadow_mode_runs_jev_keeps_the_decision_and_writes_no_relation(self):
         h = MatchHarness(self, FakeMatcher(LINKABLE))
         await h.run()
-        self.assertNotIn("Deliverable", h.notion.created[0]["properties"])
+        self.assertNotIn("deliverable_ids", h.notion.created[0])
         self.assertEqual(len(h.matcher.calls), 1)
         self.assertEqual(h.matcher.calls[0][1], "Manufacturing")
         stage = h.stage()
@@ -154,7 +154,7 @@ class WorkerMatchTests(unittest.IsolatedAsyncioTestCase):
         h = MatchHarness(self, FakeMatcher(LINKABLE), link_enabled=True)
         await h.run()
         self.assertEqual(
-            h.notion.created[0]["properties"]["Deliverable"], {"relation": [{"id": "d-ftr"}]}
+            h.notion.created[0]["deliverable_ids"], ["d-ftr"]
         )
         self.assertEqual(h.stage()["outcome"], "linked")
 
@@ -164,7 +164,7 @@ class WorkerMatchTests(unittest.IsolatedAsyncioTestCase):
         )
         await h.run()
         self.assertEqual(len(h.notion.created), 1)
-        self.assertNotIn("Deliverable", h.notion.created[0]["properties"])
+        self.assertNotIn("deliverable_ids", h.notion.created[0])
         self.assertEqual(h.stage()["outcome"], "skipped")
         self.assertEqual(h.codes().count("matcher_skipped"), 1)
         self.assertEqual(h.ledger.get_message(KEY)["state"], "done")
@@ -185,8 +185,8 @@ class WorkerMatchTests(unittest.IsolatedAsyncioTestCase):
         await h.worker.drain_once()
         self.assertEqual(len(h.matcher.calls), 1)
         self.assertEqual(
-            json.loads(h.ledger.get_message(KEY)["plan_json"])["properties"]["Deliverable"],
-            {"relation": [{"id": "d-ftr"}]},
+            json.loads(h.ledger.get_message(KEY)["plan_json"])["fields"]["deliverable_ids"],
+            ["d-ftr"],
         )
         self.assertEqual(len(h.notion.created), 1)
 

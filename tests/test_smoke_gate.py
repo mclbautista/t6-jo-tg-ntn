@@ -6,6 +6,7 @@ Offline only: real SQLite, fake Telegram/Notion/Jev. The live run stays manual.
 import json
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -160,7 +161,7 @@ class VerifyCaptureTests(unittest.IsolatedAsyncioTestCase):
         # The audited behavior: capture "passed" though the reaction never landed.
         _, ledger, _, notion = await self._run([update(7, message_id=42)], fail_reaction=True)
         self.assertEqual(ledger.get_message(KEY)["state"], "done")
-        result = await verify_capture(ledger, KEY, notion=notion)
+        result = await verify_capture(ledger, KEY, notion=notion, data_source_id="ds-1")
         self.assertEqual(result.status, FAIL)
         self.assertIn("reaction_state", result.detail)
 
@@ -170,14 +171,14 @@ class VerifyCaptureTests(unittest.IsolatedAsyncioTestCase):
             "UPDATE messages SET state = 'writing', last_error = ? WHERE telegram_key = ?",
             ("notion_write: NotionError: Notion 400 validation_error: time zone offsets", KEY),
         )
-        result = await verify_capture(ledger, KEY, notion=notion)
+        result = await verify_capture(ledger, KEY, notion=notion, data_source_id="ds-1")
         self.assertEqual(result.status, FAIL)
         self.assertIn("stopped at writing", result.detail)
         self.assertIn("400 validation_error", result.detail)
 
     async def test_an_undelivered_outbox_is_not_a_pass(self):
         _, ledger, _, notion = await self._run([update(7, message_id=42)], fail_send=99)
-        result = await verify_capture(ledger, KEY, notion=notion)
+        result = await verify_capture(ledger, KEY, notion=notion, data_source_id="ds-1")
         self.assertEqual(result.status, FAIL)
         self.assertIn("not delivered", result.detail)
 
@@ -185,21 +186,20 @@ class VerifyCaptureTests(unittest.IsolatedAsyncioTestCase):
         worker, ledger, telegram, notion = await self._run(
             [update(7, message_id=42), update(8, message_id=43)]
         )
-        self.assertEqual((await verify_capture(ledger, KEY, notion=notion)).status, PASS)
+        self.assertEqual((await verify_capture(ledger, KEY, notion=notion, data_source_id="ds-1")).status, PASS)
         ledger.set_reaction_state(KEY, "failed")  # only the first message is damaged
         self.assertEqual(ledger.get_message("-100123:43")["reaction_state"], "set")
-        self.assertEqual((await verify_capture(ledger, KEY, notion=notion)).status, FAIL)
-        self.assertEqual((await verify_capture(ledger, "-100123:99", notion=notion)).status, FAIL)
+        self.assertEqual((await verify_capture(ledger, KEY, notion=notion, data_source_id="ds-1")).status, FAIL)
+        self.assertEqual((await verify_capture(ledger, "-100123:99", notion=notion, data_source_id="ds-1")).status, FAIL)
 
     async def test_a_page_with_another_telegram_key_fails(self):
         _, ledger, _, notion = await self._run([update(7, message_id=42)])
-        page = notion.pages["page-1"]
-        page["properties"]["Telegram Key"]["rich_text"] = [{"plain_text": "-100123:999"}]
-        self.assertEqual((await verify_capture(ledger, KEY, notion=notion)).status, FAIL)
+        notion.pages["page-1"] = replace(notion.pages["page-1"], telegram_key="-100123:999")
+        self.assertEqual((await verify_capture(ledger, KEY, notion=notion, data_source_id="ds-1")).status, FAIL)
 
     async def test_a_missing_recorded_reaction_fails(self):
         _, ledger, _, notion = await self._run([update(7, message_id=42)])
-        result = await verify_capture(ledger, KEY, notion=notion, recorded_reactions=[])
+        result = await verify_capture(ledger, KEY, notion=notion, data_source_id="ds-1", recorded_reactions=[])
         self.assertEqual(result.status, FAIL)
 
 

@@ -1,4 +1,3 @@
-from jo_watchdog.core.plan import NOTES_PROPERTY
 """Notion schema and relation smoke probes (#59): assertions and honest results, offline.
 
 The recorded schemas below stand in for the live Notion responses; the live run
@@ -10,6 +9,7 @@ import unittest
 from jo_watchdog.adapters.notion import NotionError, QueryResponse
 from jo_watchdog.app.smoke_gate import FAIL, MANUAL, PASS
 from jo_watchdog.app.smoke_notion_probes import (
+    NOTES_PROPERTY,
     check_schemas,
     probe_reciprocal_relation,
     probe_retry_after,
@@ -145,7 +145,7 @@ class FakeProbeNotion:
 
     async def create_page(self, payload):
         self.created.append(payload)
-        from jo_watchdog.adapters.protocols import PageRef
+        from jo_watchdog.adapters.notion import PageRef
 
         return PageRef(id="jo-new", url="https://notion.so/jo-new")
 

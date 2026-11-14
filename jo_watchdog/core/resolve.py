@@ -509,19 +509,6 @@ def resolve_department(
     return DepartmentResolution(department=match, token=token.strip())
 
 
-def relation_properties(people: PeopleResolution, project: ProjectResolution) -> dict[str, dict]:
-    """Notion relation values for Assigned, cc and Projects.
-
-    Only resolved page ids are written; an unresolved Project leaves Projects
-    empty. ``🗂️ Coordinator`` is never set in v1.
-    """
-    return {
-        "Assigned": {"relation": [{"id": page_id} for page_id in people.assigned]},
-        "cc": {"relation": [{"id": page_id} for page_id in people.cc]},
-        "Projects": {"relation": [{"id": project.page_id}] if project.page_id else []},
-    }
-
-
 # -- Telegram entities ------------------------------------------------------------
 
 

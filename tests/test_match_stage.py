@@ -15,7 +15,6 @@ from jo_watchdog.app.config import Config
 from jo_watchdog.app.matching import ResolvedProject, run_match_stage, with_deliverable
 from jo_watchdog.core.masker import WITHHELD
 from jo_watchdog.core.matching import Candidate, CandidateDecision, MatchResult
-from jo_watchdog.core.payload import build_notion_payload
 from jo_watchdog.core.plan import build_plan
 from tests.fakes import FakeNotion
 
@@ -280,14 +279,14 @@ class PipelineShapeTests(unittest.IsolatedAsyncioTestCase):
 
     async def write(self, result) -> dict:
         plan = build_plan(name="MG - TOC - JO #41", telegram_key="-100123:9", raw_text="JO text")
-        payload = with_deliverable(build_notion_payload(plan, data_source_id="ds-jo"), result)
+        fields = with_deliverable({"name": plan.name, "telegram_key": plan.telegram_key}, result)
         notion = FakeNotion()
-        await notion.create_page(payload)
+        await notion.create("ds-jo", fields)
         return notion.created[0]
 
     async def test_shadow_mode_never_writes_a_relation(self):
         written = await self.write(await stage(FakeMatcher(LINKABLE)))
-        self.assertNotIn("Deliverable", written["properties"])
+        self.assertNotIn("deliverable_ids", written)
 
     async def test_matcher_failure_still_writes_without_backoff(self):
         sleep = RecordingSleep()
@@ -295,14 +294,14 @@ class PipelineShapeTests(unittest.IsolatedAsyncioTestCase):
             FakeMatcher(MatcherError("http_500", "x"), MatcherError("timeout", "y")), sleep=sleep
         )
         written = await self.write(result)
-        self.assertNotIn("Deliverable", written["properties"])
+        self.assertNotIn("deliverable_ids", written)
         self.assertEqual(sleep.waits, [])
 
     async def test_enabled_link_writes_the_relation(self):
         written = await self.write(
             await stage(FakeMatcher(LINKABLE), deliverable_link_enabled=True)
         )
-        self.assertEqual(written["properties"]["Deliverable"], {"relation": [{"id": "d-ftr"}]})
+        self.assertEqual(written["deliverable_ids"], ["d-ftr"])
 
 
 class RegressionPairTests(unittest.IsolatedAsyncioTestCase):

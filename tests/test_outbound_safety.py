@@ -75,13 +75,14 @@ class WalkingCaptureSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(message["masker_version"])
 
         persisted_plan = message["plan_json"]
-        notion_payload = json.dumps(notion.created, ensure_ascii=False)
+        notion_payload = json.dumps(notion.created, ensure_ascii=False, default=str)
         structured_logs = "\n".join(captured.output)
         for outbound in (persisted_plan, notion_payload, structured_logs):
             self.assertNotIn("swordfish-credential", outbound)
         self.assertIn(WITHHELD, persisted_plan)
         self.assertIn(WITHHELD, notion_payload)
-        self.assertIn(WITHHELD, structured_logs)
+        # The mismatch log now names only the differing field, never the text.
+        self.assertIn("read-back mismatch for -100123:42: name", structured_logs)
 
     async def test_ignore_log_masks_first_line_before_persistence(self):
         tmp = tempfile.TemporaryDirectory()

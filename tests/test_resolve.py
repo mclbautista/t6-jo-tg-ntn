@@ -6,6 +6,7 @@ import unittest
 from datetime import time
 from pathlib import Path
 
+from jo_watchdog.core.job_order import JobOrderPlan, apply_resolution
 from jo_watchdog.core.resolve import (
     MentionEntity,
     PeopleIndex,
@@ -13,7 +14,6 @@ from jo_watchdog.core.resolve import (
     ResolveSettings,
     normalize_name,
     parse_end_of_shift,
-    relation_properties,
     resolve_department,
     resolve_mention,
     resolve_people,
@@ -317,21 +317,25 @@ class ProjectTests(unittest.TestCase):
         self.assertEqual(resolve_project("", projects()).findings, [])
 
 
-class RelationPropertyTests(unittest.TestCase):
-    def test_only_resolved_ids_and_no_coordinator(self):
+class RelationFieldTests(unittest.TestCase):
+    def fields(self, project_raw):
+        plan = JobOrderPlan(telegram_key="k", name="n", fields={})
         people_out = resolve_people("Ramon / @nobody", None, people(), SETTINGS)
-        props = relation_properties(people_out, resolve_project("NOPE", projects()))
-        self.assertEqual(
-            props,
-            {
-                "Assigned": {"relation": [{"id": RAMON}]},
-                "cc": {"relation": [{"id": PRIYA}]},
-                "Projects": {"relation": []},
-            },
+        apply_resolution(
+            plan,
+            people=people_out,
+            project=resolve_project(project_raw, projects()),
+            department=resolve_department("TO", DEPARTMENTS, {"TO": "TOC"}),
         )
-        self.assertNotIn("🗂️ Coordinator", props)
-        resolved = relation_properties(people_out, resolve_project("MFG", projects()))
-        self.assertEqual(len(resolved["Projects"]["relation"]), 1)
+        return plan.fields
+
+    def test_only_resolved_ids_and_no_coordinator(self):
+        fields = self.fields("NOPE")
+        self.assertEqual(fields, {"assigned_ids": [RAMON], "cc_ids": [PRIYA]})
+        self.assertNotIn("coordinator_ids", fields)
+
+    def test_a_resolved_project_is_written(self):
+        self.assertEqual(len(self.fields("MFG")["project_id"]), 36)
 
 
 class DepartmentTests(unittest.TestCase):

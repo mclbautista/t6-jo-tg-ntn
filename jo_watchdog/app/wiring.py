@@ -47,10 +47,8 @@ def build_adapters(config: Config) -> Adapters:
     """The real aiogram, httpx, DeepSeek and Jev adapters, from the environment's secrets."""
     from jo_watchdog.adapters.deepseek import DeepSeekClassifier
     from jo_watchdog.adapters.jev import JevMatcher
-    from jo_watchdog.adapters.notion import NotionAdapter
     from jo_watchdog.adapters.t6_studio import T6Studio
 
-    notion = NotionAdapter(notion_token())
     studio = T6Studio(notion_token(), notion_version=config.notion_version)
     classifier = DeepSeekClassifier(
         deepseek_token(),
@@ -68,11 +66,11 @@ def build_adapters(config: Config) -> Adapters:
     telegram, close_telegram = _build_telegram(config)
     return Adapters(
         telegram=telegram,
-        notion=notion,
+        notion=studio,
         studio=studio,
         classifier=classifier,
         matcher=matcher,
-        closers=[notion.close, studio.close, classifier.close, matcher.close, close_telegram],
+        closers=[studio.close, classifier.close, matcher.close, close_telegram],
     )
 
 

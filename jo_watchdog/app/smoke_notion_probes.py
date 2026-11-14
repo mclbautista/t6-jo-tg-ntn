@@ -12,12 +12,14 @@ from collections.abc import Awaitable, Callable, Mapping
 
 from jo_watchdog.adapters.notion import NotionError, QueryRequest
 from jo_watchdog.app.smoke_gate import FAIL, MANUAL, PASS, Result
-from jo_watchdog.core.plan import NOTES_PROPERTY, WATCHDOG_NOTES_PROPERTY
 
 STATUS_OPTION = "Needs Intake Review"
 MAX_RETRY_AFTER_REQUESTS = 100
 MAX_RETRY_AFTER_WAIT = 60.0
 
+# The live property names this probe checks.
+NOTES_PROPERTY = "JO Notes"
+WATCHDOG_NOTES_PROPERTY = "Watchdog Notes"
 _TEXT = {"rich_text"}
 # Exact live property names (note the trailing space in "Blocker " and the emoji
 # in the Coordinator and Deliverables Projects names). ``None`` means the design

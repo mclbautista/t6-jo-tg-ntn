@@ -1,20 +1,19 @@
-from jo_watchdog.core.plan import NOTES_PROPERTY
 """The worker plans with the #21 planner and the #22 resolvers, and replays the stored plan."""
 
 import json
 import tempfile
 import unittest
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
-from jo_watchdog.adapters.notion import NotionError
+from t6.notion.errors import NotionError
+
 from jo_watchdog.app.caches import CacheManager
 from jo_watchdog.app.config import Config
 from jo_watchdog.app.worker import Worker
 from jo_watchdog.core.deadline import MANILA
-from jo_watchdog.core.job_order import manila_iso
 from jo_watchdog.ledger.db import Ledger
-from tests.fakes import FakeClassifier, FakeNotion, FakeTelegram, live_date, ok_result, update
+from tests.fakes import FakeClassifier, FakeNotion, FakeTelegram, ok_result, update
 
 KEY = "-100123:42"
 PRIYA = "c-priya"
@@ -88,7 +87,7 @@ class Harness:
 
 
 class PlannerWiringTests(unittest.IsolatedAsyncioTestCase):
-    async def test_fully_resolved_jo_writes_the_full_property_set(self):
+    async def test_fully_resolved_jo_writes_the_full_field_set(self):
         h = Harness(
             self,
             title="Teaser",
@@ -104,18 +103,17 @@ class PlannerWiringTests(unittest.IsolatedAsyncioTestCase):
         )
         await h.run()
 
-        [payload] = h.notion.created
-        props = payload["properties"]
-        self.assertEqual(props["Name"]["title"][0]["text"]["content"], "MFG - TOC - JO #74")
-        self.assertEqual(props["JO Number"]["rich_text"][0]["text"]["content"], "#74")
-        self.assertEqual(props["Department"], {"select": {"name": "TOC"}})
-        self.assertEqual(props["Projects"], {"relation": [{"id": "proj-mfg"}]})
-        self.assertEqual(props["Assigned"], {"relation": [{"id": "c-ben"}]})
-        self.assertEqual(props["cc"], {"relation": [{"id": "c-ana"}, {"id": PRIYA}]})
+        [fields] = h.notion.created
+        self.assertEqual(fields["name"], "MFG - TOC - JO #74")
+        self.assertEqual(fields["number"], "#74")
+        self.assertEqual(fields["department"], "TOC")
+        self.assertEqual(fields["project_id"], "proj-mfg")
+        self.assertEqual(fields["assigned_ids"], ["c-ben"])
+        self.assertEqual(fields["cc_ids"], ["c-ana", PRIYA])
         self.assertEqual(
-            manila_iso(datetime.fromisoformat(props["Deadline"]["date"]["start"])), "2026-09-30T22:00:00+08:00"
+            fields["deadline"].astimezone(MANILA).isoformat(), "2026-09-30T22:00:00+08:00"
         )  # Benjamin's End of Shift
-        self.assertNotIn("🗂️ Coordinator", props)
+        self.assertNotIn("coordinator_ids", fields)
         self.assertEqual(
             h.plan()["resolution"],
             {
@@ -128,7 +126,7 @@ class PlannerWiringTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(h.ledger.get_message(KEY)["jo_key"], "proj-mfg|74")
 
-    async def test_posted_fields_survive_extraction_plan_and_notion_payload(self):
+    async def test_posted_fields_survive_extraction_plan_and_the_write(self):
         notes = "  keep\u00a0this\n" + "n" * 2100
         h = Harness(
             self,
@@ -140,26 +138,28 @@ class PlannerWiringTests(unittest.IsolatedAsyncioTestCase):
         )
         await h.run()
 
-        [payload] = h.notion.created
-        props = payload["properties"]
+        [fields] = h.notion.created
+        self.assertEqual(fields["name"], "MFG - TOC - JO #74")
+        self.assertEqual(fields["title"], "  Teaser\u00a0cut\n")
+        self.assertEqual(fields["notes"], notes)
+        self.assertEqual(fields["subtitle"], "N/A")
+        self.assertEqual(h.plan()["fields"]["notes"], notes)
 
-        def text(prop):
-            return "".join(i["text"]["content"] for i in props[prop]["rich_text"])
+    async def test_the_body_is_written_as_source_text(self):
+        h = Harness(self, text="MFG - TOC - JO #74\nTask: cut teaser")
+        await h.run()
 
-        self.assertEqual(props["Name"]["title"][0]["text"]["content"], "MFG - TOC - JO #74")
-        self.assertEqual(text("Title"), "  Teaser\u00a0cut\n")
-        self.assertEqual(text(NOTES_PROPERTY), notes)
-        self.assertEqual(text("Subtitle"), "N/A")
-        self.assertTrue(all(len(i["text"]["content"]) <= 2000 for i in props[NOTES_PROPERTY]["rich_text"]))
-        self.assertEqual(h.plan()["properties"][NOTES_PROPERTY], props[NOTES_PROPERTY])
+        [fields] = h.notion.created
+        self.assertIn("Task: cut teaser", fields["source_text"])
+        self.assertEqual(fields["source_text"], "\n".join(h.plan()["body_blocks"]))
 
     async def test_unresolved_project_and_unknown_department_stay_blank(self):
         h = Harness(self, text="ZZZ - XYZ - JO #74\nTask: cut", task="Cut")
         await h.run()
 
-        props = h.notion.created[0]["properties"]
-        self.assertNotIn("Department", props)
-        self.assertEqual(props["Projects"], {"relation": []})
+        fields = h.notion.created[0]
+        self.assertNotIn("department", fields)
+        self.assertNotIn("project_id", fields)
         self.assertIn("unresolved_project", h.codes())
         self.assertIn("unknown_department", h.codes())
         self.assertIsNone(h.plan()["resolution"]["project_page_id"])
@@ -169,16 +169,14 @@ class PlannerWiringTests(unittest.IsolatedAsyncioTestCase):
         h = Harness(self, task="Cut", assignees_raw="Benjamin Cruze")
         await h.run()
 
-        self.assertEqual(
-            h.notion.created[0]["properties"]["Assigned"], {"relation": [{"id": "c-ben"}]}
-        )
+        self.assertEqual(h.notion.created[0]["assigned_ids"], ["c-ben"])
         self.assertIn("fuzzy_person", h.codes())
 
     async def test_unresolved_person_is_left_out_and_recorded(self):
         h = Harness(self, task="Cut", assignees_raw="Nobody Here")
         await h.run()
 
-        self.assertEqual(h.notion.created[0]["properties"]["Assigned"], {"relation": []})
+        self.assertEqual(h.notion.created[0]["assigned_ids"], [])
         self.assertEqual(
             h.plan()["resolution"]["unresolved"],
             [{"raw": "Nobody Here", "role": "assignee", "status": "unresolved"}],
@@ -188,8 +186,7 @@ class PlannerWiringTests(unittest.IsolatedAsyncioTestCase):
         h = Harness(self, task="Cut", assignees_raw="Ana if available", cc_raw="Benjamin")
         await h.run()
 
-        props = h.notion.created[0]["properties"]
-        self.assertEqual(props["Assigned"], {"relation": []})
+        self.assertEqual(h.notion.created[0]["assigned_ids"], [])
         self.assertEqual(
             h.plan()["resolution"]["unresolved"],
             [{"raw": "Ana if available", "role": "assignee", "status": "ambiguous"}],
@@ -216,9 +213,7 @@ class PlannerWiringTests(unittest.IsolatedAsyncioTestCase):
         h.worker.caches = make_caches(h.ledger, h.config, people=people)
         await h.run()
 
-        self.assertEqual(
-            h.notion.created[0]["properties"]["Assigned"], {"relation": [{"id": "c-lena"}]}
-        )
+        self.assertEqual(h.notion.created[0]["assigned_ids"], ["c-lena"])
 
     async def test_planner_and_resolver_findings_reach_the_capture_report(self):
         h = Harness(self, text="ZZZ - TOC - JO #74\nTask: cut", task="Cut", deadline_raw="ASAP")
@@ -244,26 +239,24 @@ class ExplicitDeadlineYearTests(unittest.IsolatedAsyncioTestCase):
         )
         await h.run()
 
-        props = h.notion.created[0]["properties"]
-        self.assertEqual(manila_iso(datetime.fromisoformat(props["Deadline"]["date"]["start"])), "2030-09-30T22:00:00+08:00")
-        self.assertEqual(props[NOTES_PROPERTY]["rich_text"][0]["text"]["content"], "keep this")
+        fields = h.notion.created[0]
         self.assertEqual(
-            props["Watchdog Notes"]["rich_text"][0]["text"]["content"],
-            "Deadline as posted: Sep 30, 2030 end of shift",
+            fields["deadline"].astimezone(MANILA).isoformat(), "2030-09-30T22:00:00+08:00"
         )
+        self.assertEqual(fields["notes"], "keep this")
+        self.assertEqual(fields["watchdog_notes"], "Deadline as posted: Sep 30, 2030 end of shift")
         self.assertNotIn("deadline_past", h.codes())
 
     async def test_explicit_past_year_is_stored_and_reported_not_rolled_forward(self):
         h = Harness(self, task="Cut", assignees_raw="Benjamin", deadline_raw="Sep 16, 2020 5PM")
         await h.run()
 
-        props = h.notion.created[0]["properties"]
-        self.assertEqual(manila_iso(datetime.fromisoformat(props["Deadline"]["date"]["start"])), "2020-09-16T17:00:00+08:00")
-        self.assertIn(
-            "Deadline as posted: Sep 16, 2020 5PM",
-            props["Watchdog Notes"]["rich_text"][0]["text"]["content"],
+        fields = h.notion.created[0]
+        self.assertEqual(
+            fields["deadline"].astimezone(MANILA).isoformat(), "2020-09-16T17:00:00+08:00"
         )
-        self.assertNotIn(NOTES_PROPERTY, props)
+        self.assertIn("Deadline as posted: Sep 16, 2020 5PM", fields["watchdog_notes"])
+        self.assertNotIn("notes", fields)
         self.assertIn("deadline_past", h.codes())
         self.assertIn("Deadline is before the message was posted", h.telegram.sent[-1][2])
 
@@ -286,9 +279,9 @@ class StoredPlanReplayTests(unittest.IsolatedAsyncioTestCase):
         h.worker.config = h.config.model_copy(update={"dry_run": False})
         await h.worker.drain_once()
 
-        [payload] = h.notion.created
-        self.assertEqual(payload["properties"]["Assigned"], {"relation": [{"id": "c-ben"}]})
-        self.assertEqual(payload["properties"]["Department"], {"select": {"name": "TOC"}})
+        [fields] = h.notion.created
+        self.assertEqual(fields["assigned_ids"], ["c-ben"])
+        self.assertEqual(fields["department"], "TOC")
         self.assertEqual(h.ledger.get_message(KEY)["plan_json"], stored)
 
 
@@ -302,13 +295,13 @@ class ConditionalReplayTests(unittest.IsolatedAsyncioTestCase):
         h.worker.config = h.config.model_copy(update={"dry_run": False})
         await h.worker.drain_once()
 
-        [payload] = h.notion.created
-        self.assertEqual(payload["properties"]["Assigned"], {"relation": []})
+        [fields] = h.notion.created
+        self.assertEqual(fields["assigned_ids"], [])
         self.assertEqual(h.ledger.get_message(KEY)["plan_json"], stored)
 
 
 class DryRunReportTests(unittest.IsolatedAsyncioTestCase):
-    async def test_dry_run_post_lists_properties_as_plain_text(self):
+    async def test_dry_run_post_lists_fields_as_plain_text(self):
         h = Harness(self, task="Cut", assignees_raw="Benjamin")
         h.worker.config = h.config.model_copy(update={"dry_run": True})
         await h.run()
@@ -319,121 +312,50 @@ class DryRunReportTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("'rich_text'", text)
 
 
-def _notion_date_error(payload: dict) -> NotionError | None:
-    """Notion's rule (#83): ``time_zone`` beside a non-zero UTC offset is a 400."""
-    for prop in payload["properties"].values():
-        date = prop.get("date") if isinstance(prop, dict) else None
-        if not date or not date.get("time_zone"):
-            continue
-        for edge in ("start", "end"):
-            value = date.get(edge)
-            if value and datetime.fromisoformat(value).utcoffset() != timedelta(0):
-                return NotionError(
-                    400,
-                    "validation_error",
-                    "body failed validation: if time zone is explicitly provided, "
-                    "start and end can't have non-zero time offsets from UTC.",
-                )
-    return None
+def _stored_before_134(plan: dict, *, utc: bool) -> dict:
+    """The plan as a build before #134 stored it: Notion properties, dates with a time_zone."""
+    fields = plan["fields"]
+    properties = {
+        "Name": {"title": [{"text": {"content": fields["name"]}}]},
+        "Telegram Key": {"rich_text": [{"text": {"content": fields["telegram_key"]}}]},
+        "Status": {"status": {"name": fields["status"]}},
+    }
+    for notion_name, field in (("Date", "date"), ("Deadline", "deadline")):
+        moment = datetime.fromisoformat(fields[field])
+        start = (moment.astimezone(UTC) if utc else moment.astimezone(MANILA)).isoformat()
+        properties[notion_name] = {"date": {"start": start, "time_zone": "Asia/Manila"}}
+    old = {key: value for key, value in plan.items() if key != "fields"}
+    return {**old, "properties": properties}
 
 
-class StrictDateNotion(FakeNotion):
-    async def create_page(self, payload: dict):
-        error = _notion_date_error(payload)
-        if error:
-            self.create_calls += 1
-            raise error
-        return await super().create_page(payload)
-
-
-def _stored_with_time_zone(plan: dict, *, utc: bool) -> None:
-    """Rewrite a stored plan's dates in the shape an earlier build stored them."""
-    for field in ("Date", "Deadline"):
-        date = plan["properties"][field]["date"]
-        moment = datetime.fromisoformat(date["start"])
-        date["start"] = (moment.astimezone(UTC) if utc else moment.astimezone(MANILA)).isoformat()
-        date["time_zone"] = "Asia/Manila"
-
-
-class NotionDatePayloadTests(unittest.IsolatedAsyncioTestCase):
-    async def test_date_and_deadline_are_sent_as_manila_offset_instants_without_time_zone(self):
-        h = Harness(self, task="Cut", deadline_raw="September 16, 2am")
-        h.notion = h.worker.notion = StrictDateNotion()
-        await h.run()
-        [payload] = h.notion.created
-        for name in ("Date", "Deadline"):
-            date = payload["properties"][name]["date"]
-            self.assertNotIn("time_zone", date)
-            self.assertEqual(datetime.fromisoformat(date["start"]).utcoffset(), timedelta(hours=8))
-        deadline = datetime.fromisoformat(payload["properties"]["Deadline"]["date"]["start"])
-        self.assertEqual(deadline.strftime("%m-%d %H:%M"), "09-16 02:00")
-
-    async def test_live_readback_of_both_dates_matches_the_planned_instants(self):
-        h = Harness(self, task="Cut", deadline_raw="September 16, 2am")
-        await h.run()
-        row = h.ledger.get_message(KEY)
-        self.assertEqual(row["state"], "done")
-        self.assertFalse(row["readback_mismatch"])
-        page = next(iter(h.notion.pages.values()))
-        deadline = page["properties"]["Deadline"]["date"]
-        self.assertEqual(deadline["start"], "2026-09-16T02:00:00+08:00")
-        self.assertIsNone(deadline["time_zone"])
-
-    async def test_an_eight_hour_shift_on_readback_is_detected_and_reported(self):
-        h = Harness(self, task="Cut", deadline_raw="September 16, 2am")
-        shifted = FakeNotion()
-        original = shifted.retrieve_page
-
-        async def retrieve(page_id: str) -> dict:
-            page = await original(page_id)
-            date = page["properties"]["Deadline"]["date"]
-            date["start"] = (datetime.fromisoformat(date["start"]) - timedelta(hours=8)).isoformat()
-            return page
-
-        shifted.retrieve_page = retrieve
-        h.notion = h.worker.notion = shifted
-        await h.run()
-        row = h.ledger.get_message(KEY)
-        self.assertIn("Deadline differs", row["readback_mismatch"])
-        self.assertNotIn("Date differs", row["readback_mismatch"])
-        self.assertEqual(shifted.create_calls, 1)
-
-    async def test_the_old_utc_shape_would_have_read_back_eight_hours_early(self):
-        # The #85 trial: a UTC start with time_zone came back at the wall clock in Manila.
-        read = live_date({"start": "2026-10-27T09:20:02+00:00", "time_zone": "Asia/Manila"})
-        self.assertEqual(read["start"], "2026-10-27T09:20:00+08:00")
-
-    async def test_the_rejected_shape_is_recognised_by_the_strict_fake(self):
-        bad = {"date": {"start": "2026-09-15T10:00:00+08:00", "time_zone": "Asia/Manila"}}
-        self.assertIsNotNone(_notion_date_error({"properties": {"Date": bad}}))
-
-    async def test_stuck_rows_with_either_earlier_stored_shape_recover_once(self):
+class StoredPlanFromBefore134Tests(unittest.IsolatedAsyncioTestCase):
+    async def test_a_stuck_row_stored_with_either_earlier_shape_is_written_once(self):
         for utc in (False, True):
             with self.subTest(utc=utc):
                 h = Harness(self, task="Cut", deadline_raw="September 16, 2am")
-                h.notion = h.worker.notion = StrictDateNotion()
                 h.worker.config = h.config.model_copy(update={"dry_run": True})
                 await h.run()
-                plan = h.plan()
-                _stored_with_time_zone(plan, utc=utc)
+                old = _stored_before_134(h.plan(), utc=utc)
                 h.ledger._conn.execute(
                     "UPDATE messages SET plan_json = ? WHERE telegram_key = ?",
-                    (json.dumps(plan), KEY),
+                    (json.dumps(old), KEY),
                 )
                 h.worker.config = h.config.model_copy(update={"dry_run": False})
                 await h.worker.drain_once()
 
                 self.assertEqual(h.notion.create_calls, 1)
-                [payload] = h.notion.created
-                self.assertNotIn("time_zone", payload["properties"]["Date"]["date"])
+                [fields] = h.notion.created
                 self.assertEqual(
-                    payload["properties"]["Deadline"]["date"]["start"], "2026-09-16T02:00:00+08:00"
+                    fields["deadline"].astimezone(MANILA).isoformat(), "2026-09-16T02:00:00+08:00"
                 )
+                self.assertEqual(fields["date"].utcoffset().total_seconds(), 8 * 3600)
                 row = h.ledger.get_message(KEY)
                 self.assertEqual(row["state"], "done")
                 self.assertFalse(row["readback_mismatch"])
 
-    async def test_rejected_write_keeps_the_provider_message_and_creates_no_page(self):
+
+class WriteOutcomeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_a_rejected_write_keeps_the_provider_message_and_creates_no_page(self):
         h = Harness(self, task="Cut")
         h.notion = h.worker.notion = FakeNotion(
             fail_create=True,
