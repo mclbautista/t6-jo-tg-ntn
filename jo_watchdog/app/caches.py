@@ -15,11 +15,11 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import Any
 
 from pydantic import BaseModel
+from t6.domain import Contact, Project
 
-from jo_watchdog.adapters.protocols import NotionReader
+from jo_watchdog.adapters.protocols import StudioReader
 from jo_watchdog.app.config import Config, resolve_settings
 from jo_watchdog.core.resolve import (
     DepartmentResolution,
@@ -42,17 +42,6 @@ KINDS = ("people", "projects", "departments")
 # Bump when the cached payload shape changes; older snapshots are then ignored.
 FORMAT_VERSION = 1
 
-# Live Notion property names (schema is the contract).
-CONTACT_NAME = "Name"
-CONTACT_USER_ID = "TelegramUserID"
-CONTACT_HANDLE = "TelegramHandle"
-CONTACT_ALIASES = "Aliases"
-CONTACT_END_OF_SHIFT = "End of Shift"
-PROJECT_NAME = "Name"
-PROJECT_CODE = "Project Code"
-JO_DEPARTMENT = "Department"
-
-
 class StaleCache(BaseModel):
     """A cache older than the alert threshold after a failed refresh (rendered by #23)."""
 
@@ -62,45 +51,25 @@ class StaleCache(BaseModel):
     error: str
 
 
-# -- Notion page parsing ----------------------------------------------------
+# -- t6.domain to cached entries ----------------------------------------------
 
 
-def _plain(prop: dict[str, Any] | None) -> str:
-    if not prop:
-        return ""
-    kind = prop.get("type")
-    if kind in ("title", "rich_text"):
-        return "".join(part.get("plain_text", "") for part in prop.get(kind) or []).strip()
-    if kind == "select":
-        return ((prop.get("select") or {}).get("name") or "").strip()
-    return ""
-
-
-def person_from_page(page: dict[str, Any]) -> Person:
-    props = page.get("properties", {})
+def person_from_contact(contact: Contact) -> Person:
+    shift = contact.end_of_shift
     return Person(
-        page_id=page["id"],
-        name=_plain(props.get(CONTACT_NAME)),
-        telegram_user_id=_plain(props.get(CONTACT_USER_ID)),
-        telegram_handle=_plain(props.get(CONTACT_HANDLE)),
-        aliases=_plain(props.get(CONTACT_ALIASES)),
-        end_of_shift=_plain(props.get(CONTACT_END_OF_SHIFT)),
+        page_id=contact.page_id,
+        name=contact.name,
+        telegram_user_id=str(contact.telegram_user_id or ""),
+        telegram_handle=contact.telegram_handle or "",
+        aliases=", ".join(contact.aliases),
+        end_of_shift=shift.strftime("%I:%M %p").lstrip("0") if shift else "",
     )
 
 
-def project_from_page(page: dict[str, Any]) -> ProjectEntry:
-    props = page.get("properties", {})
+def project_entry(project: Project) -> ProjectEntry:
     return ProjectEntry(
-        page_id=page["id"],
-        name=_plain(props.get(PROJECT_NAME)),
-        code=_plain(props.get(PROJECT_CODE)),
+        page_id=project.page_id, name=project.name, code=project.project_code or ""
     )
-
-
-def department_options(data_source: dict[str, Any]) -> list[str]:
-    prop = data_source.get("properties", {}).get(JO_DEPARTMENT) or {}
-    options = (prop.get("select") or {}).get("options") or []
-    return [o["name"] for o in options if o.get("name")]
 
 
 def _utcnow() -> datetime:
@@ -125,12 +94,12 @@ class CacheManager:
         self,
         *,
         ledger: Ledger,
-        notion: NotionReader,
+        studio: StudioReader,
         config: Config,
         clock: Callable[[], datetime] = _utcnow,
     ):
         self.ledger = ledger
-        self.notion = notion
+        self.studio = studio
         self.config = config
         self.settings = resolve_settings(config)
         self.clock = clock
@@ -166,13 +135,12 @@ class CacheManager:
 
     async def _fetch(self, kind: str) -> list:
         if kind == "people":
-            pages = await self.notion.query_all(self.config.contacts_data_source_id)
-            return [person_from_page(p).model_dump() for p in pages]
+            contacts = await self.studio.contacts(self.config.contacts_data_source_id)
+            return [person_from_contact(c).model_dump() for c in contacts]
         if kind == "projects":
-            pages = await self.notion.query_all(self.config.projects_data_source_id)
-            return [project_from_page(p).model_dump() for p in pages]
-        schema = await self.notion.retrieve_data_source(self.config.job_orders_data_source_id)
-        return department_options(schema)
+            projects = await self.studio.projects(self.config.projects_data_source_id)
+            return [project_entry(p).model_dump() for p in projects]
+        return await self.studio.department_names(self.config.job_orders_data_source_id)
 
     async def refresh(self) -> list[StaleCache]:
         """Refresh every kind; return stale-cache events for failed refreshes past the threshold."""

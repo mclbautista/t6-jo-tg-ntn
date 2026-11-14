@@ -27,6 +27,7 @@ from jo_watchdog.app.smoke_gate import (
 from jo_watchdog.app.wiring import Adapters, build_worker, missing_wiring
 from jo_watchdog.ledger.db import Ledger
 from tests.fakes import FakeClassifier, FakeNotion, FakeTelegram, update
+from tests.recorded import RecordedStudio
 from tests.test_match_stage import CANDS, LINKABLE, FakeDeliverables, FakeMatcher
 from tests.test_worker import make_config, make_worker, no_sleep
 
@@ -34,29 +35,11 @@ KEY = "-100123:42"
 
 
 
-NOTION_FIXTURES = Path(__file__).parent / "fixtures" / "notion"
-
-
-def _fixture(name):
-    return json.loads((NOTION_FIXTURES / name).read_text(encoding="utf-8"))
-
-
-class CachedNotion(FakeNotion):
-    """FakeNotion that also serves the recorded cache refreshes the production worker makes."""
-
-    async def query_all(self, data_source_id):
-        if data_source_id == make_config().projects_data_source_id:
-            return _fixture("projects_query.json")["results"]
-        return _fixture("contacts_query_page1.json")["results"]
-
-    async def retrieve_data_source(self, data_source_id):
-        return _fixture("job_orders_data_source.json")
-
-
-def adapters(telegram=None, notion=None, matcher=None) -> Adapters:
+def adapters(telegram=None, notion=None, studio=None, matcher=None) -> Adapters:
     return Adapters(
         telegram=telegram or FakeTelegram(),
         notion=notion or FakeNotion(),
+        studio=studio or RecordedStudio(),
         classifier=FakeClassifier(),
         matcher=matcher,
     )
@@ -71,13 +54,13 @@ class WiringTests(unittest.IsolatedAsyncioTestCase):
         return ledger
 
     def test_build_worker_wires_caches_matcher_and_deliverable_source(self):
-        notion = FakeNotion()
+        studio = RecordedStudio()
         worker = build_worker(
-            make_config(), self._ledger(), adapters(notion=notion, matcher=FakeMatcher(LINKABLE))
+            make_config(), self._ledger(), adapters(studio=studio, matcher=FakeMatcher(LINKABLE))
         )
         self.assertEqual(missing_wiring(worker), [])
-        self.assertIs(worker.deliverables, notion)
-        self.assertIs(worker.caches.notion, notion)
+        self.assertIs(worker.deliverables, studio)
+        self.assertIs(worker.caches.studio, studio)
 
     def test_a_worker_without_the_matcher_is_reported_as_unwired(self):
         worker = build_worker(make_config(), self._ledger(), adapters(matcher=None))
@@ -123,9 +106,9 @@ class SyntheticCaptureTests(unittest.IsolatedAsyncioTestCase):
         s = smoke.Smoke(make_config(), self._args())
         s.bot = None
         built = adapters(
-            notion=notion or CachedNotion(), matcher=matcher or FakeMatcher(LINKABLE)
+            notion=notion or FakeNotion(), matcher=matcher or FakeMatcher(LINKABLE)
         )
-        built.notion.query_project_deliverables = FakeDeliverables(CANDS).query_project_deliverables
+        built.studio.query_project_deliverables = FakeDeliverables(CANDS).query_project_deliverables
         with (
             mock.patch.object(smoke, "missing_secrets", return_value=[]),
             mock.patch.object(smoke, "build_adapters", return_value=built),
@@ -139,7 +122,7 @@ class SyntheticCaptureTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(telegram.reactions[0][:2], (-100123, 42))
 
     async def test_dry_run_holds_at_planned_with_one_delivered_plan(self):
-        notion = CachedNotion()
+        notion = FakeNotion()
         result, telegram = await self._capture(dry_run=True, notion=notion)
         self.assertEqual(result.status, PASS, result.detail)
         self.assertEqual(notion.created, [])

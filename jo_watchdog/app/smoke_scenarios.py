@@ -200,7 +200,8 @@ class Harness:
         self.matcher = matcher
         self.ledger = Ledger(Path(tmp) / "scenario.db")
         adapters = Adapters(
-            telegram=self.telegram, notion=self.notion, classifier=FixedClassifier(),
+            telegram=self.telegram, notion=self.notion, studio=self.notion,
+            classifier=FixedClassifier(),
             matcher=matcher,
         )
         self.worker = build_worker(

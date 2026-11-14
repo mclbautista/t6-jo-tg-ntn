@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any, Literal, Protocol, runtime_checkable
 
 from pydantic import BaseModel
+from t6.domain import Contact, Project
 
 from jo_watchdog.core.extraction import Extraction
 from jo_watchdog.core.matching import Candidate, MatchResult
@@ -113,12 +114,14 @@ class NotionClient(Protocol):
 
 
 @runtime_checkable
-class NotionReader(Protocol):
-    """The read side the six-hour caches need."""
+class StudioReader(Protocol):
+    """The read side the six-hour caches need, as ``t6.domain`` entities."""
 
-    async def query_all(self, data_source_id: str) -> list[dict[str, Any]]: ...
+    async def contacts(self, data_source_id: str) -> list[Contact]: ...
 
-    async def retrieve_data_source(self, data_source_id: str) -> dict: ...
+    async def projects(self, data_source_id: str) -> list[Project]: ...
+
+    async def department_names(self, job_orders_data_source_id: str) -> list[str]: ...
 
 
 @runtime_checkable

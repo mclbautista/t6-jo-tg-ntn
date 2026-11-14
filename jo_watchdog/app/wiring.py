@@ -29,6 +29,7 @@ class Adapters:
 
     telegram: object
     notion: object
+    studio: object
     classifier: object
     matcher: object | None
     closers: list = field(default_factory=list)
@@ -47,8 +48,10 @@ def build_adapters(config: Config) -> Adapters:
     from jo_watchdog.adapters.deepseek import DeepSeekClassifier
     from jo_watchdog.adapters.jev import JevMatcher
     from jo_watchdog.adapters.notion import NotionAdapter
+    from jo_watchdog.adapters.t6_studio import T6Studio
 
     notion = NotionAdapter(notion_token())
+    studio = T6Studio(notion_token(), notion_version=config.notion_version)
     classifier = DeepSeekClassifier(
         deepseek_token(),
         base_url=config.deepseek_base_url,
@@ -66,9 +69,10 @@ def build_adapters(config: Config) -> Adapters:
     return Adapters(
         telegram=telegram,
         notion=notion,
+        studio=studio,
         classifier=classifier,
         matcher=matcher,
-        closers=[notion.close, classifier.close, matcher.close, close_telegram],
+        closers=[notion.close, studio.close, classifier.close, matcher.close, close_telegram],
     )
 
 
@@ -93,8 +97,8 @@ def _build_telegram(config: Config):
 
 
 def build_worker(config: Config, ledger: Ledger, adapters: Adapters, **worker_options) -> Worker:
-    """The production worker: persisted caches loaded, Notion also the Deliverable source."""
-    caches = CacheManager(ledger=ledger, notion=adapters.notion, config=config)
+    """The production worker: persisted caches loaded; t6-core supplies caches and candidates."""
+    caches = CacheManager(ledger=ledger, studio=adapters.studio, config=config)
     caches.load_persisted()  # last good snapshots first, then the live refresh
     return Worker(
         ledger=ledger,
@@ -104,7 +108,7 @@ def build_worker(config: Config, ledger: Ledger, adapters: Adapters, **worker_op
         config=config,
         caches=caches,
         matcher=adapters.matcher,
-        deliverables=adapters.notion,
+        deliverables=adapters.studio,
         **worker_options,
     )
 

@@ -109,7 +109,7 @@ class Harness:
         self.config = make_config()
         self.caches = None
         if caches:
-            self.caches = CacheManager(ledger=self.ledger, notion=None, config=self.config)
+            self.caches = CacheManager(ledger=self.ledger, studio=None, config=self.config)
             self.caches._apply(
                 "people",
                 [{"page_id": "c-ben", "name": "Benjamin Cruz", "telegram_user_id": "222"}],

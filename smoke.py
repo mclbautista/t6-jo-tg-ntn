@@ -97,7 +97,6 @@ from pathlib import Path
 
 from jo_watchdog.adapters.notion import NotionAdapter, NotionError, QueryRequest
 from jo_watchdog.adapters.protocols import ClassifyResult, IncomingUpdate
-from jo_watchdog.app.caches import person_from_page
 from jo_watchdog.app.config import (
     SECRET_KEYS,
     Config,
@@ -146,6 +145,7 @@ from jo_watchdog.core.extraction import EXTRACTED_FIELDS, PROMPT_TAG, Extraction
 from jo_watchdog.core.masker import WITHHELD, outbound_text
 from jo_watchdog.core.report import DRY_RUN_HEADER
 from jo_watchdog.ledger.db import Ledger
+from tests.recorded import recorded_people
 
 ROOT = Path(__file__).resolve().parent
 SMOKE_MARK = "SMOKE TEST — delete this row"
@@ -724,11 +724,8 @@ async def step_threshold_tuning(s: Smoke) -> Result:
     """Score the corpus offline, retain the results, and leave the review to the owner."""
     fixtures = ROOT / "tests/fixtures"
     corpus = json.loads((fixtures / "redacted_corpus.json").read_text(encoding="utf-8"))
-    pages = []
-    for name in ("contacts_query_page1.json", "contacts_query_page2.json"):
-        pages += json.loads((fixtures / "notion" / name).read_text(encoding="utf-8"))["results"]
     settings = resolve_settings(s.config)
-    cases = fuzzy_cases(assignee_mentions(corpus), [person_from_page(p) for p in pages], settings)
+    cases = fuzzy_cases(assignee_mentions(corpus), recorded_people(), settings)
     pairs = json.loads((fixtures / "jev/regression_pairs.json").read_text(encoding="utf-8"))
     out = ROOT / "docs/tuning/threshold-results.json"
     report = build_report(

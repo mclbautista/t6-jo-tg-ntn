@@ -13,16 +13,10 @@ import httpx
 from pydantic import BaseModel, Field
 
 from jo_watchdog.adapters.protocols import PageRef
-from jo_watchdog.core.matching import Candidate
 from jo_watchdog.core.payload import page_url_for
 
 NOTION_VERSION = "2026-03-11"
 BASE_URL = "https://api.notion.com/v1"
-
-# Live Deliverables schema names (deliverable-matching research).
-DELIVERABLE_PROJECTS_PROPERTY = "🗺️ Projects"
-DELIVERABLE_TITLE_PROPERTY = "Name"
-
 
 class NotionError(Exception):
     """A Notion API error (status + code + message)."""
@@ -150,33 +144,9 @@ class NotionAdapter:
                 return results
             cursor = page.next_cursor
 
-    async def query_project_deliverables(
-        self, data_source_id: str, project_page_id: str
-    ) -> list[Candidate]:
-        """All Deliverables whose ``🗺️ Projects`` relation contains the Project.
-
-        A live, fully paginated query with no Status or Class filter (#26).
-        """
-        rows = await self.query_all(
-            data_source_id,
-            filter={
-                "property": DELIVERABLE_PROJECTS_PROPERTY,
-                "relation": {"contains": project_page_id},
-            },
-        )
-        return [_deliverable_candidate(row) for row in rows]
-
 
 def _retry_after(value: str | None) -> float | None:
     try:
         return float(value) if value is not None else None
     except ValueError:
         return None
-
-
-def _deliverable_candidate(row: dict) -> Candidate:
-    title = row.get("properties", {}).get(DELIVERABLE_TITLE_PROPERTY, {}).get("title") or []
-    name = "".join(
-        item.get("plain_text") or item.get("text", {}).get("content", "") for item in title
-    )
-    return Candidate(page_id=row["id"], name=name)

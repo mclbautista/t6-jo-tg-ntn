@@ -6,7 +6,6 @@ import unittest
 from datetime import time
 from pathlib import Path
 
-from jo_watchdog.app.caches import department_options, person_from_page, project_from_page
 from jo_watchdog.core.resolve import (
     MentionEntity,
     PeopleIndex,
@@ -22,6 +21,7 @@ from jo_watchdog.core.resolve import (
     split_aliases,
     split_mentions,
 )
+from tests.recorded import recorded_departments, recorded_people, recorded_project_entries
 
 FIXTURES = Path(__file__).parent / "fixtures"
 NOTION = FIXTURES / "notion"
@@ -38,23 +38,15 @@ JASON = "c0000000-0000-4000-8000-000000000009"
 LARA = "c0000000-0000-4000-8000-000000000013"
 
 
-def _load(name):
-    return json.loads((NOTION / name).read_text(encoding="utf-8"))
-
-
 def people():
-    pages = (
-        _load("contacts_query_page1.json")["results"]
-        + _load("contacts_query_page2.json")["results"]
-    )
-    return [person_from_page(p) for p in pages]
+    return recorded_people()
 
 
 def projects():
-    return [project_from_page(p) for p in _load("projects_query.json")["results"]]
+    return recorded_project_entries()
 
 
-DEPARTMENTS = department_options(_load("job_orders_data_source.json"))
+DEPARTMENTS = recorded_departments()
 SETTINGS = ResolveSettings(department_aliases={"TO": "TOC"}, standing_cc_contact_page_id=PRIYA)
 
 
@@ -280,7 +272,7 @@ class ResolvePeopleTests(unittest.TestCase):
             [
                 ("Ramon Reyes", "10:00 PM", time(22, 0)),
                 ("Mira Santos", "6:00 AM", time(6, 0)),
-                ("Lena Cruz", "Flexible / Variable", None),
+                ("Lena Cruz", "", None),
             ],
         )
 

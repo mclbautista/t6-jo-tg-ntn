@@ -33,7 +33,7 @@ PROJECTS = [{"page_id": "proj-mfg", "name": "Manufacturing", "code": "MFG"}]
 
 
 def make_caches(ledger, config, *, people=PEOPLE, departments=("TOC", "VID")):
-    caches = CacheManager(ledger=ledger, notion=None, config=config)
+    caches = CacheManager(ledger=ledger, studio=None, config=config)
     caches._apply("people", people, FETCHED)
     caches._apply("projects", PROJECTS, FETCHED)
     caches._apply("departments", list(departments), FETCHED)

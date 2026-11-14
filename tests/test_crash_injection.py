@@ -396,7 +396,7 @@ class JevPipeline(Pipeline):
             self.ledger.save_cache_snapshot(kind, FORMAT_VERSION, payload, len(payload), fetched_at)
 
     def make_worker(self, ledger, **overrides):
-        caches = QuietCaches(ledger=ledger, notion=None, config=self.config, clock=self.clock)
+        caches = QuietCaches(ledger=ledger, studio=None, config=self.config, clock=self.clock)
         if ledger.latest_cache_snapshot("projects") is None:
             self.ledger = ledger
             self.seed_caches()
